@@ -1,1 +1,1 @@
-# FinCortex---AI-Brain-for-Corporate-Reimbursements
+# FinCortex - AI Brain for Corporate Reimbursements
