@@ -1,1 +1,13 @@
+import base64
+import requests
+from openai import OpenAI
 
+# =========================
+# CONFIGURATION
+# =========================
+
+GOOGLE_API_KEY = "AIzaSyBt0T1UMBHA7FfOzw46lrBtNRPD1xt_oI0"
+VISION_API_URL = f"https://vision.googleapis.com/v1/images:annotate?key={GOOGLE_API_KEY}"
+
+OPENAI_API_KEY = "OpenAI_API_Key"
+client = OpenAI(api_key=OPENAI_API_KEY)
