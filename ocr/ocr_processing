@@ -41,3 +41,37 @@ def extract_text_from_image(image_path):
         return ""
 
     return annotations[0]["description"]
+
+# =========================
+# TEXT STRUCTURING FUNCTION
+# =========================
+
+def structure_text_with_openai(extracted_text):
+    """Send extracted text to OpenAI to parse into structured dictionary."""
+    system_message = """
+    You are an AI assistant that extracts structured information from OCR text.
+    Extract the following fields if available:
+    - Vendor Name
+    - Date
+    - Categories
+    - Subcategories
+    - items
+    - Address
+    - Total Amount
+    - Invoice Number
+    - Any other relevant details
+
+    Always return the result as a valid JSON dictionary.
+    """
+
+    response = client.chat.completions.create(
+        model="gpt-4o-mini",
+        messages=[
+            {"role": "system", "content": system_message},
+            {"role": "user", "content": extracted_text},
+        ],
+        temperature=0,
+    )
+
+    structured_output = response.choices[0].message.content
+    return structured_output
