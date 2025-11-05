@@ -139,7 +139,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       if (result.error) {
         showToast('error', 'Signup Failed', result.error.message);
       } else {
-        showToast('success', 'Account Created', 'Please check your email for verification code');
+        showToast('info', 'Verification Code Sent', 'Please check your email and verify with the OTP to complete account creation');
       }
       return result;
     } catch (error) {

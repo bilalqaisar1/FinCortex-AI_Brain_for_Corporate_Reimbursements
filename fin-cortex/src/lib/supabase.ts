@@ -10,7 +10,7 @@ export const auth = {
   // Sign up with email and password - Use backend API
   async signUp(email: string, password: string, userData: { full_name: string; employee_code: string; phone_number?: string }) {
     try {
-      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'}/api/v1/auth/signup`, {
+      const response = await fetch(`/api/v1/auth/signup`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -59,7 +59,7 @@ export const auth = {
   // Verify OTP - Use backend API
   async verifyOtp(email: string, token: string) {
     try {
-      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'}/api/v1/auth/verify-otp`, {
+      const response = await fetch(`/api/v1/auth/verify-otp`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -85,7 +85,7 @@ export const auth = {
   // Resend OTP - Use backend API
   async resendOtp(email: string) {
     try {
-      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'}/api/v1/auth/resend-otp`, {
+      const response = await fetch(`/api/v1/auth/resend-otp`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
