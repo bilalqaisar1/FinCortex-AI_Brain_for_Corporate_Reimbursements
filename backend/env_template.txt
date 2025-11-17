@@ -1,0 +1,22 @@
+# Database Configuration
+DATABASE_URL=postgresql://postgres:postgres@localhost:5432/fincortex
+
+# Supabase (optional)
+SUPABASE_URL=
+SUPABASE_ANON_KEY=
+SUPABASE_SERVICE_ROLE_KEY=
+
+# JWT
+SECRET_KEY=change-me-in-production
+ACCESS_TOKEN_EXPIRE_MINUTES=60
+
+# Email/OTP (optional)
+SMTP_SERVER=
+SMTP_PORT=587
+SMTP_USERNAME=
+SMTP_PASSWORD=
+
+# Google OAuth (optional)
+GOOGLE_CLIENT_ID=
+GOOGLE_CLIENT_SECRET=
+

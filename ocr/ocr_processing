@@ -6,10 +6,10 @@ from openai import OpenAI
 # CONFIGURATION
 # =========================
 
-GOOGLE_API_KEY = "AIzaSyBt0T1UMBHA7FfOzw46lrBtNRPD1xt_oI0"
+GOOGLE_API_KEY = "AIzaSyCxXYnYE_dhfGJz9ZLndFVpaj1oA-VUkBo"
 VISION_API_URL = f"https://vision.googleapis.com/v1/images:annotate?key={GOOGLE_API_KEY}"
 
-OPENAI_API_KEY = "OpenAI_API_Key"
+OPENAI_API_KEY = "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"
 client = OpenAI(api_key=OPENAI_API_KEY)
 
 # =========================
@@ -75,3 +75,8 @@ def structure_text_with_openai(extracted_text):
 
     structured_output = response.choices[0].message.content
     return structured_output
+if __name__ == "__main__":
+    image_path = "ocr/receit-image.jpg"
+    extracted_text = extract_text_from_image(image_path)
+    structured_text = structure_text_with_openai(extracted_text)
+    print(structured_text)
