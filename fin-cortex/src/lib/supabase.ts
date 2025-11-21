@@ -1,9 +1,8 @@
-import { createClient } from '@supabase/supabase-js'
+"use client";
 
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || 'https://your-project-id.supabase.co'
-const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || 'your-anon-key-here'
+import { supabaseClient } from "@/lib/supabase/client";
 
-export const supabase = createClient(supabaseUrl, supabaseAnonKey)
+export const supabase = supabaseClient
 
 // Auth helper functions
 export const auth = {

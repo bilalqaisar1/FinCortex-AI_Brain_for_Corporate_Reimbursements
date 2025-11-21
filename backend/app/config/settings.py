@@ -1,18 +1,39 @@
-from pydantic_settings import BaseSettings
+"""
+Application settings and configuration with hardcoded API keys.
+Optimized for production use with all credentials embedded.
+"""
+from functools import lru_cache
+from typing import Optional
 
 
-class Settings(BaseSettings):
-    database_url: str
-    secret_key: str = "change-me"
-    access_token_expire_minutes: int = 60
-    supabase_url: str | None = None
-    supabase_anon_key: str | None = None
-    supabase_service_role_key: str | None = None
+class Settings:
+    """Application configuration with hardcoded credentials."""
+    
+    
+    # Supabase Configuration
+    supabase_url: str = "https://dczlyrrkjnxbmqkbgtgz.supabase.co"
+    supabase_service_role_key: str = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImRjemx5cnJram54Ym1xa2JndGd6Iiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc1ODE5MDEzNCwiZXhwIjoyMDczNzY2MTM0fQ.K5iOUvSwC1erFvE6qpHacm1XdpVtV_btfiSjqLgpYig"
+    supabase_anon_key: str = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImRjemx5cnJram54Ym1xa2JndGd6Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTgxOTAxMzQsImV4cCI6MjA3Mzc2NjEzNH0.7hrt0vvZbguthdjU2CG6BynxpkYvoyXkBFhZBfwYxWc"
+    
+    # Google Vision API Configuration
+    google_vision_api_key: str = "AIzaSyCxXYnYE_dhfGJz9ZLndFVpaj1oA-VUkBo"
+    vision_api_url: str = "https://vision.googleapis.com/v1/images:annotate?key=AIzaSyCxXYnYE_dhfGJz9ZLndFVpaj1oA-VUkBo"
+    
+    # OpenAI Configuration
+    openai_api_key: str = "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"
+    openai_model: str = "gpt-4o-mini"
+    
+    # Application Settings
+    temp_dir: str = "temp"
+    max_upload_size_mb: int = 10
+    request_timeout_seconds: int = 30
 
-    class Config:
-        env_file = ".env"
-        case_sensitive = False
+
+@lru_cache(maxsize=1)
+def get_settings() -> Settings:
+    """Get cached settings instance (singleton pattern)."""
+    return Settings()
 
 
-settings = Settings()  # type: ignore[call-arg]
-
+# Global settings instance
+settings = get_settings()
