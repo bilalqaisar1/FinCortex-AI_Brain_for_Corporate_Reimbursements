@@ -3,11 +3,21 @@
 import Link from "next/link";
 import { useState, useEffect } from "react";
 import { useTheme } from "@/hooks/useTheme";
+import { useAuth } from "@/context/AuthContext";
 
 export default function Navbar() {
   const [isScrolled, setIsScrolled] = useState(false);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const { toggleTheme, themeIcon } = useTheme();
+  const { user, userProfile } = useAuth();
+
+  const displayName =
+    userProfile?.full_name ||
+    user?.user_metadata?.full_name ||
+    user?.email?.split("@")[0] ||
+    "Admin";
+
+  const navCtaHref = user ? "/user/dashboard" : "/login";
 
   useEffect(() => {
     const handleScroll = () => {
@@ -65,8 +75,8 @@ export default function Navbar() {
         </ul>
 
         <div className="nav-cta">
-          <div className="admin-label">Admin</div>
-          <Link href="/admin" className="btn btn-outline">
+          <div className="admin-label">{displayName}</div>
+          <Link href={navCtaHref} className="btn btn-outline">
             <span>👤</span>
           </Link>
           <button className="theme-toggle" onClick={toggleTheme}>
