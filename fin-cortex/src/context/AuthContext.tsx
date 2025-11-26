@@ -11,7 +11,7 @@ interface UserProfile {
   email: string;
   employee_code?: string;
   phone_number?: string;
-  status: string;
+  status?: string;
   role_id?: string;
   manager_id?: string;
   department_id?: string;
@@ -52,7 +52,38 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const { showToast } = useToastNotification();
 
   // Load user profile when user changes
-  const loadUserProfile = async (userId: string) => {
+  const persistUserProfile = async (supabaseUser: User | null | undefined) => {
+    if (!supabaseUser?.id) return;
+
+    try {
+      const response = await fetch('/api/v1/auth/sync-user', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          user_id: supabaseUser.id,
+        }),
+      });
+
+      if (!response.ok) {
+        const result = await response.json().catch(() => null);
+        console.warn('Failed to sync user profile', result?.detail || response.statusText);
+      }
+    } catch (error) {
+      console.error('Error syncing user profile:', error);
+    }
+  };
+
+  const loadUserProfile = async (supabaseUser: User) => {
+    if (!supabaseUser?.id) {
+      setUserProfile(null);
+      return;
+    }
+
+    await persistUserProfile(supabaseUser);
+
+    const userId = supabaseUser.id;
     try {
       // Try to get user profile first
       const { data: userProfile, error: userError } = await db.getUserProfile(userId);
@@ -106,7 +137,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       setUser(session?.user ?? null);
       
       if (session?.user) {
-        await loadUserProfile(session.user.id);
+        await loadUserProfile(session.user);
       }
       
       setLoading(false);
@@ -121,7 +152,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         setUser(session?.user ?? null);
         
         if (session?.user) {
-          await loadUserProfile(session.user.id);
+          await loadUserProfile(session.user);
         } else {
           setUserProfile(null);
         }
@@ -155,6 +186,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         showToast('error', 'Login Failed', result.error.message);
       } else {
         showToast('success', 'Welcome Back', `Welcome back, ${result.data.user?.user_metadata?.full_name || 'User'}!`);
+        if (result.data.user) {
+          await loadUserProfile(result.data.user);
+        }
       }
       return result;
     } catch (error) {
