@@ -1,4 +1,4 @@
-# MCP Reimbursement Server
+# Reimbursement MCP Server
 
 A powerful **Model Context Protocol (MCP)** server for handling employee reimbursement workflows with AI-powered receipt processing, RAG-based chatbot, and intelligent data extraction capabilities.
 
