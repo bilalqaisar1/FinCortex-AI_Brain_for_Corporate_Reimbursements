@@ -51,30 +51,75 @@ MCP-Server/
 ## 🛠️ Installation
 
 ### Prerequisites
-- Python 3.12+
-- Google Cloud Vision API credentials (optional - uses mock service if not configured)
-- OpenAI API key
-- Supabase account (optional - can use SQLite)
+- **Python 3.12+** (recommended) or Python 3.10+
+- **pip** package manager
+- **Google Cloud Vision API credentials** (optional - uses mock service if not configured)
+- **OpenAI API key** (required)
+- **Supabase account** (optional - can use SQLite)
 
 ### Setup
 
-1. **Clone the repository:**
+#### 1. Clone or Navigate to the Repository
+
 ```bash
 cd /path/to/MCP-Server
 ```
 
-2. **Create and activate virtual environment:**
+#### 2. Create Virtual Environment
+
+It's **highly recommended** to use a virtual environment to isolate project dependencies.
+
+**On Linux/macOS:**
 ```bash
-python -m venv venv
-source venv/bin/activate  # On Windows: venv\Scripts\activate
+# Create virtual environment
+python3 -m venv venv
+
+# Activate virtual environment
+source venv/bin/activate
 ```
 
-3. **Install dependencies:**
+**On Windows:**
+```bash
+# Create virtual environment
+python -m venv venv
+
+# Activate virtual environment
+venv\Scripts\activate
+```
+
+**On Windows (PowerShell):**
+```powershell
+# Create virtual environment
+python -m venv venv
+
+# Activate virtual environment
+venv\Scripts\Activate.ps1
+```
+
+> **Note:** When the virtual environment is active, you'll see `(venv)` at the beginning of your terminal prompt.
+
+#### 3. Install Dependencies
+
+The `requirements.txt` file is organized into logical groups for easy understanding:
+
+- **Web Framework & Server**: FastAPI and Uvicorn
+- **Google Cloud Services**: Vision API and authentication
+- **OpenAI & LangChain**: AI processing and RAG implementation
+- **Database & Storage**: Supabase and SQLAlchemy
+- **Data Processing**: NumPy and Pandas
+- **Security & Authentication**: JWT and password hashing
+- **Utilities**: Environment variables, validation, and HTTP clients
+
+Install all dependencies:
+
 ```bash
 pip install -r requirements.txt
 ```
 
-4. **Configure environment variables:**
+**Note:** This will install approximately 35+ packages with their dependencies. The installation may take 2-5 minutes depending on your internet connection.
+
+#### 4. Configure Environment Variables
+
 Create a `.env` file in the root directory with the following variables:
 
 ```env
@@ -101,7 +146,72 @@ DATABASE_URL=sqlite:///./reimbursement.db
 # Storage
 RECEIPTS_BUCKET=receipts-bucket
 RECEIPTS_FOLDER=receipts
+TEMP_DIR=temp
+MAX_UPLOAD_SIZE_MB=10
+REQUEST_TIMEOUT_SECONDS=30
 ```
+
+#### 5. Verify Installation
+
+Test that all dependencies are installed correctly:
+
+```bash
+python -c "import fastapi, openai, sqlalchemy; print('✓ Core dependencies installed successfully')"
+```
+
+### Virtual Environment Management
+
+**Deactivating the Virtual Environment:**
+
+When you're done working on the project, deactivate the virtual environment:
+
+```bash
+deactivate
+```
+
+**Reactivating the Virtual Environment:**
+
+To work on the project again, navigate to the project directory and activate the environment:
+
+```bash
+# Linux/macOS
+source venv/bin/activate
+
+# Windows
+venv\Scripts\activate
+```
+
+**Deleting the Virtual Environment:**
+
+If you need to start fresh, deactivate first, then:
+
+```bash
+# Linux/macOS
+rm -rf venv
+
+# Windows
+rmdir /s venv
+```
+
+Then recreate with `python -m venv venv`.
+
+### Common Installation Issues
+
+**Issue: `pip: command not found`**
+- Solution: Install pip with `python -m ensurepip --upgrade` or use `python3 -m pip` instead
+
+**Issue: Permission denied when creating venv**
+- Solution: Ensure you have write permissions in the directory
+
+**Issue: Package installation fails**
+- Solution: Upgrade pip first: `pip install --upgrade pip`
+
+**Issue: `psycopg2-binary` installation fails on Windows**
+- Solution: Install Microsoft C++ Build Tools or use pre-built wheels
+
+**Issue: Google Vision API import errors**
+- Solution: The system will use mock service automatically if Vision API is not available
+
 
 ## 🚦 Usage
 
