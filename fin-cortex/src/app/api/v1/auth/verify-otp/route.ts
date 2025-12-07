@@ -1,6 +1,7 @@
 export const runtime = 'nodejs'
 import { NextResponse } from 'next/server'
 import { supabaseAdmin } from '@/lib/supabaseAdmin'
+import { syncUserProfile } from '@/app/api/v1/auth/_utils/syncUserProfile'
 
 export async function POST(request: Request) {
   try {
@@ -27,31 +28,13 @@ export async function POST(request: Request) {
     const userId = authedUser?.id
 
     if (userId) {
-      // Check if profile exists
-      const { data: existingUser, error: existingErr } = await supabaseAdmin
-        .from('users')
-        .select('user_id')
-        .eq('user_id', userId)
-        .maybeSingle()
-
-      if (!existingErr && !existingUser) {
-        const full_name = (authedUser.user_metadata?.full_name as string) || null
-        const employee_code = (authedUser.user_metadata?.employee_code as string) || null
-        const phone_number = (authedUser.user_metadata?.phone_number as string) || null
-
-        // Only insert when we have required fields captured during signup
-        if (full_name && employee_code) {
-          await supabaseAdmin
-            .from('users')
-            .insert({
-              user_id: userId,
-              email,
-              full_name,
-              employee_code,
-              phone_number,
-              status: 'active',
-            })
-        }
+      try {
+        await syncUserProfile(userId, {
+          email,
+          phone_number: (authedUser.user_metadata?.phone_number as string) || null,
+        })
+      } catch (syncError) {
+        console.error('Failed to sync user profile after OTP verification', syncError)
       }
     }
 

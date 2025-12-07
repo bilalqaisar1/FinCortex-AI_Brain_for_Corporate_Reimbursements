@@ -49,19 +49,19 @@ export function PageHeader({
     <div className={cn("mb-8", className)}>
       {/* Breadcrumbs */}
       {breadcrumbs.length > 0 && (
-        <div className="flex items-center space-x-2 text-sm text-slate-600 mb-4">
+        <div className="flex items-center space-x-2 text-sm text-slate-600 dark:text-slate-400 mb-4">
           {breadcrumbs.map((item, index) => (
             <div key={index} className="flex items-center space-x-2">
-              {index > 0 && <ChevronRight className="w-4 h-4" />}
+              {index > 0 && <ChevronRight className="w-4 h-4 text-slate-600 dark:text-slate-400" />}
               {item.href ? (
                 <Link 
                   href={item.href} 
-                  className="hover:text-blue-600 transition-colors"
+                  className="hover:text-blue-600 dark:hover:text-blue-400 transition-colors"
                 >
                   {item.label}
                 </Link>
               ) : (
-                <span className="text-slate-900 font-medium">{item.label}</span>
+                <span className="text-slate-900 dark:text-slate-100 font-medium">{item.label}</span>
               )}
             </div>
           ))}
@@ -95,7 +95,7 @@ export function PageHeader({
           
           <div className="flex-1 min-w-0">
             <div className="flex items-center space-x-3 flex-wrap">
-              <h1 className="text-2xl sm:text-3xl font-bold text-slate-900 truncate">{title}</h1>
+              <h1 className="text-2xl sm:text-3xl font-bold text-slate-900 dark:text-slate-100 truncate">{title}</h1>
               {badge && (
                 <Badge 
                   variant={badge.variant || "secondary"}
@@ -106,7 +106,7 @@ export function PageHeader({
               )}
             </div>
             {description && (
-              <p className="text-sm sm:text-base text-slate-600 mt-1 line-clamp-2">{description}</p>
+              <p className="text-sm sm:text-base text-slate-600 dark:text-slate-400 mt-1 line-clamp-2">{description}</p>
             )}
           </div>
         </div>

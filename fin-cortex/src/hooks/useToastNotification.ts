@@ -8,8 +8,8 @@ export const useToastNotification = () => {
     // Create a simple toast element and append to body
     const toast = document.createElement('div');
     toast.className = `
-      fixed top-4 right-4 z-50 p-4 rounded-lg shadow-lg backdrop-blur-sm max-w-sm w-full
-      transform transition-all duration-300 ease-in-out translate-x-0 opacity-100
+      fixed top-1/2 left-1/2 z-50 p-4 rounded-lg shadow-lg backdrop-blur-sm max-w-sm w-full
+      transform -translate-x-1/2 -translate-y-1/2 transition-all duration-300 ease-in-out opacity-100
       ${getToastStyles(type)}
     `;
     
@@ -44,7 +44,7 @@ export const useToastNotification = () => {
     // Auto remove after 5 seconds
     setTimeout(() => {
       if (toast.parentElement) {
-        toast.style.transform = 'translateX(100%)';
+        toast.style.transform = 'translate(-50%, -50%) scale(0.95)';
         toast.style.opacity = '0';
         setTimeout(() => {
           if (toast.parentElement) {

@@ -1,0 +1,31 @@
+Debug Session Report - Receipt Upload & Submission
+Date: 2025-11-27
+URL: http://localhost:3000/user/claims/new
+Receipt: WhatsApp Image 2025-11-17 at 12.36.05 PM.jpeg
+
+1. Upload Flow
+   - Upload endpoint call: POST http://localhost:8000/api/v1/receipt/upload
+   - Status: 200 OK
+   - Response payload included structured data (ENGINE, 12-Nov-2025, clothing/garments, total 3009.50, invoice 985670) and raw OCR text.
+   - Image preview rendered; OCR success toast shown.
+
+2. Auto-fill Validation
+   - Receipt code auto-generated: RC-20251127-011-0001
+   - Vendor/date/category/subcategory/amount/invoice/address/items populated from OCR response.
+   - Category/subcategory matched to dropdown values without runtime errors.
+
+3. Submission Attempt
+   - Filled required dropdowns manually (Receipt Type=Invoice, Vendor Type=Retail).
+   - Clicked "Submit Claim".
+   - UI immediately surfaced toast/inline error: "Authentication Error  You must be signed in to submit a claim".
+   - No network request was fired toward /api/v1/reimbursements; only prior fetches (column-values, receipt upload) present in DevTools log.
+
+4. Root Cause of Submission Failure
+   - `useAuth()` hook reports `user` as null; localStorage/cookies contain no Supabase session entries (`sb-...` keys absent).
+   - `handleSubmit` guard (ExpenseForm.tsx lines ~626-638) checks `if (!user?.id)` and aborts before building FormData, leading to authentication error toast.
+   - Because submission short-circuits, no data reaches Supabase tables (reimbursements, vendors, items) and no storage upload is attempted for the final attachment (only initial OCR upload occurs).
+
+5. Recommendations
+   - Sign in (or stub a valid Supabase session) before testing claim submission so `user.id` is defined.
+   - Optionally enhance UX: redirect unauthenticated users to login rather than showing inline error after form completion.
+   - After restoring auth, re-test to ensure POST /api/v1/reimbursements executes and verify records appear in Supabase (`reimbursements`, `reimbursement_items`, `reimbursement_attachments`) and file in `receipts-bucket`.

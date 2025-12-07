@@ -70,8 +70,8 @@ type SubcategoryOption = SelectOption & {
 interface OCRData {
   "Vendor Name"?: string;
   Date?: string;
-  Categories?: string[];
-  Subcategories?: string[];
+  Categories?: string | string[];
+  Subcategories?: string | string[];
   items?: Array<{ item: string; price: string }>;
   Address?: string;
   "Total Amount"?: string;
@@ -101,6 +101,8 @@ const ExpenseForm: React.FC<ExpenseFormProps> = ({ isDarkTheme }) => {
   const [uploadedFile, setUploadedFile] = useState<File | null>(null);
   const [isProcessingOCR, setIsProcessingOCR] = useState(false);
   const [ocrData, setOcrData] = useState<OCRData | null>(null);
+  const [ocrRawText, setOcrRawText] = useState<string>("");
+  const [ocrStructured, setOcrStructured] = useState<OCRData | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [errors, setErrors] = useState<FormErrors>({});
   const [showReviewMessage, setShowReviewMessage] = useState(false);
@@ -252,9 +254,25 @@ const ExpenseForm: React.FC<ExpenseFormProps> = ({ isDarkTheme }) => {
     return "";
   };
 
+  const normalizeStringArray = (value?: string | string[]): string[] => {
+    if (!value) return [];
+    if (Array.isArray(value)) {
+      return value
+        .map((entry) => (typeof entry === "string" ? entry.trim() : ""))
+        .filter(Boolean);
+    }
+    if (typeof value === "string") {
+      return value
+        .split(/[,;|]/)
+        .map((entry) => entry.trim())
+        .filter(Boolean);
+    }
+    return [];
+  };
+
   // Helper function to find best category match (fuzzy matching)
-  const findCategoryMatch = (categoryName: string): SelectOption | undefined => {
-    if (!categoryName) return undefined;
+  const findCategoryMatch = useCallback((categoryName: string): SelectOption | undefined => {
+    if (!categoryName || categoryOptions.length === 0) return undefined;
     const normalized = categoryName.toLowerCase().trim();
     
     // Exact match first
@@ -276,20 +294,21 @@ const ExpenseForm: React.FC<ExpenseFormProps> = ({ isDarkTheme }) => {
     });
     
     return match;
-  };
+  }, [categoryOptions]);
 
   // Helper function to find best subcategory match (fuzzy matching)
-  const findSubcategoryMatch = (
+  const findSubcategoryMatch = useCallback((
     subcategoryName: string,
     categoryIdOverride?: string
   ): SubcategoryOption | undefined => {
-    if (!subcategoryName) return undefined;
+    if (!subcategoryName || subcategoryOptions.length === 0) return undefined;
     const targetCategoryId = categoryIdOverride || formData.categoryId;
     if (!targetCategoryId) return undefined;
 
     const normalized = subcategoryName.toLowerCase().trim();
 
     const scopedSubcategories = subcategoryOptions.filter((opt) => opt.categoryId === targetCategoryId);
+    if (scopedSubcategories.length === 0) return undefined;
     
     // Exact match first
     let match = scopedSubcategories.find((opt) => opt.label.toLowerCase() === normalized);
@@ -310,84 +329,198 @@ const ExpenseForm: React.FC<ExpenseFormProps> = ({ isDarkTheme }) => {
     });
     
     return match;
-  };
+  }, [subcategoryOptions, formData.categoryId]);
 
   // Auto-fill form from OCR data
   useEffect(() => {
     if (!ocrData) return;
 
-    setFormData((prev) => {
-      const updated = { ...prev };
-      let matchedCategoryId = prev.categoryId;
+    const autoFillForm = async () => {
+      // First, update non-async fields
+      setFormData((prev) => {
+        const updated = { ...prev };
 
-      // Vendor Name
-      if (ocrData["Vendor Name"]) {
-        updated.vendorName = String(ocrData["Vendor Name"]).trim();
-      }
+        // Vendor Name
+        if (ocrData["Vendor Name"]) {
+          updated.vendorName = String(ocrData["Vendor Name"]).trim();
+        }
 
-      // Date - improved parsing
-      if (ocrData.Date) {
-        const parsedDate = parseDate(String(ocrData.Date));
-        if (parsedDate) {
-          updated.date = parsedDate;
+        // Date - improved parsing
+        if (ocrData.Date) {
+          const parsedDate = parseDate(String(ocrData.Date));
+          if (parsedDate) {
+            updated.date = parsedDate;
+          }
+        }
+
+        // Address
+        if (ocrData.Address) {
+          updated.address = String(ocrData.Address).trim();
+        }
+
+        // Total Amount - improved parsing
+        if (ocrData["Total Amount"]) {
+          const parsedAmount = parseAmount(String(ocrData["Total Amount"]));
+          if (parsedAmount) {
+            updated.totalAmount = parsedAmount;
+          }
+        }
+
+        // Invoice Number
+        if (ocrData["Invoice Number"]) {
+          updated.invoiceNumber = String(ocrData["Invoice Number"]).trim();
+        }
+
+        // Items - improved parsing
+        if (ocrData.items && Array.isArray(ocrData.items) && ocrData.items.length > 0) {
+          updated.items = ocrData.items.map((item: any) => ({
+            item: String(item.item || "").trim(),
+            price: parseAmount(String(item.price || "")),
+            quantity: item.quantity ? String(item.quantity).trim() : "1",
+          })).filter((item) => item.item || item.price); // Remove empty items
+        }
+
+        return updated;
+      });
+
+      // Then handle category/subcategory with async operations (outside setFormData)
+      const ocrCategories = normalizeStringArray(ocrData.Categories);
+      let matchedCategoryId: string | undefined;
+      
+      if (ocrCategories.length > 0) {
+        if (categoryOptions.length > 0) {
+          const categoryMatch = findCategoryMatch(ocrCategories[0]);
+          if (categoryMatch) {
+            matchedCategoryId = categoryMatch.id;
+            setFormData((prev) => ({
+              ...prev,
+              categoryId: matchedCategoryId!,
+              subcategoryId: "", // Reset subcategory when category changes
+            }));
+          } else {
+            // Category not found - create it gracefully
+            try {
+              const createResponse = await fetch(`${BACKEND_BASE_URL}/api/v1/categories`, {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                  category_name: ocrCategories[0],
+                }),
+              });
+              if (createResponse.ok) {
+                const result = await createResponse.json();
+                if (result.success && result.data) {
+                  matchedCategoryId = String(result.data.category_id);
+                  setFormData((prev) => ({
+                    ...prev,
+                    categoryId: matchedCategoryId!,
+                    subcategoryId: "",
+                  }));
+                  showToast("info", "Category Created", `"${ocrCategories[0]}" category was automatically created.`);
+                }
+              }
+            } catch (error) {
+              console.warn("Failed to create category:", error);
+            }
+          }
+        } else {
+          // No categories loaded yet, try to create
+          try {
+            const createResponse = await fetch(`${BACKEND_BASE_URL}/api/v1/categories`, {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({
+                category_name: ocrCategories[0],
+              }),
+            });
+            if (createResponse.ok) {
+              const result = await createResponse.json();
+              if (result.success && result.data) {
+                matchedCategoryId = String(result.data.category_id);
+                setFormData((prev) => ({
+                  ...prev,
+                  categoryId: matchedCategoryId!,
+                  subcategoryId: "",
+                }));
+                showToast("info", "Category Created", `"${ocrCategories[0]}" category was automatically created.`);
+              }
+            }
+          } catch (error) {
+            console.warn("Failed to create category:", error);
+          }
         }
       }
 
-      // Address
-      if (ocrData.Address) {
-        updated.address = String(ocrData.Address).trim();
-      }
-
-      // Total Amount - improved parsing
-      if (ocrData["Total Amount"]) {
-        const parsedAmount = parseAmount(String(ocrData["Total Amount"]));
-        if (parsedAmount) {
-          updated.totalAmount = parsedAmount;
+      // Handle subcategory (after category is potentially set)
+      const ocrSubcategories = normalizeStringArray(ocrData.Subcategories);
+      const targetCategoryId = matchedCategoryId || formData.categoryId;
+      
+      if (ocrSubcategories.length > 0 && targetCategoryId) {
+        if (subcategoryOptions.length > 0) {
+          const subcategoryMatch = findSubcategoryMatch(ocrSubcategories[0], targetCategoryId);
+          if (subcategoryMatch) {
+            setFormData((prev) => ({
+              ...prev,
+              subcategoryId: subcategoryMatch.id,
+              categoryId: subcategoryMatch.categoryId || prev.categoryId,
+            }));
+          } else {
+            // Subcategory not found - create it gracefully
+            try {
+              const createResponse = await fetch(`${BACKEND_BASE_URL}/api/v1/subcategories`, {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                  subcategory_name: ocrSubcategories[0],
+                  category_id: parseInt(targetCategoryId),
+                }),
+              });
+              if (createResponse.ok) {
+                const result = await createResponse.json();
+                if (result.success && result.data) {
+                  setFormData((prev) => ({
+                    ...prev,
+                    subcategoryId: String(result.data.subcategory_id),
+                  }));
+                  showToast("info", "Subcategory Created", `"${ocrSubcategories[0]}" subcategory was automatically created.`);
+                }
+              }
+            } catch (error) {
+              console.warn("Failed to create subcategory:", error);
+            }
+          }
+        } else if (targetCategoryId) {
+          // No subcategories loaded, try to create
+          try {
+            const createResponse = await fetch(`${BACKEND_BASE_URL}/api/v1/subcategories`, {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({
+                subcategory_name: ocrSubcategories[0],
+                category_id: parseInt(targetCategoryId),
+              }),
+            });
+            if (createResponse.ok) {
+              const result = await createResponse.json();
+              if (result.success && result.data) {
+                setFormData((prev) => ({
+                  ...prev,
+                  subcategoryId: String(result.data.subcategory_id),
+                }));
+                showToast("info", "Subcategory Created", `"${ocrSubcategories[0]}" subcategory was automatically created.`);
+              }
+            }
+          } catch (error) {
+            console.warn("Failed to create subcategory:", error);
+          }
         }
       }
 
-      // Invoice Number
-      if (ocrData["Invoice Number"]) {
-        updated.invoiceNumber = String(ocrData["Invoice Number"]).trim();
-      }
+      setShowReviewMessage(true);
+    };
 
-      // Items - improved parsing
-      if (ocrData.items && Array.isArray(ocrData.items) && ocrData.items.length > 0) {
-        updated.items = ocrData.items.map((item: any) => ({
-          item: String(item.item || "").trim(),
-          price: parseAmount(String(item.price || "")),
-          quantity: item.quantity ? String(item.quantity).trim() : "1",
-        })).filter((item) => item.item || item.price); // Remove empty items
-      }
-
-      // Match category - improved fuzzy matching
-      if (ocrData.Categories && Array.isArray(ocrData.Categories) && ocrData.Categories.length > 0) {
-        const categoryMatch = findCategoryMatch(ocrData.Categories[0]);
-        if (categoryMatch) {
-          matchedCategoryId = categoryMatch.id;
-          updated.categoryId = matchedCategoryId;
-          updated.subcategoryId = ""; // Reset subcategory when category changes
-        }
-      }
-
-      // Match subcategory - improved fuzzy matching
-      if (
-        ocrData.Subcategories &&
-        Array.isArray(ocrData.Subcategories) &&
-        ocrData.Subcategories.length > 0 &&
-        matchedCategoryId
-      ) {
-        const subcategoryMatch = findSubcategoryMatch(ocrData.Subcategories[0], matchedCategoryId);
-        if (subcategoryMatch) {
-          updated.subcategoryId = subcategoryMatch.id;
-        }
-      }
-
-      return updated;
-    });
-
-    setShowReviewMessage(true);
-  }, [ocrData, categoryOptionsKey, availableSubcategoriesKey, subcategoryOptionsKey]);
+    void autoFillForm();
+  }, [ocrData, categoryOptions, subcategoryOptions, findCategoryMatch, findSubcategoryMatch, showToast]);
 
   const processOCR = useCallback(
     async (imageFile: File) => {
@@ -412,7 +545,10 @@ const ExpenseForm: React.FC<ExpenseFormProps> = ({ isDarkTheme }) => {
         }
 
         const structured = payload.data?.structured || {};
+        const rawText = payload.data?.raw_text || "";
         setOcrData(structured);
+        setOcrStructured(structured);
+        setOcrRawText(rawText);
         showToast("success", "Receipt Processed", "Fields have been auto-filled. Please review and make corrections if needed.");
       } catch (error) {
         console.error("OCR processing failed", error);
@@ -432,6 +568,8 @@ const ExpenseForm: React.FC<ExpenseFormProps> = ({ isDarkTheme }) => {
       }
       setUploadedFile(file);
       setOcrData(null);
+      setOcrRawText("");
+      setOcrStructured(null);
       setShowReviewMessage(false);
       await processOCR(file);
     },
@@ -493,9 +631,80 @@ const ExpenseForm: React.FC<ExpenseFormProps> = ({ isDarkTheme }) => {
       return;
     }
 
-    // For now, just show a message - submission to Supabase is disabled
-    showToast("info", "Form Ready", "Form validation passed. Submission functionality will be enabled later.");
-    console.log("Form data:", formData);
+    if (!user?.id) {
+      showToast("error", "Authentication Error", "You must be signed in to submit a claim");
+      return;
+    }
+
+    if (!BACKEND_BASE_URL) {
+      showToast("error", "Configuration Error", "Backend URL not configured");
+      return;
+    }
+
+    setIsSubmitting(true);
+    try {
+      const formPayload = new FormData();
+      formPayload.append("receipt_code", formData.receiptCode);
+      formPayload.append("user_id", user.id);
+      formPayload.append("vendor_name", formData.vendorName);
+      formPayload.append("expense_date", formData.date);
+      formPayload.append("category_id", formData.categoryId);
+      if (formData.subcategoryId) {
+        formPayload.append("subcategory_id", formData.subcategoryId);
+      }
+      formPayload.append("receipt_type_id", formData.receiptType);
+      formPayload.append("vendor_type", formData.vendorType);
+      formPayload.append("amount_claimed", formData.totalAmount);
+      if (formData.invoiceNumber) {
+        formPayload.append("invoice_number", formData.invoiceNumber);
+      }
+      if (formData.address) {
+        formPayload.append("address", formData.address);
+      }
+      if (formData.description) {
+        formPayload.append("description", formData.description);
+      }
+      if (!uploadedFile) {
+        throw new Error("Receipt file is required");
+      }
+      formPayload.append("receipt_file", uploadedFile);
+      
+      // Add items as JSON string
+      const itemsData = formData.items
+        .filter((item) => item.item || item.price)
+        .map((item) => ({
+          item: item.item,
+          price: item.price,
+          quantity: item.quantity || "1",
+        }));
+      formPayload.append("items", JSON.stringify(itemsData));
+
+      // Add OCR data if available
+      if (ocrRawText) {
+        formPayload.append("ocr_raw_text", ocrRawText);
+      }
+      if (ocrStructured) {
+        formPayload.append("ocr_structured", JSON.stringify(ocrStructured));
+      }
+
+      const response = await fetch(`${BACKEND_BASE_URL}/api/v1/reimbursements`, {
+        method: "POST",
+        body: formPayload,
+      });
+
+      const payload = await response.json();
+      if (!response.ok || !payload?.success) {
+        throw new Error(payload?.detail || payload?.message || "Failed to submit reimbursement");
+      }
+
+      showToast("success", "Claim Submitted", "Your reimbursement claim has been submitted successfully.");
+      router.push("/user/dashboard");
+    } catch (error) {
+      console.error("Submission failed", error);
+      showToast("error", "Submission Failed", error instanceof Error ? error.message : "Please try again.");
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   const selectTriggerClasses = `${isDarkTheme ? "bg-[#233648]" : "bg-white/90"} border-subtle text-primary`;
@@ -535,6 +744,8 @@ const ExpenseForm: React.FC<ExpenseFormProps> = ({ isDarkTheme }) => {
                   onClick={() => {
                     setUploadedFile(null);
                     setOcrData(null);
+                    setOcrRawText("");
+                    setOcrStructured(null);
                     setShowReviewMessage(false);
                   }}
                   className="absolute top-2 right-2 p-2 bg-red-500/90 hover:bg-red-500 rounded-full text-white"
@@ -570,7 +781,7 @@ const ExpenseForm: React.FC<ExpenseFormProps> = ({ isDarkTheme }) => {
 
       {/* Review Message */}
       {showReviewMessage && ocrData && (
-        <Card className="glass-effect border-emerald-500/20 bg-emerald-500/10">
+        <Card className="glass-effect border-emerald-500/20 bg-emerald-500/10 relative z-50">
           <CardContent className="pt-6">
             <div className="flex items-start gap-3">
               <Info className="size-5 text-emerald-400 mt-0.5" />

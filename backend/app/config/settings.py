@@ -20,9 +20,13 @@ class Settings:
     vision_api_url: str = "https://vision.googleapis.com/v1/images:annotate?key=AIzaSyCxXYnYE_dhfGJz9ZLndFVpaj1oA-VUkBo"
     
     # OpenAI Configuration
-    openai_api_key: str = "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"
+    openai_api_key: str = "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"
     openai_model: str = "gpt-4o-mini"
     
+    # Storage
+    receipts_bucket: str = "receipts-bucket"
+    receipts_folder: str = "receipts"
+
     # Application Settings
     temp_dir: str = "temp"
     max_upload_size_mb: int = 10

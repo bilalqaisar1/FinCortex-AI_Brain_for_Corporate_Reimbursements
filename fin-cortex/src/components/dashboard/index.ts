@@ -9,6 +9,8 @@ export { EmptyState } from "./EmptyState";
 export { FilterPanel } from "./FilterPanel";
 export { AdminSidebar } from "./AdminSidebar";
 export { DashboardLayout } from "./DashboardLayout";
+export { ManagerSidebar } from "./ManagerSidebar";
+export { ManagerLayout } from "./ManagerLayout";
 export { Chart, BarChart, LineChart, PieChart } from "./Charts";
 export { PendingApprovals } from "./PendingApprovals";
 export { BudgetOverview } from "./BudgetOverview";

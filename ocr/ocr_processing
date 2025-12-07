@@ -6,10 +6,10 @@ from openai import OpenAI
 # CONFIGURATION
 # =========================
 
-GOOGLE_API_KEY = "AIzaSyCxXYnYE_dhfGJz9ZLndFVpaj1oA-VUkBo"
+GOOGLE_API_KEY = "api-key"
 VISION_API_URL = f"https://vision.googleapis.com/v1/images:annotate?key={GOOGLE_API_KEY}"
 
-OPENAI_API_KEY = "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"
+OPENAI_API_KEY = "api-key"
 client = OpenAI(api_key=OPENAI_API_KEY)
 
 # =========================
