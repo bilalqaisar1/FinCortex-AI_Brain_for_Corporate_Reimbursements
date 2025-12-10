@@ -5,10 +5,10 @@ import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { 
-  Eye, 
-  EyeOff, 
-  Mail, 
+import {
+  Eye,
+  EyeOff,
+  Mail,
   Lock,
   ArrowLeft,
   Shield,
@@ -19,7 +19,6 @@ import { useState } from "react";
 import { useTheme } from "@/hooks/useTheme";
 import { useAuth } from "@/context/AuthContext";
 import { useRouter } from "next/navigation";
-import { supabaseClient } from "@/lib/supabase/client";
 import { useToastNotification } from "@/hooks/useToastNotification";
 
 export default function LoginPage() {
@@ -88,22 +87,35 @@ export default function LoginPage() {
     }
 
     try {
-      // Call RPC function directly from frontend
-      const { data, error } = await supabaseClient.rpc('check_user_credentials', {
-        p_email: sanitizedEmail,
-        p_password: sanitizedPassword,
-        p_employee_code: sanitizedEmployeeCode
+      // Call API route to check credentials
+      console.log('🔐 Calling check-login-credential API...');
+      const response = await fetch('/api/v1/auth/check-login-credential', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          email: sanitizedEmail,
+          password: sanitizedPassword,
+          employee_code: sanitizedEmployeeCode
+        }),
       });
 
-      if (error) {
-        console.error('RPC error:', error);
-        setErrorMessage("An error occurred during login. Please try again.");
-        showToast('error', 'Login Failed', 'An error occurred during login. Please try again.');
+      const result = await response.json();
+      console.log('📊 API Response:', result);
+
+      if (!response.ok) {
+        console.error('❌ API error:', result);
+        setErrorMessage(result.detail || "An error occurred during login. Please try again.");
+        showToast('error', 'Login Failed', result.detail || 'An error occurred during login.');
         setIsLoading(false);
         return;
       }
 
-      // Handle RPC response
+      const data = result.data;
+      console.log('✅ Credential check data:', data);
+
+      // Handle API response
       if (!data) {
         setErrorMessage("Invalid response from server. Please try again.");
         showToast('error', 'Login Failed', 'Invalid response from server.');
@@ -111,7 +123,7 @@ export default function LoginPage() {
         return;
       }
 
-      // Check if user exists
+      // Check if user exists (id field indicates if email was found)
       if (!data.id) {
         setErrorMessage("No account found with this email address.");
         showToast('error', 'Account Not Found', 'No account found with this email address.');
@@ -135,20 +147,25 @@ export default function LoginPage() {
         return;
       }
 
-      // All validations passed - proceed with login
-      const result = await loginWithRPC(sanitizedEmail, sanitizedPassword, data.role);
+      console.log('🚀 Proceeding with login for role:', data.role);
 
-      if (result.error) {
-        setErrorMessage(result.error.message || "Login failed. Please try again.");
-        showToast('error', 'Login Failed', result.error.message || "Login failed. Please try again.");
+      // All validations passed - proceed with login
+      const loginResult = await loginWithRPC(sanitizedEmail, sanitizedPassword, data.role);
+
+      if (loginResult.error) {
+        console.error('❌ Login error:', loginResult.error);
+        setErrorMessage(loginResult.error.message || "Login failed. Please try again.");
+        showToast('error', 'Login Failed', loginResult.error.message || "Login failed. Please try again.");
         setIsLoading(false);
         return;
       }
 
-      // Success - redirect to landing page first
-      showToast('success', 'Login Successful', `Welcome back! Redirecting to home...`);
-      
-      // Redirect to home page first - navbar will show user info and link to dashboard
+      // Success - show personalized welcome message with user's name
+      const userName = data.name || sanitizedEmail.split('@')[0];
+      console.log('🎉 Login successful! Welcome:', userName);
+      showToast('success', 'Login Successful', `Welcome back, ${userName}! Redirecting to home...`);
+
+      // Redirect to home page - navbar will show user info and Dashboard button
       router.push('/');
 
     } catch (error) {
@@ -180,7 +197,7 @@ export default function LoginPage() {
               <p className="text-xs text-muted -mt-1">AI-Powered</p>
             </div>
           </Link>
-          
+
           <div className="flex items-center space-x-4">
             <button
               onClick={toggleTheme}
@@ -188,8 +205,8 @@ export default function LoginPage() {
             >
               <span className="text-xl">{themeIcon}</span>
             </button>
-            <Link 
-              href="/" 
+            <Link
+              href="/"
               className="flex items-center space-x-2 text-muted hover:text-primary transition-colors group"
             >
               <ArrowLeft className="w-4 h-4 group-hover:-translate-x-1 transition-transform" />
@@ -270,9 +287,9 @@ export default function LoginPage() {
                     onClick={() => setShowPassword(!showPassword)}
                   >
                     {showPassword ? (
-                        <EyeOff className="h-5 w-5 text-muted hover:text-primary" />
+                      <EyeOff className="h-5 w-5 text-muted hover:text-primary" />
                     ) : (
-                        <Eye className="h-5 w-5 text-muted hover:text-primary" />
+                      <Eye className="h-5 w-5 text-muted hover:text-primary" />
                     )}
                   </button>
                 </div>
@@ -319,8 +336,8 @@ export default function LoginPage() {
                     Remember me
                   </Label>
                 </div>
-                <Link 
-                  href="/forgot-password" 
+                <Link
+                  href="/forgot-password"
                   className="text-sm text-accent hover:text-accent/80 font-medium transition-colors"
                 >
                   Forgot password?
@@ -345,7 +362,7 @@ export default function LoginPage() {
               )}
 
               {/* Sign In Button */}
-              <Button 
+              <Button
                 type="submit"
                 disabled={isLoading}
                 className="w-full h-12 btn-primary text-white font-medium disabled:opacity-50 rounded-xl"
@@ -365,8 +382,8 @@ export default function LoginPage() {
             <div className="mt-8 text-center">
               <p className="text-sm text-muted">
                 Don&apos;t have an account?{" "}
-                <Link 
-                  href="/signup" 
+                <Link
+                  href="/signup"
                   className="text-accent hover:text-accent/80 font-medium transition-colors"
                 >
                   Create account

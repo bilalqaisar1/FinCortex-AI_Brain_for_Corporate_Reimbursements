@@ -13,7 +13,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { User, Settings, LogOut, Shield } from "lucide-react";
+import { User, Settings, LogOut, ArrowRight } from "lucide-react";
 
 export default function Navbar() {
   const [isScrolled, setIsScrolled] = useState(false);
@@ -32,7 +32,7 @@ export default function Navbar() {
 
   const userInitials = displayName
     .split(" ")
-    .map((n) => n[0])
+    .map((n: string) => n[0])
     .join("")
     .toUpperCase()
     .slice(0, 2);
@@ -40,9 +40,9 @@ export default function Navbar() {
   // Determine dashboard href based on user role
   const getDashboardHref = () => {
     if (!user || !userProfile) return "/login";
-    
+
     const role = userProfile.userRole;
-    
+
     if (role === 'admin') {
       return "/admin";
     } else if (role === 'manager') {
@@ -50,12 +50,12 @@ export default function Navbar() {
     } else if (role === 'user') {
       return "/user/dashboard";
     }
-    
+
     // Fallback: try to infer from profile structure
     if (userProfile.employee_code !== undefined) {
       return "/user/dashboard";
     }
-    
+
     return "/login";
   };
 
@@ -94,7 +94,7 @@ export default function Navbar() {
       const target = e.target as Element;
       const mobileToggle = document.getElementById('mobileToggle');
       const navLinks = document.getElementById('navLinks');
-      
+
       if (mobileToggle && navLinks && !mobileToggle.contains(target) && !navLinks.contains(target)) {
         setIsMobileMenuOpen(false);
       }
@@ -125,7 +125,7 @@ export default function Navbar() {
         <Link href="/" className="logo">
           Fincortex
         </Link>
-        
+
         <ul className={`nav-links ${isMobileMenuOpen ? 'active' : ''}`} id="navLinks">
           <li><a href="#home" onClick={handleLinkClick}>Home</a></li>
           <li><a href="#features" onClick={handleLinkClick}>Features</a></li>
@@ -133,32 +133,36 @@ export default function Navbar() {
           <li><a href="#solutions" onClick={handleLinkClick}>Solutions</a></li>
           <li><a href="#about" onClick={handleLinkClick}>About</a></li>
           <li><a href="#contact" onClick={handleLinkClick}>Contact</a></li>
-          {user && userProfile && (
-            <li className="md:hidden">
-              <Link href={navCtaHref} onClick={() => setIsMobileMenuOpen(false)}>
-                <Shield className="w-4 h-4 inline mr-2" />
-                Dashboard
-              </Link>
-            </li>
-          )}
         </ul>
+
+        {/* Mobile: Guest centered or User info centered */}
+        {!user || !userProfile ? (
+          <div className="md:hidden absolute left-1/2 -translate-x-1/2 text-sm font-medium text-primary">
+            Guest
+          </div>
+        ) : (
+          <div className="md:hidden absolute left-1/2 -translate-x-1/2 text-center">
+            <div className="text-sm font-medium text-primary">{displayName}</div>
+            {userRole && (
+              <div className="mt-0.5 flex justify-center">{getRoleBadge()}</div>
+            )}
+          </div>
+        )}
 
         <div className="nav-cta">
           {user && userProfile ? (
             <>
-              <div className="hidden md:flex items-center space-x-3">
+              {/* Desktop: User info on right + Dashboard button */}
+              <div className="hidden md:flex items-center gap-3">
                 <div className="text-right">
                   <div className="text-sm font-medium text-primary">{displayName}</div>
-                  {userEmail && (
-                    <div className="text-xs text-muted truncate max-w-[150px]">{userEmail}</div>
-                  )}
                   {userRole && (
                     <div className="mt-0.5">{getRoleBadge()}</div>
                   )}
                 </div>
                 <DropdownMenu>
                   <DropdownMenuTrigger asChild>
-                    <button className="btn btn-outline p-0 w-10 h-10 rounded-full">
+                    <button className="btn btn-outline p-0 w-10 h-10 rounded-full hover:ring-2 hover:ring-blue-400 transition-all">
                       <Avatar className="h-10 w-10">
                         <AvatarImage src={user?.user_metadata?.avatar_url} alt={displayName} />
                         <AvatarFallback className="bg-gradient-to-br from-blue-500 to-purple-600 text-white text-sm">
@@ -180,12 +184,6 @@ export default function Navbar() {
                       </div>
                     </DropdownMenuLabel>
                     <DropdownMenuSeparator />
-                    <DropdownMenuItem asChild>
-                      <Link href={navCtaHref} className="flex items-center cursor-pointer">
-                        <Shield className="mr-2 h-4 w-4" />
-                        <span>Dashboard</span>
-                      </Link>
-                    </DropdownMenuItem>
                     <DropdownMenuItem asChild>
                       <Link href={`${navCtaHref}/profile`} className="flex items-center cursor-pointer">
                         <User className="mr-2 h-4 w-4" />
@@ -206,13 +204,15 @@ export default function Navbar() {
                   </DropdownMenuContent>
                 </DropdownMenu>
               </div>
-              <div className="md:hidden flex items-center space-x-2">
+
+              {/* Mobile: Dashboard button + Avatar dropdown */}
+              <div className="md:hidden flex items-center gap-2">
                 <DropdownMenu>
                   <DropdownMenuTrigger asChild>
-                    <button className="btn btn-outline p-0 w-10 h-10 rounded-full">
-                      <Avatar className="h-10 w-10">
+                    <button className="btn btn-outline p-0 w-9 h-9 rounded-full">
+                      <Avatar className="h-9 w-9">
                         <AvatarImage src={user?.user_metadata?.avatar_url} alt={displayName} />
-                        <AvatarFallback className="bg-gradient-to-br from-blue-500 to-purple-600 text-white text-sm">
+                        <AvatarFallback className="bg-gradient-to-br from-blue-500 to-purple-600 text-white text-xs">
                           {userInitials}
                         </AvatarFallback>
                       </Avatar>
@@ -231,12 +231,6 @@ export default function Navbar() {
                       </div>
                     </DropdownMenuLabel>
                     <DropdownMenuSeparator />
-                    <DropdownMenuItem asChild>
-                      <Link href={navCtaHref} className="flex items-center cursor-pointer">
-                        <Shield className="mr-2 h-4 w-4" />
-                        <span>Dashboard</span>
-                      </Link>
-                    </DropdownMenuItem>
                     <DropdownMenuItem asChild>
                       <Link href={`${navCtaHref}/profile`} className="flex items-center cursor-pointer">
                         <User className="mr-2 h-4 w-4" />
@@ -259,16 +253,17 @@ export default function Navbar() {
               </div>
             </>
           ) : (
-            <Link href="/login" className="btn btn-outline p-0 w-10 h-10 rounded-full flex items-center justify-center">
-              <User className="w-5 h-5" />
-            </Link>
+            /* Anonymous user: Show "Guest" on desktop right side */
+            <div className="hidden md:block text-sm font-medium text-primary">
+              Guest
+            </div>
           )}
-          <button className="theme-toggle" onClick={toggleTheme}>
-            <div className="theme-icon">{themeIcon}</div>
+          <button className="theme-toggle p-1.5 w-8 h-8 flex items-center justify-center" onClick={toggleTheme}>
+            <div className="theme-icon text-sm">{themeIcon}</div>
           </button>
         </div>
 
-        <button 
+        <button
           className={`mobile-toggle ${isMobileMenuOpen ? 'active' : ''}`}
           id="mobileToggle"
           onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}

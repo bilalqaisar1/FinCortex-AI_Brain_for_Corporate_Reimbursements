@@ -129,17 +129,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         }
       }
 
-      // Fallback: Try to get user profile first (for backward compatibility)
-      const { data: userProfile, error: userError } = await db.getUserProfile(userId);
-      if (!userError && userProfile) {
-        setUserProfile({
-          ...userProfile,
-          userRole: 'user'
-        });
-        return;
-      }
-
-      // If not a regular user, try admin
+      // Priority 1: Check Admin Profile
       const { data: adminProfile, error: adminError } = await db.getAdminProfile(userId);
       if (!adminError && adminProfile) {
         setUserProfile({
@@ -155,7 +145,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         return;
       }
 
-      // If not an admin, try manager
+      // Priority 2: Check Manager Profile
       const { data: managerProfile, error: managerError } = await db.getManagerProfile(userId);
       if (!managerError && managerProfile) {
         setUserProfile({
@@ -167,6 +157,16 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           role_id: managerProfile.role_id,
           roles: managerProfile.roles,
           userRole: 'manager'
+        });
+        return;
+      }
+
+      // Priority 3: Check User Profile (Generic/Employee)
+      const { data: userProfile, error: userError } = await db.getUserProfile(userId);
+      if (!userError && userProfile) {
+        setUserProfile({
+          ...userProfile,
+          userRole: 'user'
         });
         return;
       }
@@ -184,11 +184,11 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       const { session } = await auth.getSession();
       setSession(session);
       setUser(session?.user ?? null);
-      
+
       if (session?.user) {
         await loadUserProfile(session.user);
       }
-      
+
       setLoading(false);
     };
 
@@ -199,13 +199,13 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       async (event, session) => {
         setSession(session);
         setUser(session?.user ?? null);
-        
+
         if (session?.user) {
           await loadUserProfile(session.user);
         } else {
           setUserProfile(null);
         }
-        
+
         setLoading(false);
       }
     );
@@ -264,10 +264,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       console.log('AuthContext: Starting OTP verification for email:', email);
       const result = await auth.verifyOtp(email, token);
       console.log('AuthContext: OTP verification result:', { data: result.data, error: result.error });
-      
+
       if (result.error) {
         console.log('AuthContext: OTP verification failed:', result.error);
-        
+
         // Provide specific error messages for OTP issues
         let errorMessage = result.error.message;
         if (result.error.message?.includes('expired')) {
@@ -275,12 +275,12 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         } else if (result.error.message?.includes('invalid')) {
           errorMessage = 'Invalid OTP code. Please check and try again.';
         }
-        
+
         showToast('error', 'Verification Failed', errorMessage);
       } else {
         console.log('AuthContext: OTP verification successful');
         showToast('success', 'Account Verified', 'Your account has been successfully verified!');
-        
+
         // Backend handles user profile creation and activity logging
       }
       return result;
@@ -352,7 +352,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     try {
       // First, try to sign in with Supabase Auth
       const result = await auth.signIn(email, password);
-      
+
       if (result.error) {
         // If Supabase Auth fails, the user might not exist in auth.users
         // Since RPC validation passed, we know credentials are correct in the database
@@ -454,11 +454,11 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           };
         } catch (dbError) {
           console.error('Error in loginWithRPC fallback:', dbError);
-          return { 
-            data: null, 
-            error: { 
-              message: 'Authentication succeeded but failed to load user profile. Please try again or contact support.' 
-            } 
+          return {
+            data: null,
+            error: {
+              message: 'Authentication succeeded but failed to load user profile. Please try again or contact support.'
+            }
           };
         }
       }
@@ -471,9 +471,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       return result;
     } catch (error) {
       console.error('Error in loginWithRPC:', error);
-      return { 
-        data: null, 
-        error: { message: 'An unexpected error occurred during login' } 
+      return {
+        data: null,
+        error: { message: 'An unexpected error occurred during login' }
       };
     }
   };
