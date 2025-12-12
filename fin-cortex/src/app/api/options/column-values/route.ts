@@ -2,74 +2,57 @@ import { NextResponse } from "next/server";
 
 import { supabaseAdmin } from "@/lib/supabaseAdmin";
 
-type ColumnInput = {
-  key: string;
-  columnName: string;
+type CategoryPayload = {
+  category_id: number;
+  category_name: string;
+  subcategories: { subcategory_id: number; subcategory_name: string }[];
 };
-
-type RPCRow = Record<string, string | null>;
 
 export async function POST(request: Request) {
   try {
-    const { tableName, columns } = (await request.json()) as {
-      tableName?: string;
-      columns?: ColumnInput[];
+    const { admin_uuid } = (await request.json()) as {
+      admin_uuid?: string;
     };
 
-    if (!tableName || !Array.isArray(columns) || columns.length === 0) {
+    if (!admin_uuid) {
       return NextResponse.json(
-        { success: false, message: "tableName and columns are required." },
+        { success: false, message: "admin_uuid is required." },
         { status: 400 },
       );
     }
 
-    const columnResults = await Promise.all(
-      columns.map(async ({ key, columnName }) => {
-        if (!key || !columnName) {
-          throw new Error("Each column definition must include key and columnName.");
-        }
-
-        const { data, error } = await supabaseAdmin.rpc("get_column_data_json", {
-          table_name: tableName,
-          column_name: columnName,
-        });
-
-        if (error) {
-          throw error;
-        }
-
-        const values = Array.isArray(data?.values)
-          ? data.values.map((value: unknown) =>
-              value === null || value === undefined ? null : String(value),
-            )
-          : [];
-
-        return { key, values };
-      }),
+    const { data, error } = await supabaseAdmin.rpc(
+      "get_expense_categories_with_subcategories",
+      {
+        p_admin_uuid: admin_uuid,
+      },
     );
 
-    const rowCount =
-      columnResults.length > 0 ? Math.max(...columnResults.map((column) => column.values.length)) : 0;
+    if (error) {
+      throw error;
+    }
 
-    const rows: RPCRow[] = rowCount
-      ? Array.from({ length: rowCount }, (_, index) => {
-          const row: RPCRow = {};
+    const categories: CategoryPayload[] = Array.isArray(data) ? data : [];
 
-          columnResults.forEach(({ key, values }) => {
-            row[key] = values[index] ?? null;
-          });
+    console.log("\n==============================================");
+    console.log("🔍 DEBUG - /api/options/column-values FINAL OUTPUT");
+    console.log("==============================================");
+    console.log(`admin_uuid: ${admin_uuid}`);
+    console.log(`categories count: ${categories.length}`);
+    categories.forEach((cat, idx) => {
+      console.log(
+        `${idx + 1}. ${cat.category_name} (id: ${cat.category_id}) | subcategories: ${cat.subcategories?.length ?? 0}`,
+      );
+    });
+    console.log("==============================================\n");
 
-          return row;
-        }).filter((row) => Object.values(row).some((value) => value !== null))
-      : [];
-
-    return NextResponse.json({ success: true, rows });
+    return NextResponse.json({ success: true, categories });
   } catch (error) {
-    console.error("Failed to fetch column values", error);
+    console.error("Failed to fetch categories with subcategories", error);
     return NextResponse.json(
       {
         success: false,
-        message: "Unable to fetch column values",
+        message: "Unable to fetch categories with subcategories",
         detail: error instanceof Error ? error.message : "Unknown error",
       },
       { status: 500 },
