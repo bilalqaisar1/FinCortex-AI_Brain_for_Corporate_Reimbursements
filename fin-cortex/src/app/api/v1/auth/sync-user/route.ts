@@ -30,35 +30,78 @@ export async function POST(request: Request) {
     // Read-only: Fetch user profile from database (no insert/update)
     const profile = await syncUserProfile(user_id)
 
-    // Determine which table the profile came from by checking which ID field exists
+    // Determine which table the profile came from by checking which ID field exists as Primary Key
     let userTable = 'users'
-    if ('admin_id' in profile) {
-      userTable = 'admins'
-    } else if ('manager_id' in profile) {
-      userTable = 'managers'
-    } else {
+    if ('user_id' in profile && (profile as any).user_id) {
       userTable = 'users'
+    } else if ('manager_id' in profile && (profile as any).manager_id) {
+      userTable = 'managers'
+    } else if ('admin_id' in profile) {
+      userTable = 'admins'
     }
-    
+
     const profileRoleId = profile.role_id || null
 
-    // Fetch role information if role_id exists
-    let roleInfo = null
-    if (profileRoleId) {
+    // Prepare parallel fetches for related data
+    const fetchRole = async () => {
+      if (!profileRoleId) return null;
       try {
-        const { data: roleData, error: roleError } = await supabaseAdmin
+        const { data, error } = await supabaseAdmin
           .from('roles')
           .select('role_id, role_name, description')
           .eq('role_id', profileRoleId)
-          .single()
-
-        if (!roleError && roleData) {
-          roleInfo = roleData
-        }
-      } catch (roleFetchError) {
-        console.warn('⚠️ Could not fetch role information:', roleFetchError)
+          .single();
+        return !error ? data : null;
+      } catch (e) {
+        console.warn('⚠️ Could not fetch role information:', e);
+        return null;
       }
-    }
+    };
+
+    const fetchDepartment = async () => {
+      let depId = null;
+      if (userTable === 'users' && (profile as any).department_id) {
+        depId = (profile as any).department_id;
+      } else if (userTable === 'managers' && (profile as any).manager_department_id) {
+        depId = (profile as any).manager_department_id;
+      }
+
+      if (!depId) return null;
+
+      try {
+        const { data, error } = await supabaseAdmin
+          .from('departments')
+          .select('department_id, department_name')
+          .eq('department_id', depId)
+          .single();
+        return !error ? data : null;
+      } catch (e) {
+        console.warn('⚠️ Could not fetch department information:', e);
+        return null;
+      }
+    };
+
+    const fetchManager = async () => {
+      if (!(profile as any).manager_id) return null;
+      try {
+        const { data, error } = await supabaseAdmin
+          .from('managers')
+          .select('manager_id, manager_admin_id, full_name, email')
+          .eq('manager_id', (profile as any).manager_id)
+          .single();
+        return !error ? data : null;
+      } catch (e) {
+        console.warn('⚠️ Could not fetch manager information:', e);
+        return null;
+      }
+    };
+
+    // Execute fetches in parallel
+    const [roleInfo, departmentInfo, managerInfo] = await Promise.all([
+      fetchRole(),
+      fetchDepartment(),
+      fetchManager()
+    ]);
 
     // Determine userRole based on profile data
     let userRole: 'admin' | 'manager' | 'user' | null = null
@@ -82,53 +125,19 @@ export async function POST(request: Request) {
       }
     }
 
-    // Fetch department info if department_id exists (only for users table)
-    let departmentInfo = null
-    if ((profile as any).department_id) {
-      try {
-        const { data: deptData, error: deptError } = await supabaseAdmin
-          .from('departments')
-          .select('department_id, department_name')
-          .eq('department_id', (profile as any).department_id)
-          .single()
-
-        if (!deptError && deptData) {
-          departmentInfo = deptData
-        }
-      } catch (deptFetchError) {
-        console.warn('⚠️ Could not fetch department information:', deptFetchError)
-      }
-    }
-
-    // Fetch manager info if manager_id exists (for users table)
-    let managerInfo = null
-    if ((profile as any).manager_id && userTable === 'users') {
-      try {
-        const { data: managerData, error: managerError } = await supabaseAdmin
-          .from('managers')
-          .select('manager_id, admin_id, full_name, email')
-          .eq('manager_id', (profile as any).manager_id)
-          .single()
-
-        if (!managerError && managerData) {
-          managerInfo = managerData
-        }
-      } catch (managerFetchError) {
-        console.warn('⚠️ Could not fetch manager information:', managerFetchError)
-      }
-    }
-
     // Get user ID based on table
     const userId = (profile as any).admin_id || (profile as any).manager_id || (profile as any).user_id || null;
-    
+
     // Get admin_id - for users, get from manager; for managers, get from profile; for admins, it's their own ID
     let adminId: string | null = null
     if (userTable === 'users') {
-      // For users, admin_id comes from their manager
-      adminId = managerInfo?.admin_id || (profile as any).admin_id || null
+      // For users, admin_id comes from their manager (via syncUserProfile or fresh fetch)
+      // syncUserProfile (utils) already tries to inject 'admin_id'
+      // managerInfo (fresh fetch) has 'manager_admin_id'
+      adminId = managerInfo?.manager_admin_id || (profile as any).admin_id || null
     } else if (userTable === 'managers') {
-      // For managers, admin_id is in their profile
-      adminId = (profile as any).admin_id || null
+      // For managers, admin_id is in their profile as 'manager_admin_id'
+      adminId = (profile as any).manager_admin_id || null
     } else if (userTable === 'admins') {
       // For admins, their admin_id is their own ID
       adminId = (profile as any).admin_id || null
@@ -190,5 +199,3 @@ export async function POST(request: Request) {
     )
   }
 }
-
-

@@ -4,16 +4,6 @@ import Link from "next/link";
 import { useState, useEffect } from "react";
 import { useTheme } from "@/hooks/useTheme";
 import { useAuth } from "@/context/AuthContext";
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuLabel,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { User, Settings, LogOut, ArrowRight } from "lucide-react";
 
 export default function Navbar() {
   const [isScrolled, setIsScrolled] = useState(false);
@@ -27,44 +17,7 @@ export default function Navbar() {
     user?.email?.split("@")[0] ||
     "Guest";
 
-  const userEmail = userProfile?.email || user?.email || "";
   const userRole = userProfile?.userRole || (userProfile?.employee_code !== undefined ? 'user' : null);
-
-  const userInitials = displayName
-    .split(" ")
-    .map((n: string) => n[0])
-    .join("")
-    .toUpperCase()
-    .slice(0, 2);
-
-  // Determine dashboard href based on user role
-  const getDashboardHref = () => {
-    if (!user || !userProfile) return "/login";
-
-    const role = userProfile.userRole;
-
-    if (role === 'admin') {
-      return "/admin";
-    } else if (role === 'manager') {
-      return "/manager";
-    } else if (role === 'user') {
-      return "/user/dashboard";
-    }
-
-    // Fallback: try to infer from profile structure
-    if (userProfile.employee_code !== undefined) {
-      return "/user/dashboard";
-    }
-
-    return "/login";
-  };
-
-  const navCtaHref = getDashboardHref();
-
-  const handleSignOut = async () => {
-    await signOut();
-    window.location.href = "/";
-  };
 
   const getRoleBadge = () => {
     if (!userRole) return null;
@@ -152,7 +105,7 @@ export default function Navbar() {
         <div className="nav-cta">
           {user && userProfile ? (
             <>
-              {/* Desktop: User info on right + Dashboard button */}
+              {/* Desktop: User info (full name + role) */}
               <div className="hidden md:flex items-center gap-3">
                 <div className="text-right">
                   <div className="text-sm font-medium text-primary">{displayName}</div>
@@ -160,96 +113,11 @@ export default function Navbar() {
                     <div className="mt-0.5">{getRoleBadge()}</div>
                   )}
                 </div>
-                <DropdownMenu>
-                  <DropdownMenuTrigger asChild>
-                    <button className="btn btn-outline p-0 w-10 h-10 rounded-full hover:ring-2 hover:ring-blue-400 transition-all">
-                      <Avatar className="h-10 w-10">
-                        <AvatarImage src={user?.user_metadata?.avatar_url} alt={displayName} />
-                        <AvatarFallback className="bg-gradient-to-br from-blue-500 to-purple-600 text-white text-sm">
-                          {userInitials}
-                        </AvatarFallback>
-                      </Avatar>
-                    </button>
-                  </DropdownMenuTrigger>
-                  <DropdownMenuContent align="end" className="w-56">
-                    <DropdownMenuLabel className="font-normal">
-                      <div className="flex flex-col space-y-1">
-                        <p className="text-sm font-medium leading-none">{displayName}</p>
-                        {userEmail && (
-                          <p className="text-xs leading-none text-muted-foreground">{userEmail}</p>
-                        )}
-                        {userRole && (
-                          <div className="mt-1">{getRoleBadge()}</div>
-                        )}
-                      </div>
-                    </DropdownMenuLabel>
-                    <DropdownMenuSeparator />
-                    <DropdownMenuItem asChild>
-                      <Link href={`${navCtaHref}/profile`} className="flex items-center cursor-pointer">
-                        <User className="mr-2 h-4 w-4" />
-                        <span>Profile</span>
-                      </Link>
-                    </DropdownMenuItem>
-                    <DropdownMenuItem asChild>
-                      <Link href={`${navCtaHref}/settings`} className="flex items-center cursor-pointer">
-                        <Settings className="mr-2 h-4 w-4" />
-                        <span>Settings</span>
-                      </Link>
-                    </DropdownMenuItem>
-                    <DropdownMenuSeparator />
-                    <DropdownMenuItem onClick={handleSignOut} className="text-red-600 dark:text-red-400 cursor-pointer">
-                      <LogOut className="mr-2 h-4 w-4" />
-                      <span>Log out</span>
-                    </DropdownMenuItem>
-                  </DropdownMenuContent>
-                </DropdownMenu>
               </div>
 
-              {/* Mobile: Dashboard button + Avatar dropdown */}
-              <div className="md:hidden flex items-center gap-2">
-                <DropdownMenu>
-                  <DropdownMenuTrigger asChild>
-                    <button className="btn btn-outline p-0 w-9 h-9 rounded-full">
-                      <Avatar className="h-9 w-9">
-                        <AvatarImage src={user?.user_metadata?.avatar_url} alt={displayName} />
-                        <AvatarFallback className="bg-gradient-to-br from-blue-500 to-purple-600 text-white text-xs">
-                          {userInitials}
-                        </AvatarFallback>
-                      </Avatar>
-                    </button>
-                  </DropdownMenuTrigger>
-                  <DropdownMenuContent align="end" className="w-56">
-                    <DropdownMenuLabel className="font-normal">
-                      <div className="flex flex-col space-y-1">
-                        <p className="text-sm font-medium leading-none">{displayName}</p>
-                        {userEmail && (
-                          <p className="text-xs leading-none text-muted-foreground">{userEmail}</p>
-                        )}
-                        {userRole && (
-                          <div className="mt-1">{getRoleBadge()}</div>
-                        )}
-                      </div>
-                    </DropdownMenuLabel>
-                    <DropdownMenuSeparator />
-                    <DropdownMenuItem asChild>
-                      <Link href={`${navCtaHref}/profile`} className="flex items-center cursor-pointer">
-                        <User className="mr-2 h-4 w-4" />
-                        <span>Profile</span>
-                      </Link>
-                    </DropdownMenuItem>
-                    <DropdownMenuItem asChild>
-                      <Link href={`${navCtaHref}/settings`} className="flex items-center cursor-pointer">
-                        <Settings className="mr-2 h-4 w-4" />
-                        <span>Settings</span>
-                      </Link>
-                    </DropdownMenuItem>
-                    <DropdownMenuSeparator />
-                    <DropdownMenuItem onClick={handleSignOut} className="text-red-600 dark:text-red-400 cursor-pointer">
-                      <LogOut className="mr-2 h-4 w-4" />
-                      <span>Log out</span>
-                    </DropdownMenuItem>
-                  </DropdownMenuContent>
-                </DropdownMenu>
+              {/* Mobile: User info (full name + role) */}
+              <div className="md:hidden flex items-center">
+                {/* Already shown in centered position above */}
               </div>
             </>
           ) : (

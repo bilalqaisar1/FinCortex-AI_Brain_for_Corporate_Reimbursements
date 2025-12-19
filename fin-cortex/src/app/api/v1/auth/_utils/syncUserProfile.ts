@@ -25,35 +25,33 @@ export async function syncUserProfile(
   const trimmedUserId = safeStr(userId);
   if (!trimmedUserId) throw new Error("user_id is required");
 
-  // 1. Get Auth User (to verify user exists)
-  const { data: authData, error: authError } = await supabaseAdmin.auth.admin.getUserById(trimmedUserId);
+  // Validate UUID format - RPC function always returns UUID (or empty string for not found)
+  const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+  const isValidUUID = uuidRegex.test(trimmedUserId);
 
-  if (authError || !authData?.user) {
-    throw new Error(authError?.message || "Unable to locate authenticated user");
+  if (!isValidUUID) {
+    throw new Error(`Invalid user_id format. Expected UUID but received: ${trimmedUserId}`);
   }
 
-  const { user: authUser } = authData;
-  const email = safeStr(overrides?.email) ??
-    safeStr(authUser.email) ??
-    safeStr(authUser.identities?.[0]?.identity_data?.email);
-
-  if (!email) {
-    throw new Error("Email is required to fetch user profile");
+  // Try to get auth user by UUID (optional - user might not exist in auth.users)
+  let authUser: any = null;
+  try {
+    const { data: authData, error: authError } = await supabaseAdmin.auth.admin.getUserById(trimmedUserId);
+    if (!authError && authData?.user) {
+      authUser = authData.user;
+    }
+  } catch (authErr) {
+    // User might not exist in auth.users - that's okay, we'll query database directly
+    console.warn("⚠️ User not found in auth.users, will query database directly:", authErr);
   }
 
-  // 2. Determine which table the user exists in by checking by user_id
-  // Try admins table first
-  const { data: adminProfile, error: adminError } = await supabaseAdmin
-    .from("admins")
-    .select("*")
-    .eq("admin_id", trimmedUserId)
-    .maybeSingle();
+  // 2. Query database tables by UUID only (RPC always returns UUID)
+  // RPC returns the ID from the table where the user was found, so we should check in order:
+  // 1. Managers (most common for RPC since it checks managers second)
+  // 2. Admins
+  // 3. Users
 
-  if (!adminError && adminProfile) {
-    return adminProfile;
-  }
-
-  // Try managers table
+  // Try managers table first (RPC checks managers second, so this is likely)
   const { data: managerProfile, error: managerError } = await supabaseAdmin
     .from("managers")
     .select("*")
@@ -63,6 +61,17 @@ export async function syncUserProfile(
   if (!managerError && managerProfile) {
     // Manager profile found - it already has admin_id in the table
     return managerProfile;
+  }
+
+  // Try admins table
+  const { data: adminProfile, error: adminError } = await supabaseAdmin
+    .from("admins")
+    .select("*")
+    .eq("admin_id", trimmedUserId)
+    .maybeSingle();
+
+  if (!adminError && adminProfile) {
+    return adminProfile;
   }
 
   // Try users table
@@ -78,7 +87,7 @@ export async function syncUserProfile(
       try {
         const { data: managerData, error: managerFetchError } = await supabaseAdmin
           .from("managers")
-          .select("admin_id")
+          .select("manager_admin_id")
           .eq("manager_id", (userProfile as any).manager_id)
           .maybeSingle();
 
@@ -86,7 +95,7 @@ export async function syncUserProfile(
           // Add admin_id to user profile from manager
           return {
             ...userProfile,
-            admin_id: managerData.admin_id || null,
+            admin_id: managerData.manager_admin_id || null,
           };
         }
       } catch (err) {
@@ -99,4 +108,8 @@ export async function syncUserProfile(
 
   // If user doesn't exist in any table, throw error
   throw new Error("User profile not found in database");
+<<<<<<< Updated upstream
 }
+=======
+}
+>>>>>>> Stashed changes

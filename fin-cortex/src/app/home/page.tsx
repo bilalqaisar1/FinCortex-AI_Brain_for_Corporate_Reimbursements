@@ -2,15 +2,22 @@
 
 import { useState, useEffect } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { useTheme } from "@/hooks/useTheme";
 import { useAuth } from "@/context/AuthContext";
 import TypeWriter from "@/components/TypeWriter";
 
 export default function HomePage() {
   const { isDarkTheme, toggleTheme, themeIcon } = useTheme();
-  const { user, userProfile } = useAuth();
+  const { user, userProfile, signOut } = useAuth();
+  const router = useRouter();
   const [isScrolled, setIsScrolled] = useState(false);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+
+  const handleSignOut = async () => {
+    await signOut();
+    router.push("/");
+  };
 
   // Typewriter texts for hero section
   const typewriterTexts = [
@@ -45,6 +52,7 @@ export default function HomePage() {
     document.addEventListener('click', handleClickOutside);
     return () => document.removeEventListener('click', handleClickOutside);
   }, []);
+
 
   const handleLinkClick = (e: React.MouseEvent<HTMLAnchorElement>) => {
     const href = e.currentTarget.getAttribute('href');
@@ -97,17 +105,26 @@ export default function HomePage() {
 
             <div className="hero-cta flex gap-4 flex-wrap">
               {user ? (
-                <Link
-                  href={
-                    userProfile?.userRole === 'admin' ? "/admin" :
-                      userProfile?.userRole === 'manager' ? "/manager" :
-                        "/user/dashboard"
-                  }
-                  className="btn btn-outline px-6 py-3 rounded-full text-primary border-2 border-subtle bg-transparent font-semibold transition-all duration-300 hover:border-blue-400 hover:shadow-lg hover:-translate-y-0.5 relative overflow-hidden min-w-44 min-h-11 flex items-center justify-center gap-2"
-                >
-                  Dashboard
-                  <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="5" y1="12" x2="19" y2="12"></line><polyline points="12 5 19 12 12 19"></polyline></svg>
-                </Link>
+                <>
+                  <Link
+                    href={
+                      userProfile?.userRole === 'admin' ? "/admin" :
+                        userProfile?.userRole === 'manager' ? "/manager" :
+                          "/user/dashboard"
+                    }
+                    className="btn btn-outline px-6 py-3 rounded-full text-primary border-2 border-subtle bg-transparent font-semibold transition-all duration-300 hover:border-blue-400 hover:shadow-lg hover:-translate-y-0.5 relative overflow-hidden min-w-44 min-h-11 flex items-center justify-center gap-2"
+                  >
+                    Dashboard
+                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="5" y1="12" x2="19" y2="12"></line><polyline points="12 5 19 12 12 19"></polyline></svg>
+                  </Link>
+                  <button
+                    onClick={handleSignOut}
+                    className="btn btn-outline px-6 py-3 rounded-full text-primary border-2 border-subtle bg-transparent font-semibold transition-all duration-300 hover:border-red-400 hover:shadow-lg hover:-translate-y-0.5 relative overflow-hidden min-w-44 min-h-11 flex items-center justify-center gap-2 text-red-600 dark:text-red-400 hover:bg-red-50/10 dark:hover:bg-red-950/20"
+                  >
+                    Sign Out
+                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"></path><polyline points="16 17 21 12 16 7"></polyline><line x1="21" y1="12" x2="9" y2="12"></line></svg>
+                  </button>
+                </>
               ) : (
                 <Link href="/login" className="btn btn-outline px-6 py-3 rounded-full text-primary border-2 border-subtle bg-transparent font-semibold transition-all duration-300 hover:border-blue-400 hover:shadow-lg hover:-translate-y-0.5 relative overflow-hidden min-w-44 min-h-11 flex items-center justify-center">
                   Sign In

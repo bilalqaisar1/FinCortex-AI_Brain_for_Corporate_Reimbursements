@@ -19,11 +19,48 @@ import {
 } from "@/components/ui/table";
 import Link from "next/link";
 import { useTheme } from "@/hooks/useTheme";
+import { RouteProtection } from "@/components/auth/RouteProtection";
+import { useAuth } from "@/context/AuthContext";
 
 export default function UserDashboardPage() {
   const [isScrolled, setIsScrolled] = useState(false);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const { toggleTheme, themeIcon } = useTheme();
+  const { user, userProfile } = useAuth();
+
+  const displayName =
+    userProfile?.full_name ||
+    user?.user_metadata?.full_name ||
+    user?.email?.split("@")[0] ||
+    "User";
+
+  const roleLabel =
+    userProfile?.roles?.role_name ||
+    (userProfile?.userRole
+      ? userProfile.userRole.charAt(0).toUpperCase() + userProfile.userRole.slice(1)
+      : userProfile?.employee_code
+        ? "Employee"
+        : "Member");
+
+  const employeeCode = userProfile?.employee_code || "N/A";
+  const managerName = userProfile?.managers?.full_name || "Manager";
+  const userInitials = displayName
+    .split(" ")
+    .map((n) => n[0])
+    .join("")
+    .toUpperCase()
+    .slice(0, 2);
+
+  const memberSince = React.useMemo(() => {
+    const joinedDate = user?.created_at ? new Date(user.created_at) : null;
+    if (!joinedDate || Number.isNaN(joinedDate.getTime())) return "—";
+    return joinedDate.toLocaleDateString("en-US", { month: "long", year: "numeric" });
+  }, [user?.created_at]);
+
+  const today = React.useMemo(() => {
+    const now = new Date();
+    return now.toLocaleDateString("en-US", { month: "long", day: "numeric", year: "numeric" });
+  }, []);
 
   // Handle scroll effect for navbar
   useEffect(() => {
@@ -91,6 +128,7 @@ export default function UserDashboardPage() {
 
 
   return (
+    <RouteProtection allowedRoles={['user']}>
     <div className="flex min-h-[calc(100vh-0px)] w-full">
       {/* Navbar - Logo left, centered menu, theme toggle right */}
       <nav className={`navbar ${isScrolled ? 'scrolled' : ''}`} id="navbar">
@@ -135,13 +173,25 @@ export default function UserDashboardPage() {
             <div className="flex flex-wrap items-center justify-between gap-4">
               <div className="flex flex-col">
                 <div className="mb-2 flex flex-wrap items-center gap-3">
-                  <div className="flex size-10 items-center justify-center rounded-full bg-gradient-to-br from-blue-500 to-purple-600 text-white font-bold">M</div>
-                  <span className="text-base font-semibold text-primary">Mahroz</span>
-                  <span className="rounded-full border border-subtle px-3 py-1 text-xs font-semibold text-[#8b5cf6]" style={{ background: "linear-gradient(135deg, rgba(102,126,234,0.2), rgba(118,75,162,0.2))" }}>EMPLOYEE</span>
-                  <span className="rounded-full border border-subtle px-3 py-1 text-xs font-semibold text-muted">EMP-2023-1042</span>
+                  <div className="flex size-10 items-center justify-center rounded-full bg-gradient-to-br from-blue-500 to-purple-600 text-white font-bold">
+                    {userInitials}
+                  </div>
+                  <span className="text-base font-semibold text-primary">{displayName}</span>
+                  <span
+                    className="rounded-full border border-subtle px-3 py-1 text-xs font-semibold text-[#8b5cf6]"
+                    style={{ background: "linear-gradient(135deg, rgba(102,126,234,0.2), rgba(118,75,162,0.2))" }}
+                  >
+                    {roleLabel ? roleLabel.toUpperCase() : "MEMBER"}
+                  </span>
+                  <span className="rounded-full border border-subtle px-3 py-1 text-xs font-semibold text-muted">
+                    {employeeCode}
+                  </span>
                 </div>
-                <p className="text-sm text-muted">Finance Department • Manager: John Doe • Member since May 2023</p>
+                <p className="text-sm text-muted">
+                  Manager: {managerName} • Member since {memberSince}
+                </p>
               </div>
+              <div className="text-right text-sm text-muted">Today • {today}</div>
             </div>
           </div>
 
@@ -473,6 +523,7 @@ export default function UserDashboardPage() {
         </div>
       </main>
     </div>
+    </RouteProtection>
   );
 }
 

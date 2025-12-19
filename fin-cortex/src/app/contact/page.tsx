@@ -6,13 +6,13 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
-import { 
-  Mail, 
-  Phone, 
-  MapPin, 
-  Clock, 
-  Send, 
-  CheckCircle, 
+import {
+  Mail,
+  Phone,
+  MapPin,
+  Clock,
+  Send,
+  CheckCircle,
   ArrowRight,
   Sparkles
 } from "lucide-react";
@@ -44,13 +44,13 @@ export default function ContactPage() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsSubmitting(true);
-    
+
     // Simulate form submission
     await new Promise(resolve => setTimeout(resolve, 2000));
-    
+
     setIsSubmitting(false);
     setIsSubmitted(true);
-    
+
     // Reset form after 3 seconds
     setTimeout(() => {
       setIsSubmitted(false);
@@ -114,12 +114,12 @@ export default function ContactPage() {
             <Sparkles className="w-4 h-4 mr-2" />
             <span className="text-sm font-medium">Get In Touch</span>
           </div>
-          
+
           <h1 className="text-4xl md:text-6xl font-bold text-primary mb-6 animate-fade-in-up" style={{ animationDelay: '0.1s' }}>
             Contact Us
             <span className="block text-gradient-primary">Get In Touch</span>
           </h1>
-          
+
           <p className="text-xl text-muted max-w-3xl mx-auto animate-fade-in-up" style={{ animationDelay: '0.2s' }}>
             Ready to transform your reimbursement management? Our team of experts is here to help you get started with FinCortex.
           </p>
@@ -128,146 +128,146 @@ export default function ContactPage() {
         {/* Contact Form - Full Width */}
         <div className="animate-fade-in-up mb-16" style={{ animationDelay: '0.3s' }}>
           <Card className="p-8 border border-subtle bg-gradient-to-br from-white/10 to-white/5 backdrop-blur-25 hover:shadow-lg hover:shadow-blue-500/25 hover:border-blue-400/50 transition-all duration-400 relative overflow-hidden group">
-              {/* Shimmer Effect */}
-              <div className="absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity duration-600 pointer-events-none">
-                <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/10 to-transparent -skew-x-12 transform -translate-x-full group-hover:translate-x-full transition-transform duration-700"></div>
+            {/* Shimmer Effect */}
+            <div className="absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity duration-600 pointer-events-none">
+              <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/10 to-transparent -skew-x-12 transform -translate-x-full group-hover:translate-x-full transition-transform duration-700"></div>
+            </div>
+
+            <div className="relative z-10">
+              <div className="flex items-center gap-3 mb-8">
+                <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center shadow-lg">
+                  <Send className="w-6 h-6 text-white" />
+                </div>
+                <div>
+                  <h2 className="text-2xl font-bold text-primary">Send us a Message</h2>
+                  <p className="text-muted">We&apos;ll get back to you within 24 hours</p>
+                </div>
               </div>
 
-              <div className="relative z-10">
-                <div className="flex items-center gap-3 mb-8">
-                  <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center shadow-lg">
-                    <Send className="w-6 h-6 text-white" />
+              {isSubmitted ? (
+                <div className="text-center py-12">
+                  <div className="w-20 h-20 bg-gradient-to-br from-green-500 to-emerald-600 rounded-full flex items-center justify-center mx-auto mb-6 animate-bounce-in">
+                    <CheckCircle className="w-10 h-10 text-white" />
                   </div>
-                  <div>
-                    <h2 className="text-2xl font-bold text-primary">Send us a Message</h2>
-                    <p className="text-muted">We'll get back to you within 24 hours</p>
-                  </div>
+                  <h3 className="text-2xl font-bold text-primary mb-2">Message Sent!</h3>
+                  <p className="text-muted">Thank you for reaching out. We'll be in touch soon.</p>
                 </div>
-
-                {isSubmitted ? (
-                  <div className="text-center py-12">
-                    <div className="w-20 h-20 bg-gradient-to-br from-green-500 to-emerald-600 rounded-full flex items-center justify-center mx-auto mb-6 animate-bounce-in">
-                      <CheckCircle className="w-10 h-10 text-white" />
-                    </div>
-                    <h3 className="text-2xl font-bold text-primary mb-2">Message Sent!</h3>
-                    <p className="text-muted">Thank you for reaching out. We'll be in touch soon.</p>
-                  </div>
-                ) : (
-                  <form onSubmit={handleSubmit} className="space-y-6">
-                    <div className="grid md:grid-cols-2 gap-6">
-                      <div className="space-y-2">
-                        <Label htmlFor="name" className="text-sm font-medium text-primary">Full Name *</Label>
-                        <Input
-                          id="name"
-                          name="name"
-                          type="text"
-                          required
-                          value={formData.name}
-                          onChange={handleInputChange}
-                          className="bg-card/50 border-subtle focus:border-blue-400 focus:ring-blue-400/20 transition-all duration-300"
-                          placeholder="Enter your full name"
-                        />
-                      </div>
-                      <div className="space-y-2">
-                        <Label htmlFor="email" className="text-sm font-medium text-primary">Email Address *</Label>
-                        <Input
-                          id="email"
-                          name="email"
-                          type="email"
-                          required
-                          value={formData.email}
-                          onChange={handleInputChange}
-                          className="bg-card/50 border-subtle focus:border-blue-400 focus:ring-blue-400/20 transition-all duration-300"
-                          placeholder="Enter your email"
-                        />
-                      </div>
-                    </div>
-
-                    <div className="grid md:grid-cols-2 gap-6">
-                      <div className="space-y-2">
-                        <Label htmlFor="company" className="text-sm font-medium text-primary">Company</Label>
-                        <Input
-                          id="company"
-                          name="company"
-                          type="text"
-                          value={formData.company}
-                          onChange={handleInputChange}
-                          className="bg-card/50 border-subtle focus:border-blue-400 focus:ring-blue-400/20 transition-all duration-300"
-                          placeholder="Your company name"
-                        />
-                      </div>
-                      <div className="space-y-2">
-                        <Label htmlFor="inquiryType" className="text-sm font-medium text-primary">Inquiry Type</Label>
-                        <select
-                          id="inquiryType"
-                          name="inquiryType"
-                          value={formData.inquiryType}
-                          onChange={handleInputChange}
-                          className="w-full px-3 py-2 bg-card/50 border border-subtle rounded-md text-primary focus:border-blue-400 focus:ring-blue-400/20 transition-all duration-300"
-                        >
-                          <option value="general">General Inquiry</option>
-                          <option value="demo">Request Demo</option>
-                          <option value="support">Technical Support</option>
-                          <option value="admin">Admin Support</option>
-                          <option value="manager">Manager Support</option>
-                          <option value="user">User Support</option>
-                          <option value="integration">System Integration</option>
-                          <option value="pricing">Pricing Information</option>
-                          <option value="partnership">Partnership</option>
-                          <option value="training">Training & Onboarding</option>
-                        </select>
-                      </div>
-                    </div>
-
+              ) : (
+                <form onSubmit={handleSubmit} className="space-y-6">
+                  <div className="grid md:grid-cols-2 gap-6">
                     <div className="space-y-2">
-                      <Label htmlFor="subject" className="text-sm font-medium text-primary">Subject *</Label>
+                      <Label htmlFor="name" className="text-sm font-medium text-primary">Full Name *</Label>
                       <Input
-                        id="subject"
-                        name="subject"
+                        id="name"
+                        name="name"
                         type="text"
                         required
-                        value={formData.subject}
+                        value={formData.name}
                         onChange={handleInputChange}
                         className="bg-card/50 border-subtle focus:border-blue-400 focus:ring-blue-400/20 transition-all duration-300"
-                        placeholder="What's this about?"
+                        placeholder="Enter your full name"
                       />
                     </div>
-
                     <div className="space-y-2">
-                      <Label htmlFor="message" className="text-sm font-medium text-primary">Message *</Label>
-                      <Textarea
-                        id="message"
-                        name="message"
+                      <Label htmlFor="email" className="text-sm font-medium text-primary">Email Address *</Label>
+                      <Input
+                        id="email"
+                        name="email"
+                        type="email"
                         required
-                        value={formData.message}
+                        value={formData.email}
                         onChange={handleInputChange}
-                        className="bg-card/50 border-subtle focus:border-blue-400 focus:ring-blue-400/20 transition-all duration-300 min-h-[120px]"
-                        placeholder="Tell us more about your needs..."
+                        className="bg-card/50 border-subtle focus:border-blue-400 focus:ring-blue-400/20 transition-all duration-300"
+                        placeholder="Enter your email"
                       />
                     </div>
+                  </div>
 
-                    <Button
-                      type="submit"
-                      disabled={isSubmitting}
-                      className="w-full bg-gradient-to-r from-blue-500 to-purple-600 hover:from-blue-600 hover:to-purple-700 text-white font-semibold py-3 px-6 rounded-lg transition-all duration-300 hover:-translate-y-0.5 hover:shadow-xl disabled:opacity-50 disabled:cursor-not-allowed"
-                    >
-                      {isSubmitting ? (
-                        <div className="flex items-center gap-2">
-                          <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin"></div>
-                          Sending Message...
-                        </div>
-                      ) : (
-                        <div className="flex items-center gap-2">
-                          <Send className="w-4 h-4" />
-                          Send Message
-                          <ArrowRight className="w-4 h-4" />
-                        </div>
-                      )}
-                    </Button>
-                  </form>
-                )}
-              </div>
-            </Card>
+                  <div className="grid md:grid-cols-2 gap-6">
+                    <div className="space-y-2">
+                      <Label htmlFor="company" className="text-sm font-medium text-primary">Company</Label>
+                      <Input
+                        id="company"
+                        name="company"
+                        type="text"
+                        value={formData.company}
+                        onChange={handleInputChange}
+                        className="bg-card/50 border-subtle focus:border-blue-400 focus:ring-blue-400/20 transition-all duration-300"
+                        placeholder="Your company name"
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="inquiryType" className="text-sm font-medium text-primary">Inquiry Type</Label>
+                      <select
+                        id="inquiryType"
+                        name="inquiryType"
+                        value={formData.inquiryType}
+                        onChange={handleInputChange}
+                        className="w-full px-3 py-2 bg-card/50 border border-subtle rounded-md text-primary focus:border-blue-400 focus:ring-blue-400/20 transition-all duration-300"
+                      >
+                        <option value="general">General Inquiry</option>
+                        <option value="demo">Request Demo</option>
+                        <option value="support">Technical Support</option>
+                        <option value="admin">Admin Support</option>
+                        <option value="manager">Manager Support</option>
+                        <option value="user">User Support</option>
+                        <option value="integration">System Integration</option>
+                        <option value="pricing">Pricing Information</option>
+                        <option value="partnership">Partnership</option>
+                        <option value="training">Training & Onboarding</option>
+                      </select>
+                    </div>
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label htmlFor="subject" className="text-sm font-medium text-primary">Subject *</Label>
+                    <Input
+                      id="subject"
+                      name="subject"
+                      type="text"
+                      required
+                      value={formData.subject}
+                      onChange={handleInputChange}
+                      className="bg-card/50 border-subtle focus:border-blue-400 focus:ring-blue-400/20 transition-all duration-300"
+                      placeholder="What's this about?"
+                    />
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label htmlFor="message" className="text-sm font-medium text-primary">Message *</Label>
+                    <Textarea
+                      id="message"
+                      name="message"
+                      required
+                      value={formData.message}
+                      onChange={handleInputChange}
+                      className="bg-card/50 border-subtle focus:border-blue-400 focus:ring-blue-400/20 transition-all duration-300 min-h-[120px]"
+                      placeholder="Tell us more about your needs..."
+                    />
+                  </div>
+
+                  <Button
+                    type="submit"
+                    disabled={isSubmitting}
+                    className="w-full bg-gradient-to-r from-blue-500 to-purple-600 hover:from-blue-600 hover:to-purple-700 text-white font-semibold py-3 px-6 rounded-lg transition-all duration-300 hover:-translate-y-0.5 hover:shadow-xl disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    {isSubmitting ? (
+                      <div className="flex items-center gap-2">
+                        <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin"></div>
+                        Sending Message...
+                      </div>
+                    ) : (
+                      <div className="flex items-center gap-2">
+                        <Send className="w-4 h-4" />
+                        Send Message
+                        <ArrowRight className="w-4 h-4" />
+                      </div>
+                    )}
+                  </Button>
+                </form>
+              )}
+            </div>
+          </Card>
         </div>
 
         {/* Contact Information - 2 Columns */}
@@ -275,28 +275,28 @@ export default function ContactPage() {
           <h3 className="text-2xl font-bold text-primary mb-6 text-center">Get in Touch</h3>
           <div className="grid md:grid-cols-2 gap-6">
             {contactInfo.map((item, index) => (
-                  <Card
-                    key={index}
-                    className="p-6 border border-subtle bg-gradient-to-br from-white/10 to-white/5 backdrop-blur-25 hover:shadow-lg hover:shadow-blue-500/25 hover:border-blue-400/50 transition-all duration-400 relative overflow-hidden group"
-                    style={{ animationDelay: `${0.5 + index * 0.1}s` }}
-                  >
-                    {/* Shimmer Effect */}
-                    <div className="absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity duration-600 pointer-events-none">
-                      <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/10 to-transparent -skew-x-12 transform -translate-x-full group-hover:translate-x-full transition-transform duration-700"></div>
-                    </div>
+              <Card
+                key={index}
+                className="p-6 border border-subtle bg-gradient-to-br from-white/10 to-white/5 backdrop-blur-25 hover:shadow-lg hover:shadow-blue-500/25 hover:border-blue-400/50 transition-all duration-400 relative overflow-hidden group"
+                style={{ animationDelay: `${0.5 + index * 0.1}s` }}
+              >
+                {/* Shimmer Effect */}
+                <div className="absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity duration-600 pointer-events-none">
+                  <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/10 to-transparent -skew-x-12 transform -translate-x-full group-hover:translate-x-full transition-transform duration-700"></div>
+                </div>
 
-                    <div className="flex items-center gap-4 relative z-10">
-                      <div className={`w-12 h-12 rounded-xl bg-gradient-to-br ${item.color} flex items-center justify-center shadow-lg group-hover:scale-110 transition-transform duration-300`}>
-                        <item.icon className="w-6 h-6 text-white" />
-                      </div>
-                      <div className="flex-1">
-                        <h4 className="text-lg font-semibold text-primary mb-1">{item.title}</h4>
-                        <p className="text-sm text-muted mb-2">{item.description}</p>
-                        <p className="text-primary font-medium">{item.value}</p>
-                      </div>
-                    </div>
-                  </Card>
-                ))}
+                <div className="flex items-center gap-4 relative z-10">
+                  <div className={`w-12 h-12 rounded-xl bg-gradient-to-br ${item.color} flex items-center justify-center shadow-lg group-hover:scale-110 transition-transform duration-300`}>
+                    <item.icon className="w-6 h-6 text-white" />
+                  </div>
+                  <div className="flex-1">
+                    <h4 className="text-lg font-semibold text-primary mb-1">{item.title}</h4>
+                    <p className="text-sm text-muted mb-2">{item.description}</p>
+                    <p className="text-primary font-medium">{item.value}</p>
+                  </div>
+                </div>
+              </Card>
+            ))}
           </div>
         </div>
 
@@ -362,10 +362,10 @@ export default function ContactPage() {
           </div>
         </div>
       </div>
-      
+
       {/* Separator before Footer */}
       <EnhancedSeparator variant="gradient" thickness="medium" animated className="my-16" />
-      
+
       {/* Footer */}
       <Footer />
     </section>

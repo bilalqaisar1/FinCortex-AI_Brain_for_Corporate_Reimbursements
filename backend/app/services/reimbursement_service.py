@@ -7,7 +7,7 @@ import logging
 from dataclasses import dataclass
 from decimal import Decimal, InvalidOperation
 from typing import Any, Dict, List, Optional
-from uuid import UUID
+from uuid import UUID, uuid4
 
 from postgrest import APIError
 
@@ -27,9 +27,15 @@ class ReimbursementItemPayload:
 class ReimbursementSubmission:
     receipt_code: str
     user_id: UUID
+    admin_id: Optional[UUID]
+    manager_id: Optional[UUID]
+    department_id: Optional[int]
+    company_id: Optional[UUID]
     vendor_name: str
     vendor_type: Optional[str]
     address: Optional[str]
+    invoice_number: Optional[str]
+    payment_method: Optional[str]
     category_id: Optional[int]
     subcategory_id: Optional[int]
     receipt_type_id: Optional[int]
@@ -107,14 +113,13 @@ def _get_or_create_vendor(name: str, vendor_type: Optional[str], address: Option
         if company_id:
             vendor_data["company_id"] = company_id
         
-        insert_response = (
-            supabase.table("vendors")
-            .insert(vendor_data)
-            .select("vendor_id")
-            .single()
-            .execute()
-        )
-        return insert_response.data["vendor_id"]
+        insert_response = supabase.table("vendors").insert(
+            vendor_data,
+            returning="representation",
+        ).execute()
+        if not insert_response.data:
+            raise ReimbursementServiceError("Failed to create vendor: no data returned")
+        return insert_response.data[0]["vendor_id"]
     except APIError as exc:
         logger.error("Failed to create vendor: %s", exc.message)
         raise ReimbursementServiceError(f"Failed to create vendor: {exc.message}") from exc
@@ -140,7 +145,8 @@ def _insert_items(reimbursement_id: int, items: List[ReimbursementItemPayload]) 
             {
                 "reimbursement_id": reimbursement_id,
                 "item_name": item.item.strip(),
-                "quantity": float(quantity),
+                # quantity column is integer; cast decimal safely
+                "quantity": int(quantity),
                 "unit_price": str(unit_price),
                 "total_price": str(total_price),
             }
@@ -206,7 +212,7 @@ def create_reimbursement(
     submission: ReimbursementSubmission, 
     *, 
     attachment: Optional[Dict[str, Any]] = None,
-    company_id: Optional[int] = None
+    company_id: Optional[UUID] = None
 ) -> Dict[str, Any]:
     """
     Create reimbursement record with related data.
@@ -224,19 +230,80 @@ def create_reimbursement(
     supabase = get_supabase_client()
 
     # Get user's company_id if not provided
-    if company_id is None:
+    # Enrich context: manager, department, admin, company
+    try:
+        user_response = (
+            supabase.table("users")
+            .select("manager_id, department_id")
+            .eq("user_id", str(submission.user_id))
+            .single()
+            .execute()
+        )
+        user_row = user_response.data if user_response and user_response.data else {}
+    except Exception as exc:
+        logger.warning("Could not fetch user context: %s", exc)
+        user_row = {}
+
+    # Infer manager_id/department_id from user record when not provided
+    if not submission.manager_id and user_row.get("manager_id"):
         try:
-            user_response = (
-                supabase.table("users")
-                .select("company_id")
-                .eq("user_id", str(submission.user_id))
+            submission.manager_id = UUID(user_row["manager_id"])
+        except Exception:
+            submission.manager_id = None
+    if submission.department_id is None and user_row.get("department_id") is not None:
+        submission.department_id = user_row["department_id"]
+
+    # Infer admin_id from manager if missing
+    if not submission.admin_id and submission.manager_id:
+        try:
+            mgr_response = (
+                supabase.table("managers")
+                .select("admin_id")
+                .eq("manager_id", str(submission.manager_id))
                 .single()
                 .execute()
             )
-            if user_response.data and user_response.data.get("company_id"):
-                company_id = user_response.data["company_id"]
+            if mgr_response.data and mgr_response.data.get("admin_id"):
+                try:
+                    submission.admin_id = UUID(mgr_response.data["admin_id"])
+                except Exception:
+                    submission.admin_id = None
         except Exception as exc:
-            logger.warning("Could not fetch user company_id: %s", exc)
+            logger.warning("Could not fetch manager admin_id: %s", exc)
+
+    # Infer company_id: prefer provided, else by admin, else via company_managers for manager
+    if submission.company_id is None:
+        # Try admin -> companies.admin_id
+        if submission.admin_id:
+            try:
+                comp_resp = (
+                    supabase.table("companies")
+                    .select("company_id")
+                    .eq("admin_id", str(submission.admin_id))
+                    .limit(1)
+                    .single()
+                    .execute()
+                )
+                if comp_resp.data and comp_resp.data.get("company_id"):
+                    submission.company_id = UUID(comp_resp.data["company_id"])
+            except Exception as exc:
+                logger.warning("Could not fetch company by admin_id: %s", exc)
+
+        # If still None, try manager mapping
+        if submission.company_id is None and submission.manager_id:
+            try:
+                cm_resp = (
+                    supabase.table("company_managers")
+                    .select("company_id")
+                    .eq("manager_id", str(submission.manager_id))
+                    .limit(1)
+                    .single()
+                    .execute()
+                )
+                if cm_resp.data and cm_resp.data.get("company_id"):
+                    submission.company_id = UUID(cm_resp.data["company_id"])
+            except Exception as exc:
+                logger.warning("Could not fetch company by manager_id: %s", exc)
     
     # Get or create vendor
     try:
@@ -255,27 +322,48 @@ def create_reimbursement(
     # Parse amount
     amount_claimed = _parse_decimal(submission.amount_claimed, "0")
     
-    # Insert main reimbursement record
+    # Insert main reimbursement record with duplicate receipt_code fallback
+    def _insert_reimbursement(receipt_code: str):
+        return supabase.table("reimbursements").insert(
+            {
+                "receipt_code": receipt_code.strip(),
+                "user_id": str(submission.user_id),
+                "admin_id": str(submission.admin_id) if submission.admin_id else None,
+                "manager_id": str(submission.manager_id) if submission.manager_id else None,
+                "department_id": submission.department_id,
+                "company_id": str(submission.company_id) if submission.company_id else None,
+                "vendor_id": vendor_id,
+                "invoice_number": submission.invoice_number.strip() if submission.invoice_number else None,
+                "payment_method": submission.payment_method.strip() if submission.payment_method else "unknown",
+                "category_id": submission.category_id,
+                "subcategory_id": submission.subcategory_id,
+                "receipt_type_id": submission.receipt_type_id,
+                "amount_claimed": str(amount_claimed),
+                "description": submission.description.strip() if submission.description else None,
+                "expense_date": submission.expense_date,
+                "status": "pending",
+            },
+            returning="representation",
+        ).execute()
+
     try:
-        reimbursement_response = (
-            supabase.table("reimbursements")
-            .insert(
-                {
-                    "receipt_code": submission.receipt_code.strip(),
-                    "user_id": str(submission.user_id),
-                    "vendor_id": vendor_id,
-                    "category_id": submission.category_id,
-                    "subcategory_id": submission.subcategory_id,
-                    "receipt_type_id": submission.receipt_type_id,
-                    "amount_claimed": str(amount_claimed),
-                    "description": submission.description.strip() if submission.description else None,
-                    "expense_date": submission.expense_date,
-                }
-            )
-            .select("reimbursement_id, receipt_code")
-            .single()
-            .execute()
-        )
+        try:
+            reimbursement_response = _insert_reimbursement(submission.receipt_code)
+        except APIError as exc:
+            # Handle duplicate receipt_code by retrying with a generated code
+            if "receipt_code" in exc.message.lower() and getattr(exc, "code", None) in ("23505", None):
+                fallback_code = f"RC-{uuid4().hex[:8].upper()}"
+                logger.warning(
+                    "Duplicate receipt_code '%s' detected; retrying with '%s'",
+                    submission.receipt_code,
+                    fallback_code,
+                )
+                reimbursement_response = _insert_reimbursement(fallback_code)
+            else:
+                raise
+
+        if not reimbursement_response.data:
+            raise ReimbursementServiceError("Failed to create reimbursement: no data returned")
     except APIError as exc:
         logger.error("Reimbursement insertion failed: %s", exc.message)
         raise ReimbursementServiceError(f"Failed to create reimbursement: {exc.message}") from exc
@@ -283,7 +371,7 @@ def create_reimbursement(
         logger.error("Unexpected error creating reimbursement: %s", exc)
         raise ReimbursementServiceError(f"Unexpected error: {str(exc)}") from exc
 
-    reimbursement = reimbursement_response.data
+    reimbursement = reimbursement_response.data[0]
     reimbursement_id = reimbursement["reimbursement_id"]
 
     # Insert related records

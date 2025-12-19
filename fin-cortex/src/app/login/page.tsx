@@ -123,8 +123,8 @@ export default function LoginPage() {
         return;
       }
 
-      // Check if user exists (id field indicates if email was found)
-      if (!data.id) {
+      // Check if user exists (useruuid field contains UUID or empty string)
+      if (!data.useruuid || data.useruuid === '' || data.useruuid === null) {
         setErrorMessage("No account found with this email address.");
         showToast('error', 'Account Not Found', 'No account found with this email address.');
         setIsLoading(false);
@@ -150,7 +150,9 @@ export default function LoginPage() {
       console.log('🚀 Proceeding with login for role:', data.role);
 
       // All validations passed - proceed with login
-      const loginResult = await loginWithRPC(sanitizedEmail, sanitizedPassword, data.role);
+      // Pass the UUID from RPC response (useruuid field)
+      const userId = data.useruuid && typeof data.useruuid === 'string' && data.useruuid !== '' ? data.useruuid : undefined;
+      const loginResult = await loginWithRPC(sanitizedEmail, sanitizedPassword, data.role, userId);
 
       if (loginResult.error) {
         console.error('❌ Login error:', loginResult.error);
@@ -163,9 +165,14 @@ export default function LoginPage() {
       // Success - show personalized welcome message with user's name
       const userName = data.name || sanitizedEmail.split('@')[0];
       console.log('🎉 Login successful! Welcome:', userName);
+      console.log('🎭 User role:', data.role);
+
+      // Wait a bit for user profile to load
+      await new Promise(resolve => setTimeout(resolve, 500));
+
       showToast('success', 'Login Successful', `Welcome back, ${userName}! Redirecting to home...`);
 
-      // Redirect to home page - navbar will show user info and Dashboard button
+      // Always redirect to home page - dashboard button will link to correct dashboard based on role
       router.push('/');
 
     } catch (error) {

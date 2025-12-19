@@ -37,11 +37,31 @@ export const auth = {
 
   // Sign in with email and password
   async signIn(email: string, password: string) {
+    try {
     const { data, error } = await supabase.auth.signInWithPassword({
       email,
       password
     })
+      
+      // Handle refresh token errors
+      if (error && (error.message?.includes('refresh') || error.message?.includes('Invalid Refresh Token') || error.message?.includes('Refresh Token Not Found'))) {
+        console.warn('Refresh token error detected during sign in, clearing session');
+        await supabase.auth.signOut().catch(() => {
+          // Silently handle sign out errors
+        });
+      }
+      
     return { data, error }
+    } catch (error: any) {
+      // Handle unexpected errors
+      if (error?.message?.includes('refresh') || error?.message?.includes('Invalid Refresh Token') || error?.message?.includes('Refresh Token Not Found')) {
+        console.warn('Refresh token error in signIn, clearing session');
+        await supabase.auth.signOut().catch(() => {
+          // Silently handle sign out errors
+        });
+      }
+      return { data: null, error }
+    }
   },
 
   // Sign in with Google
@@ -120,8 +140,31 @@ export const auth = {
 
   // Get session
   async getSession() {
+    try {
     const { data: { session }, error } = await supabase.auth.getSession()
+      
+      // Handle refresh token errors
+      if (error && (error.message?.includes('refresh') || error.message?.includes('Invalid Refresh Token') || error.message?.includes('Refresh Token Not Found'))) {
+        console.warn('Refresh token error detected, clearing session');
+        // Clear the invalid session
+        await supabase.auth.signOut().catch(() => {
+          // Silently handle sign out errors
+        });
+        return { session: null, error: null };
+      }
+      
     return { session, error }
+    } catch (error: any) {
+      // Handle unexpected errors
+      if (error?.message?.includes('refresh') || error?.message?.includes('Invalid Refresh Token') || error?.message?.includes('Refresh Token Not Found')) {
+        console.warn('Refresh token error in getSession, clearing session');
+        await supabase.auth.signOut().catch(() => {
+          // Silently handle sign out errors
+        });
+        return { session: null, error: null };
+      }
+      return { session: null, error }
+    }
   }
 }
 

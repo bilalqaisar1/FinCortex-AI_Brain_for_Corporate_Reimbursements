@@ -82,7 +82,8 @@ def upload_receipt_to_bucket(file_path: str, *, prefix: Optional[str] = None) ->
             file_content,
             {
                 "content-type": content_type,
-                "upsert": True,
+                # storage3/httpx requires header values to be strings
+                "upsert": "true",
             },
         )
         

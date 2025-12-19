@@ -45,11 +45,11 @@ export async function POST(request: Request) {
         }
 
         // Return the RPC response
-        // Response format: { id: boolean, role: string|null, name: string|null, password: boolean, employee_code?: boolean }
+        // Response format: { useruuid: uuid|empty_string, role: string|null, name: string|null, password: boolean, employee_code?: boolean }
         return NextResponse.json({
             success: true,
             data: {
-                id: data.id,
+                useruuid: data.useruuid || null,  // RPC returns 'useruuid' field with UUID or empty string
                 role: data.role,
                 name: data.name,
                 password: data.password,

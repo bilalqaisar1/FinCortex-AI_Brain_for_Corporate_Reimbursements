@@ -28,6 +28,8 @@ from app.services.reimbursement_service import (
     create_reimbursement,
 )
 from app.services.storage_service import StorageUploadError, upload_receipt_to_bucket
+from app.services.remote_receipt_service import process_remote_receipt
+from app.services.supabase_rpc_service import get_expense_categories_with_subcategories, SupabaseRPCError
 from app.config.settings import settings
 
 logger = logging.getLogger(__name__)
@@ -44,6 +46,10 @@ class ReimbursementItemModel(BaseModel):
 class ReimbursementPayloadModel(BaseModel):
     receipt_code: Optional[str] = Field(None, description="Unique receipt identifier")
     invoice_number: Optional[str] = Field(None, description="Original invoice number")
+    admin_id: Optional[UUID] = Field(None, description="Admin user ID")
+    manager_id: Optional[UUID] = Field(None, description="Manager user ID")
+    department_id: Optional[int] = Field(None, description="Department ID")
+    company_id: Optional[UUID] = Field(None, description="Company ID (usually inferred)")
     vendor_name: str = Field(..., description="Vendor name")
     vendor_type: Optional[str] = Field(None, description="Vendor type/category")
     address: Optional[str] = Field(None, description="Vendor address")
@@ -51,6 +57,7 @@ class ReimbursementPayloadModel(BaseModel):
     category_id: Optional[int] = Field(None, description="Expense category ID")
     subcategory_id: Optional[int] = Field(None, description="Expense subcategory ID")
     receipt_type_id: Optional[int] = Field(None, description="Receipt type ID")
+    payment_method: Optional[str] = Field(None, description="Payment method (cash/card/etc.)")
     total_amount: str = Field(..., description="Total claimed amount")
     description: Optional[str] = Field(None, description="Expense description")
     user_id: UUID = Field(..., description="Submitting user ID")
@@ -88,12 +95,16 @@ def _normalize_date(date_str: Optional[str]) -> Optional[str]:
 
 
 @router.post("/receipt/upload")
-async def upload_receipt(file: UploadFile = File(...)) -> JSONResponse:
+async def upload_receipt(
+    file: UploadFile = File(...),
+    admin_uuid: Optional[str] = Form(None),
+) -> JSONResponse:
     """
     Upload receipt image and process it through OCR + GPT.
 
     Args:
         file: Uploaded receipt image file
+        admin_uuid: Optional admin UUID to scope categories/subcategories
 
     Returns:
         JSON response with raw_text and structured data
@@ -101,10 +112,16 @@ async def upload_receipt(file: UploadFile = File(...)) -> JSONResponse:
     Raises:
         HTTPException: If file processing fails
     """
+    logger.info("📥 POST /receipt/upload - Request received: filename='%s', content_type='%s', admin_uuid='%s'", 
+                file.filename, file.content_type, admin_uuid)
+    
     if not file.content_type or not file.content_type.startswith("image/"):
+        error_msg = "Invalid file type. Please upload an image file (PNG, JPG, JPEG, etc.)"
+        logger.error("❌ POST /receipt/upload - Validation error: %s", error_msg)
+        logger.error("📤 POST /receipt/upload - Error response: status_code=400, detail='%s'", error_msg)
         raise HTTPException(
             status_code=400,
-            detail="Invalid file type. Please upload an image file (PNG, JPG, JPEG, etc.)",
+            detail=error_msg,
         )
 
     temp_dir = os.path.abspath(settings.temp_dir)
@@ -117,34 +134,61 @@ async def upload_receipt(file: UploadFile = File(...)) -> JSONResponse:
         with open(saved_path, "wb") as out_file:
             shutil.copyfileobj(file.file, out_file)
 
-        logger.info("Image successfully uploaded: %s", temp_filename)
+        logger.info("✅ POST /receipt/upload - Image successfully saved: %s", temp_filename)
 
-        result = process_receipt(saved_path)
+        categories_data = None
+        if admin_uuid:
+            try:
+                categories_data = get_expense_categories_with_subcategories(admin_uuid)
+            except SupabaseRPCError as rpc_exc:
+                logger.warning(
+                    "⚠️ Failed to fetch categories for admin %s: %s",
+                    admin_uuid,
+                    rpc_exc,
+                )
+            except Exception as rpc_exc:
+                logger.warning(
+                    "⚠️ Unexpected error fetching categories for admin %s: %s",
+                    admin_uuid,
+                    rpc_exc,
+                )
 
-        logger.info("Receipt processing completed successfully")
-
-        return JSONResponse(
-            content={
-                "success": True,
-                "data": result,
-            }
+        result = process_receipt(
+            saved_path,
+            admin_uuid=admin_uuid,
+            categories_data=categories_data,
         )
 
+        response_data = {
+            "success": True,
+            "data": result,
+        }
+        logger.info("✅ POST /receipt/upload - Receipt processing completed successfully")
+        logger.info("📤 POST /receipt/upload - Final response: success=True, data keys=%s", 
+                   list(result.keys()) if isinstance(result, dict) else "N/A")
+
+        return JSONResponse(content=response_data)
+
     except ReceiptProcessingError as exc:
-        logger.error("Receipt processing failed: %s", exc)
-        raise HTTPException(status_code=500, detail=str(exc)) from exc
+        error_msg = str(exc)
+        logger.error("❌ POST /receipt/upload - Receipt processing failed: %s", error_msg, exc_info=True)
+        logger.error("📤 POST /receipt/upload - Error response: status_code=500, detail='%s'", error_msg)
+        raise HTTPException(status_code=500, detail=error_msg) from exc
     except Exception as exc:
-        logger.error("Unexpected error during receipt upload: %s", exc)
+        error_msg = f"Failed to process receipt: {str(exc)}"
+        logger.error("❌ POST /receipt/upload - Unexpected error: %s", error_msg, exc_info=True)
+        logger.error("📤 POST /receipt/upload - Error response: status_code=500, detail='%s'", error_msg)
         raise HTTPException(
             status_code=500,
-            detail=f"Failed to process receipt: {str(exc)}",
+            detail=error_msg,
         ) from exc
     finally:
         try:
             if os.path.exists(saved_path):
                 os.remove(saved_path)
         except Exception as cleanup_error:
-            logger.warning("Failed to delete temporary file %s: %s", saved_path, cleanup_error)
+            logger.warning("⚠️ POST /receipt/upload - Failed to delete temporary file %s: %s", 
+                          saved_path, cleanup_error)
         finally:
             file.file.close()
 
@@ -153,11 +197,16 @@ async def upload_receipt(file: UploadFile = File(...)) -> JSONResponse:
 async def create_reimbursement_endpoint(
     receipt_code: str = Form(...),
     user_id: str = Form(...),
+    admin_id: Optional[str] = Form(None),
+    manager_id: Optional[str] = Form(None),
+    department_id: Optional[str] = Form(None),
+    company_id: Optional[str] = Form(None),
     vendor_name: str = Form(...),
-    expense_date: str = Form(...),
-    category_id: str = Form(...),
-    receipt_type_id: str = Form(...),
-    vendor_type: str = Form(...),
+    expense_date: Optional[str] = Form(None),
+    category_id: Optional[str] = Form(None),
+    receipt_type_id: Optional[str] = Form(None),
+    payment_method: Optional[str] = Form(None),
+    vendor_type: Optional[str] = Form(None),
     amount_claimed: str = Form(...),
     subcategory_id: Optional[str] = Form(None),
     invoice_number: Optional[str] = Form(None),
@@ -172,11 +221,18 @@ async def create_reimbursement_endpoint(
     Persist reimbursement details, upload receipt to Supabase Storage,
     and create related records (items, attachments, OCR snapshot).
     """
+    logger.info("📥 POST /reimbursements - Request received: receipt_code='%s', user_id='%s', vendor_name='%s', amount_claimed='%s'", 
+                receipt_code, user_id, vendor_name, amount_claimed)
+    
     try:
         items_list = json.loads(items) if items else []
         parsed_items = [ReimbursementItemModel(**item) for item in items_list]
+        logger.info("✅ POST /reimbursements - Parsed %d items from JSON", len(parsed_items))
     except (json.JSONDecodeError, ValidationError) as exc:
-        raise HTTPException(status_code=400, detail=f"Invalid items JSON: {exc}") from exc
+        error_msg = f"Invalid items JSON: {exc}"
+        logger.error("❌ POST /reimbursements - Validation error: %s", error_msg)
+        logger.error("📤 POST /reimbursements - Error response: status_code=400, detail='%s'", error_msg)
+        raise HTTPException(status_code=400, detail=error_msg) from exc
 
     ocr_structured_dict: Optional[Dict[str, Any]] = None
     if ocr_structured:
@@ -194,6 +250,32 @@ async def create_reimbursement_endpoint(
     except ValueError:
         raise HTTPException(status_code=400, detail="Invalid user_id format") from None
 
+    admin_uuid: Optional[UUID] = None
+    if admin_id:
+        try:
+            admin_uuid = UUID(admin_id)
+        except ValueError:
+            admin_uuid = None
+
+    manager_uuid: Optional[UUID] = None
+    if manager_id:
+        try:
+            manager_uuid = UUID(manager_id)
+        except ValueError:
+            manager_uuid = None
+
+    company_uuid: Optional[UUID] = None
+    if company_id:
+        try:
+            company_uuid = UUID(company_id)
+        except ValueError:
+            company_uuid = None
+
+    try:
+        department_id_int = int(department_id) if department_id and department_id.strip() else None
+    except (ValueError, AttributeError):
+        department_id_int = None
+
     # Parse integer IDs with validation
     try:
         category_id_int = int(category_id) if category_id and category_id.strip() else None
@@ -210,9 +292,85 @@ async def create_reimbursement_endpoint(
     except (ValueError, AttributeError):
         receipt_type_id_int = None
 
+    # Attempt to fall back to OCR structured category IDs / names if not provided
+    def _extract_int(obj: Optional[Dict[str, Any]], key: str) -> Optional[int]:
+        if not obj or key not in obj:
+            return None
+        try:
+            return int(obj.get(key))
+        except (TypeError, ValueError):
+            return None
+
+    def _extract_str(obj: Optional[Dict[str, Any]], keys: List[str]) -> Optional[str]:
+        if not obj:
+            return None
+        for key in keys:
+            val = obj.get(key)
+            if isinstance(val, str) and val.strip():
+                return val.strip()
+        return None
+
+    if category_id_int is None and ocr_structured_dict:
+        category_id_int = _extract_int(ocr_structured_dict, "category_id") or _extract_int(
+            ocr_structured_dict, "categoryId"
+        )
+    if subcategory_id_int is None and ocr_structured_dict:
+        subcategory_id_int = _extract_int(ocr_structured_dict, "subcategory_id") or _extract_int(
+            ocr_structured_dict, "subcategoryId"
+        )
+
+    # If still missing, try resolving by names via RPC using admin_id
+    if (category_id_int is None or subcategory_id_int is None) and admin_uuid and ocr_structured_dict:
+        ocr_cat_name = _extract_str(
+            ocr_structured_dict,
+            ["Categories", "Category", "category", "category_name", "categoryName"],
+        )
+        ocr_sub_name = _extract_str(
+            ocr_structured_dict,
+            ["Subcategories", "Subcategory", "subcategory", "subcategory_name", "subcategoryName"],
+        )
+        try:
+            categories_data = get_expense_categories_with_subcategories(str(admin_uuid))
+            def _norm(s: str) -> str:
+                return s.strip().lower()
+
+            matched_cat = None
+            if ocr_cat_name:
+                for cat in categories_data or []:
+                    if _norm(cat.get("category_name", "")) == _norm(ocr_cat_name):
+                        matched_cat = cat
+                        category_id_int = cat.get("category_id")
+                        break
+            # If no category match but subcategory name exists, search all subs
+            if matched_cat is None and ocr_sub_name:
+                for cat in categories_data or []:
+                    for sub in cat.get("subcategories") or []:
+                        if _norm(sub.get("subcategory_name", "")) == _norm(ocr_sub_name):
+                            matched_cat = cat
+                            category_id_int = cat.get("category_id")
+                            subcategory_id_int = sub.get("subcategory_id")
+                            break
+                    if matched_cat:
+                        break
+
+            # If category matched but subcategory still missing, try matching within that category
+            if matched_cat and ocr_sub_name and subcategory_id_int is None:
+                for sub in matched_cat.get("subcategories") or []:
+                    if _norm(sub.get("subcategory_name", "")) == _norm(ocr_sub_name):
+                        subcategory_id_int = sub.get("subcategory_id")
+                        break
+        except SupabaseRPCError as rpc_exc:
+            logger.warning("Could not resolve categories via RPC: %s", rpc_exc)
+        except Exception as rpc_exc:
+            logger.warning("Unexpected error resolving categories via RPC: %s", rpc_exc)
+
     parsed_payload = ReimbursementPayloadModel(
         receipt_code=receipt_code,
         user_id=user_uuid,
+        admin_id=admin_uuid,
+        manager_id=manager_uuid,
+        department_id=department_id_int,
+        company_id=company_uuid,
         vendor_name=vendor_name,
         vendor_type=vendor_type.strip() if vendor_type else None,
         address=address.strip() if address else None,
@@ -220,6 +378,7 @@ async def create_reimbursement_endpoint(
         category_id=category_id_int,
         subcategory_id=subcategory_id_int,
         receipt_type_id=receipt_type_id_int,
+        payment_method=payment_method.strip() if payment_method else None,
         total_amount=amount_claimed,
         description=description.strip() if description else None,
         invoice_number=invoice_number.strip() if invoice_number else None,
@@ -245,9 +404,15 @@ async def create_reimbursement_endpoint(
         submission = ReimbursementSubmission(
             receipt_code=_normalize_receipt_code(parsed_payload),
             user_id=parsed_payload.user_id,
+            admin_id=parsed_payload.admin_id,
+            manager_id=parsed_payload.manager_id,
+            department_id=parsed_payload.department_id,
+            company_id=parsed_payload.company_id,
             vendor_name=parsed_payload.vendor_name.strip(),
             vendor_type=parsed_payload.vendor_type.strip() if parsed_payload.vendor_type else None,
             address=parsed_payload.address.strip() if parsed_payload.address else None,
+            invoice_number=parsed_payload.invoice_number,
+            payment_method=parsed_payload.payment_method,
             category_id=parsed_payload.category_id,
             subcategory_id=parsed_payload.subcategory_id,
             receipt_type_id=parsed_payload.receipt_type_id,
@@ -275,21 +440,45 @@ async def create_reimbursement_endpoint(
             },
         )
 
-        return {
+        # Auto-upload compressed copy to storage bucket (test mode)
+        attachment_upload = None
+        try:
+            with open(saved_path, "rb") as fh:
+                file_bytes = fh.read()
+            attachment_upload = process_remote_receipt(
+                file_bytes=file_bytes,
+                original_filename=receipt_file.filename or temp_filename,
+                content_type=receipt_file.content_type or "application/octet-stream",
+                reimbursement_id=None,
+                admin_prefix=f"uploads/{parsed_payload.user_id}",
+            )
+        except Exception as upload_exc:
+            logger.warning("Auto bucket upload on receipt upload failed: %s", upload_exc)
+
+        response_data = {
             "success": True,
             "data": {
                 "reimbursement_id": reimbursement["reimbursement_id"],
                 "receipt_code": reimbursement["receipt_code"],
                 "attachment_url": storage_result.public_url,
+                "auto_upload": attachment_upload,
             },
         }
+        logger.info("✅ POST /reimbursements - Reimbursement created successfully: reimbursement_id=%s, receipt_code='%s'", 
+                   reimbursement["reimbursement_id"], reimbursement["receipt_code"])
+        logger.info("📤 POST /reimbursements - Final response: %s", response_data)
+        return response_data
 
     except (ReimbursementServiceError, StorageUploadError) as exc:
-        logger.error("Reimbursement creation failed: %s", exc)
-        raise HTTPException(status_code=400, detail=str(exc)) from exc
+        error_msg = str(exc)
+        logger.error("❌ POST /reimbursements - Reimbursement creation failed: %s", error_msg, exc_info=True)
+        logger.error("📤 POST /reimbursements - Error response: status_code=400, detail='%s'", error_msg)
+        raise HTTPException(status_code=400, detail=error_msg) from exc
     except Exception as exc:
-        logger.error("Unexpected error creating reimbursement: %s", exc)
-        raise HTTPException(status_code=500, detail="Failed to create reimbursement") from exc
+        error_msg = "Failed to create reimbursement"
+        logger.error("❌ POST /reimbursements - Unexpected error: %s", str(exc), exc_info=True)
+        logger.error("📤 POST /reimbursements - Error response: status_code=500, detail='%s'", error_msg)
+        raise HTTPException(status_code=500, detail=error_msg) from exc
     finally:
         try:
             if os.path.exists(saved_path):

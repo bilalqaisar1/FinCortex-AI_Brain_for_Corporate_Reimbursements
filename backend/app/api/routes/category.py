@@ -37,59 +37,96 @@ async def create_category(request: CreateCategoryRequest) -> Dict[str, Any]:
     
     Returns the created or existing category ID.
     """
-    supabase = get_supabase_client()
+    category_name = request.category_name.strip()
+    logger.info("📥 POST /categories - Request received: category_name='%s', company_id=%s", 
+                category_name, request.company_id)
     
-    # Check if category already exists (case-insensitive)
-    existing = (
-        supabase.table("expense_categories")
-        .select("category_id, category_name")
-        .ilike("category_name", request.category_name.strip())
-        .limit(1)
-        .execute()
-    )
-    
-    if existing.data:
-        # Return existing category
-        category = existing.data[0]
-        # Verify exact match (case-insensitive)
-        if category["category_name"].lower() == request.category_name.strip().lower():
-            return {
+    try:
+        supabase = get_supabase_client()
+
+        # Fetch all categories and filter in Python for exact case-insensitive match
+        try:
+            existing = (
+                supabase.table("expense_categories")
+                .select("category_id, category_name")
+                .execute()
+            )
+        except Exception as query_exc:
+            logger.warning("Failed to fetch existing categories, proceeding with creation: %s", query_exc)
+            existing = type("obj", (object,), {"data": []})()
+
+        matched_category = None
+        if existing.data:
+            for cat in existing.data:
+                if cat["category_name"].lower() == category_name.lower():
+                    matched_category = cat
+                    break
+
+        if matched_category:
+            response_data = {
                 "success": True,
                 "data": {
-                    "category_id": category["category_id"],
-                    "category_name": category["category_name"],
+                    "category_id": matched_category["category_id"],
+                    "category_name": matched_category["category_name"],
                     "created": False,
                 },
             }
-    
-    # Create new category
-    try:
-        insert_data = {
-            "category_name": request.category_name.strip(),
+            logger.info(
+                "✅ POST /categories - Category already exists: category_id=%s, category_name='%s'",
+                matched_category["category_id"],
+                matched_category["category_name"],
+            )
+            logger.info("📤 POST /categories - Final response: %s", response_data)
+            return response_data
+
+        insert_payload = {
+            "category_name": category_name,
             "description": request.description,
         }
         if request.company_id:
-            insert_data["company_id"] = request.company_id
-        
-        result = (
-            supabase.table("expense_categories")
-            .insert(insert_data)
-            .select("category_id, category_name")
-            .single()
-            .execute()
-        )
-        
-        return {
+            insert_payload["company_id"] = request.company_id
+
+        try:
+            insert_result = supabase.table("expense_categories").insert(insert_payload).execute()
+
+            if insert_result.data and len(insert_result.data) > 0:
+                inserted_category = insert_result.data[0]
+            else:
+                query_result = (
+                    supabase.table("expense_categories")
+                    .select("category_id, category_name")
+                    .eq("category_name", category_name)
+                    .limit(1)
+                    .execute()
+                )
+                if not query_result.data:
+                    raise Exception("Failed to retrieve inserted category")
+                inserted_category = query_result.data[0]
+        except Exception as insert_exc:
+            logger.error("Category insert failed: %s", insert_exc)
+            raise Exception(f"Failed to insert category: {str(insert_exc)}") from insert_exc
+
+        response_data = {
             "success": True,
             "data": {
-                "category_id": result.data["category_id"],
-                "category_name": result.data["category_name"],
+                "category_id": inserted_category["category_id"],
+                "category_name": inserted_category["category_name"],
                 "created": True,
             },
         }
+        logger.info(
+            "✅ POST /categories - Category created successfully: category_id=%s, category_name='%s'",
+            inserted_category["category_id"],
+            inserted_category["category_name"],
+        )
+        logger.info("📤 POST /categories - Final response: %s", response_data)
+        return response_data
+
     except Exception as exc:
-        logger.error("Failed to create category: %s", exc)
-        raise HTTPException(status_code=500, detail=f"Failed to create category: {str(exc)}") from exc
+        error_msg = f"Failed to create category: {str(exc)}"
+        logger.error("❌ POST /categories - Error: %s", error_msg, exc_info=True)
+        logger.error("📤 POST /categories - Error response: status_code=500, detail='%s'", error_msg)
+        raise HTTPException(status_code=500, detail=error_msg) from exc
 
 
 @router.post("/subcategories")
@@ -99,56 +136,97 @@ async def create_subcategory(request: CreateSubcategoryRequest) -> Dict[str, Any
     
     Returns the created or existing subcategory ID.
     """
-    supabase = get_supabase_client()
+    subcategory_name = request.subcategory_name.strip()
+    logger.info("📥 POST /subcategories - Request received: subcategory_name='%s', category_id=%s", 
+                subcategory_name, request.category_id)
     
-    # Check if subcategory already exists for this category (case-insensitive)
-    existing = (
-        supabase.table("expense_subcategories")
-        .select("subcategory_id, subcategory_name, category_id")
-        .eq("category_id", request.category_id)
-        .ilike("subcategory_name", request.subcategory_name.strip())
-        .limit(1)
-        .execute()
-    )
-    
-    if existing.data:
-        # Verify exact match (case-insensitive)
-        subcat = existing.data[0]
-        if subcat["subcategory_name"].lower() == request.subcategory_name.strip().lower():
-            return {
+    try:
+        supabase = get_supabase_client()
+
+        # Fetch all subcategories for this category and filter in Python
+        try:
+            existing = (
+                supabase.table("expense_subcategories")
+                .select("subcategory_id, subcategory_name, category_id")
+                .eq("category_id", request.category_id)
+                .execute()
+            )
+        except Exception as query_exc:
+            logger.warning("Failed to fetch existing subcategories, proceeding with creation: %s", query_exc)
+            existing = type("obj", (object,), {"data": []})()
+
+        matched_subcat = None
+        if existing.data:
+            for subcat in existing.data:
+                if subcat["subcategory_name"].lower() == subcategory_name.lower():
+                    matched_subcat = subcat
+                    break
+
+        if matched_subcat:
+            response_data = {
                 "success": True,
                 "data": {
-                    "subcategory_id": subcat["subcategory_id"],
-                    "subcategory_name": subcat["subcategory_name"],
-                    "category_id": subcat["category_id"],
+                    "subcategory_id": matched_subcat["subcategory_id"],
+                    "subcategory_name": matched_subcat["subcategory_name"],
+                    "category_id": matched_subcat["category_id"],
                     "created": False,
                 },
             }
-    
-    # Create new subcategory
-    try:
-        result = (
-            supabase.table("expense_subcategories")
-            .insert({
-                "subcategory_name": request.subcategory_name.strip(),
-                "category_id": request.category_id,
-                "description": request.description,
-            })
-            .select("subcategory_id, subcategory_name, category_id")
-            .single()
-            .execute()
-        )
-        
-        return {
+            logger.info(
+                "✅ POST /subcategories - Subcategory already exists: subcategory_id=%s, subcategory_name='%s'",
+                matched_subcat["subcategory_id"],
+                matched_subcat["subcategory_name"],
+            )
+            logger.info("📤 POST /subcategories - Final response: %s", response_data)
+            return response_data
+
+        insert_payload = {
+            "subcategory_name": subcategory_name,
+            "category_id": request.category_id,
+            "description": request.description,
+        }
+
+        try:
+            insert_result = supabase.table("expense_subcategories").insert(insert_payload).execute()
+
+            if insert_result.data and len(insert_result.data) > 0:
+                inserted_subcat = insert_result.data[0]
+            else:
+                query_result = (
+                    supabase.table("expense_subcategories")
+                    .select("subcategory_id, subcategory_name, category_id")
+                    .eq("subcategory_name", subcategory_name)
+                    .eq("category_id", request.category_id)
+                    .limit(1)
+                    .execute()
+                )
+                if not query_result.data:
+                    raise Exception("Failed to retrieve inserted subcategory")
+                inserted_subcat = query_result.data[0]
+        except Exception as insert_exc:
+            logger.error("Subcategory insert failed: %s", insert_exc)
+            raise Exception(f"Failed to insert subcategory: {str(insert_exc)}") from insert_exc
+
+        response_data = {
             "success": True,
             "data": {
-                "subcategory_id": result.data["subcategory_id"],
-                "subcategory_name": result.data["subcategory_name"],
-                "category_id": result.data["category_id"],
+                "subcategory_id": inserted_subcat["subcategory_id"],
+                "subcategory_name": inserted_subcat["subcategory_name"],
+                "category_id": inserted_subcat["category_id"],
                 "created": True,
             },
         }
+        logger.info(
+            "✅ POST /subcategories - Subcategory created successfully: subcategory_id=%s, subcategory_name='%s'",
+            inserted_subcat["subcategory_id"],
+            inserted_subcat["subcategory_name"],
+        )
+        logger.info("📤 POST /subcategories - Final response: %s", response_data)
+        return response_data
+
     except Exception as exc:
-        logger.error("Failed to create subcategory: %s", exc)
-        raise HTTPException(status_code=500, detail=f"Failed to create subcategory: {str(exc)}") from exc
+        error_msg = f"Failed to create subcategory: {str(exc)}"
+        logger.error("❌ POST /subcategories - Error: %s", error_msg, exc_info=True)
+        logger.error("📤 POST /subcategories - Error response: status_code=500, detail='%s'", error_msg)
+        raise HTTPException(status_code=500, detail=error_msg) from exc
 

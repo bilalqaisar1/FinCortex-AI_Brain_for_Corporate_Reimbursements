@@ -3,7 +3,7 @@ Receipt processing orchestrator.
 Coordinates Vision OCR and GPT structuring services.
 """
 import logging
-from typing import Dict, Any
+from typing import Dict, Any, List, Optional
 
 from app.services.vision_service import extract_text_from_image, VisionServiceError
 from app.services.gpt_service import structure_text_with_openai, GPTServiceError
@@ -16,12 +16,19 @@ class ReceiptProcessingError(Exception):
     pass
 
 
-def process_receipt(image_path: str) -> Dict[str, Any]:
+def process_receipt(
+    image_path: str,
+    *,
+    admin_uuid: Optional[str] = None,
+    categories_data: Optional[List[Dict[str, Any]]] = None,
+) -> Dict[str, Any]:
     """
     Full pipeline: Extract OCR text from image, then structure it with GPT.
     
     Args:
         image_path: Path to the receipt image file
+        admin_uuid: Optional admin UUID to scope allowed categories/subcategories
+        categories_data: Optional pre-fetched categories/subcategories to avoid extra RPC
     
     Returns:
         Dictionary with keys:
@@ -39,7 +46,11 @@ def process_receipt(image_path: str) -> Dict[str, Any]:
             raise ReceiptProcessingError("No text extracted from image. Please ensure the image contains readable text.")
         
         # Step 2: Structure text using GPT
-        structured_data = structure_text_with_openai(raw_text)
+        structured_data = structure_text_with_openai(
+            raw_text,
+            admin_uuid=admin_uuid,
+            categories_data=categories_data,
+        )
         
         return {
             "raw_text": raw_text,

@@ -9,10 +9,11 @@ interface StatsCardProps {
   title: string;
   value: string | number;
   change?: string;
-  changeType?: "positive" | "negative" | "neutral";
+  changeType?: "positive" | "negative" | "neutral" | "warning";
   icon: LucideIcon;
   iconColor?: string;
   iconBgColor?: string;
+  description?: string;
   className?: string;
   loading?: boolean;
 }
@@ -23,6 +24,7 @@ export function StatsCard({
   change,
   changeType = "neutral",
   icon: Icon,
+  description,
   iconColor = "text-blue-600 dark:text-blue-400",
   iconBgColor = "bg-blue-100 dark:bg-blue-900/30",
   className,
@@ -50,6 +52,7 @@ export function StatsCard({
   const getChangeIcon = () => {
     if (changeType === "positive") return <TrendingUp className="w-3 h-3" />;
     if (changeType === "negative") return <TrendingDown className="w-3 h-3" />;
+    if (changeType === "warning") return <TrendingUp className="w-3 h-3" />;
     return null;
   };
 
@@ -59,6 +62,8 @@ export function StatsCard({
         return "text-green-600 dark:text-green-400";
       case "negative":
         return "text-red-600 dark:text-red-400";
+      case "warning":
+        return "text-orange-600 dark:text-orange-400";
       default:
         return "text-slate-600 dark:text-slate-400";
     }
@@ -83,6 +88,11 @@ export function StatsCard({
                 {getChangeIcon()}
                 <span className="truncate">{change}</span>
               </div>
+            )}
+            {description && (
+              <p className="text-xs text-slate-500 dark:text-slate-400 mt-1 truncate">
+                {description}
+              </p>
             )}
           </div>
           <div className={cn(

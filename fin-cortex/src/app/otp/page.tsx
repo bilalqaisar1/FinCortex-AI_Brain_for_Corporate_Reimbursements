@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { 
+import {
   ArrowLeft,
   Shield,
   Smartphone,
@@ -46,7 +46,7 @@ export default function OTPPage() {
 
   const handleOtpChange = (index: number, value: string) => {
     if (value.length > 1) return; // Only allow single digit
-    
+
     const newOtp = [...otp];
     newOtp[index] = value;
     setOtp(newOtp);
@@ -67,13 +67,13 @@ export default function OTPPage() {
     e.preventDefault();
     const pastedData = e.clipboardData.getData('text').replace(/\D/g, '').slice(0, 6);
     const newOtp = [...otp];
-    
+
     for (let i = 0; i < pastedData.length && i < 6; i++) {
       newOtp[i] = pastedData[i];
     }
-    
+
     setOtp(newOtp);
-    
+
     // Focus the next empty input or the last input
     const nextEmptyIndex = newOtp.findIndex((digit, index) => !digit && index < 6);
     const focusIndex = nextEmptyIndex !== -1 ? nextEmptyIndex : 5;
@@ -83,7 +83,7 @@ export default function OTPPage() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     const otpString = otp.join('');
-    
+
     if (otpString.length !== 6) {
       return;
     }
@@ -96,12 +96,12 @@ export default function OTPPage() {
 
     console.log('Starting OTP verification for:', otpString);
     setIsLoading(true);
-    
+
     try {
       // Get email from URL params
       const urlParams = new URLSearchParams(window.location.search);
       const email = urlParams.get('email');
-      
+
       if (!email) {
         console.log('No email found, redirecting to signup');
         router.push('/signup');
@@ -109,19 +109,19 @@ export default function OTPPage() {
       }
 
       console.log('Verifying OTP for email:', email);
-      
+
       // Add timeout to prevent infinite loading
-      const timeoutPromise = new Promise<never>((_, reject) => 
+      const timeoutPromise = new Promise<never>((_, reject) =>
         setTimeout(() => reject(new Error('OTP verification timeout')), 15000)
       );
-      
+
       const { data, error } = await Promise.race([verifyOtp(email, otpString), timeoutPromise]);
 
       console.log('OTP verification result:', { data, error });
 
       if (error) {
         console.error('OTP verification error:', error);
-        
+
         // Handle specific OTP errors
         if (error.message?.includes('expired') || error.message?.includes('invalid')) {
           console.log('OTP expired or invalid, clearing OTP fields');
@@ -152,12 +152,12 @@ export default function OTPPage() {
 
   const handleResend = async () => {
     setIsResending(true);
-    
+
     try {
       // Get email from URL params
       const urlParams = new URLSearchParams(window.location.search);
       const email = urlParams.get('email');
-      
+
       if (!email) {
         router.push('/signup');
         return;
@@ -223,7 +223,7 @@ export default function OTPPage() {
               <p className="text-xs text-muted -mt-1">AI-Powered</p>
             </div>
           </Link>
-          
+
           <div className="flex items-center space-x-4">
             <button
               onClick={toggleTheme}
@@ -231,8 +231,8 @@ export default function OTPPage() {
             >
               <span className="text-xl">{themeIcon}</span>
             </button>
-            <Link 
-              href="/login" 
+            <Link
+              href="/login"
               className="flex items-center space-x-2 text-muted hover:text-primary transition-colors group"
             >
               <ArrowLeft className="w-4 h-4 group-hover:-translate-x-1 transition-transform" />
@@ -265,7 +265,7 @@ export default function OTPPage() {
                 <Label className="text-sm font-medium text-secondary text-center block">
                   Enter verification code
                 </Label>
-                
+
                 {/* OTP Expired Warning */}
                 {otpExpired && (
                   <div className="p-3 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg">
@@ -330,7 +330,7 @@ export default function OTPPage() {
               </div>
 
               {/* Verify Button */}
-              <Button 
+              <Button
                 type="submit"
                 disabled={isLoading || otp.join('').length !== 6}
                 className="w-full h-12 btn-primary text-white font-medium disabled:opacity-50 rounded-xl"
@@ -345,7 +345,7 @@ export default function OTPPage() {
                   <span>Verify Account</span>
                 )}
               </Button>
-              
+
               {/* Debug Reset Button - Only show if loading for too long */}
               {isLoading && (
                 <div className="mt-4 text-center">
@@ -372,7 +372,7 @@ export default function OTPPage() {
                 </span>
               </div>
               <p className="text-xs text-muted">
-                Didn't receive the code? Check your spam folder or{" "}
+                Didn&apos;t receive the code? Check your spam folder or{" "}
                 <button
                   onClick={handleResend}
                   disabled={isResending || timeLeft > 0}

@@ -22,7 +22,6 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { useRPCColumnValues } from "@/hooks/useRPCColumnValues";
 import { useToastNotification } from "@/hooks/useToastNotification";
 import { useAuth } from "@/context/AuthContext";
 
@@ -63,10 +62,6 @@ type SelectOption = {
   label: string;
 };
 
-type SubcategoryOption = SelectOption & {
-  categoryId: string | null;
-};
-
 interface OCRData {
   "Vendor Name"?: string;
   Date?: string;
@@ -80,7 +75,7 @@ interface OCRData {
 
 const ExpenseForm: React.FC<ExpenseFormProps> = ({ isDarkTheme }) => {
   const router = useRouter();
-  const { user } = useAuth();
+  const { user, userProfile } = useAuth();
   const { showToast } = useToastNotification();
 
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -107,47 +102,23 @@ const ExpenseForm: React.FC<ExpenseFormProps> = ({ isDarkTheme }) => {
   const [errors, setErrors] = useState<FormErrors>({});
   const [showReviewMessage, setShowReviewMessage] = useState(false);
 
-  // Load categories
-  const {
-    data: categoryOptions,
-    loading: categoriesLoading,
-    error: categoriesError,
-  } = useRPCColumnValues<SelectOption, "id" | "label">({
-    tableName: "expense_categories",
-    columns: [
-      { key: "id", columnName: "category_id" },
-      { key: "label", columnName: "category_name" },
-    ],
-    transform: (rows) =>
-      rows
-        .map((row) => ({
-          id: String(row["id"] ?? ""),
-          label: String(row["label"] ?? ""),
-        }))
-        .filter((option) => option.id && option.label),
-  });
+  // Derived read-only category/subcategory from GPT/OCR; kept in formData for payload consistency
+  // Derived read-only category/subcategory from GPT/OCR; shown on form (read-only)
+  const detectedCategory = React.useMemo(() => {
+    if (!ocrStructured) return "";
+    const cat = (ocrStructured as any)?.Categories;
+    if (Array.isArray(cat)) return cat.filter(Boolean).join(", ");
+    return cat ? String(cat) : "";
+  }, [ocrStructured]);
 
-  // Load subcategories
-  const {
-    data: subcategoryOptions,
-    loading: subcategoriesLoading,
-    error: subcategoriesError,
-  } = useRPCColumnValues<SubcategoryOption, "id" | "label" | "categoryId">({
-    tableName: "expense_subcategories",
-    columns: [
-      { key: "id", columnName: "subcategory_id" },
-      { key: "label", columnName: "subcategory_name" },
-      { key: "categoryId", columnName: "category_id" },
-    ],
-    transform: (rows) =>
-      rows
-        .map((row) => ({
-          id: String(row["id"] ?? ""),
-          label: String(row["label"] ?? ""),
-          categoryId: row["categoryId"] ? String(row["categoryId"]) : null,
-        }))
-        .filter((option) => option.id && option.label),
-  });
+  const detectedSubcategory = React.useMemo(() => {
+    if (!ocrStructured) return "";
+    const sub = (ocrStructured as any)?.Subcategories;
+    if (Array.isArray(sub)) return sub.filter(Boolean).join(", ");
+    return sub ? String(sub) : "";
+  }, [ocrStructured]);
+
+  // Categories/Subcategories are resolved server-side (via GPT + admin scope); no frontend dropdowns.
 
   // Hardcoded receipt types
   const receiptTypeOptions: SelectOption[] = [
@@ -172,26 +143,6 @@ const ExpenseForm: React.FC<ExpenseFormProps> = ({ isDarkTheme }) => {
     { id: "9", label: "Education" },
     { id: "10", label: "Other" },
   ];
-
-  // Filter subcategories by selected category
-  const availableSubcategories = React.useMemo(() => {
-    if (!formData.categoryId) return [];
-    return subcategoryOptions.filter((option) => option.categoryId === formData.categoryId);
-  }, [formData.categoryId, subcategoryOptions]);
-
-  // Create stable reference keys to avoid useEffect dependency array size issues
-  const categoryOptionsKey = React.useMemo(
-    () => categoryOptions.map((opt) => opt.id).join(","),
-    [categoryOptions]
-  );
-  const availableSubcategoriesKey = React.useMemo(
-    () => availableSubcategories.map((opt) => opt.id).join(","),
-    [availableSubcategories]
-  );
-  const subcategoryOptionsKey = React.useMemo(
-    () => subcategoryOptions.map((opt) => opt.id).join(","),
-    [subcategoryOptions]
-  );
 
   // Generate receipt code on mount
   useEffect(() => {
@@ -250,7 +201,7 @@ const ExpenseForm: React.FC<ExpenseFormProps> = ({ isDarkTheme }) => {
           }
         }
       }
-    } catch {}
+    } catch { }
     return "";
   };
 
@@ -270,68 +221,7 @@ const ExpenseForm: React.FC<ExpenseFormProps> = ({ isDarkTheme }) => {
     return [];
   };
 
-  // Helper function to find best category match (fuzzy matching)
-  const findCategoryMatch = useCallback((categoryName: string): SelectOption | undefined => {
-    if (!categoryName || categoryOptions.length === 0) return undefined;
-    const normalized = categoryName.toLowerCase().trim();
-    
-    // Exact match first
-    let match = categoryOptions.find((opt) => opt.label.toLowerCase() === normalized);
-    if (match) return match;
-    
-    // Partial match (contains)
-    match = categoryOptions.find((opt) => 
-      opt.label.toLowerCase().includes(normalized) || 
-      normalized.includes(opt.label.toLowerCase())
-    );
-    if (match) return match;
-    
-    // Word-based match
-    const words = normalized.split(/\s+/);
-    match = categoryOptions.find((opt) => {
-      const optWords = opt.label.toLowerCase().split(/\s+/);
-      return words.some((word) => optWords.some((optWord) => optWord.includes(word) || word.includes(optWord)));
-    });
-    
-    return match;
-  }, [categoryOptions]);
-
-  // Helper function to find best subcategory match (fuzzy matching)
-  const findSubcategoryMatch = useCallback((
-    subcategoryName: string,
-    categoryIdOverride?: string
-  ): SubcategoryOption | undefined => {
-    if (!subcategoryName || subcategoryOptions.length === 0) return undefined;
-    const targetCategoryId = categoryIdOverride || formData.categoryId;
-    if (!targetCategoryId) return undefined;
-
-    const normalized = subcategoryName.toLowerCase().trim();
-
-    const scopedSubcategories = subcategoryOptions.filter((opt) => opt.categoryId === targetCategoryId);
-    if (scopedSubcategories.length === 0) return undefined;
-    
-    // Exact match first
-    let match = scopedSubcategories.find((opt) => opt.label.toLowerCase() === normalized);
-    if (match) return match;
-    
-    // Partial match (contains)
-    match = scopedSubcategories.find((opt) =>
-      opt.label.toLowerCase().includes(normalized) || 
-      normalized.includes(opt.label.toLowerCase())
-    );
-    if (match) return match;
-    
-    // Word-based match
-    const words = normalized.split(/\s+/);
-    match = scopedSubcategories.find((opt) => {
-      const optWords = opt.label.toLowerCase().split(/\s+/);
-      return words.some((word) => optWords.some((optWord) => optWord.includes(word) || word.includes(optWord)));
-    });
-    
-    return match;
-  }, [subcategoryOptions, formData.categoryId]);
-
-  // Auto-fill form from OCR data
+  // Auto-fill form from OCR data (categories handled server-side; no frontend matching/creation)
   useEffect(() => {
     if (!ocrData) return;
 
@@ -383,144 +273,11 @@ const ExpenseForm: React.FC<ExpenseFormProps> = ({ isDarkTheme }) => {
         return updated;
       });
 
-      // Then handle category/subcategory with async operations (outside setFormData)
-      const ocrCategories = normalizeStringArray(ocrData.Categories);
-      let matchedCategoryId: string | undefined;
-      
-      if (ocrCategories.length > 0) {
-        if (categoryOptions.length > 0) {
-          const categoryMatch = findCategoryMatch(ocrCategories[0]);
-          if (categoryMatch) {
-            matchedCategoryId = categoryMatch.id;
-            setFormData((prev) => ({
-              ...prev,
-              categoryId: matchedCategoryId!,
-              subcategoryId: "", // Reset subcategory when category changes
-            }));
-          } else {
-            // Category not found - create it gracefully
-            try {
-              const createResponse = await fetch(`${BACKEND_BASE_URL}/api/v1/categories`, {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({
-                  category_name: ocrCategories[0],
-                }),
-              });
-              if (createResponse.ok) {
-                const result = await createResponse.json();
-                if (result.success && result.data) {
-                  matchedCategoryId = String(result.data.category_id);
-                  setFormData((prev) => ({
-                    ...prev,
-                    categoryId: matchedCategoryId!,
-                    subcategoryId: "",
-                  }));
-                  showToast("info", "Category Created", `"${ocrCategories[0]}" category was automatically created.`);
-                }
-              }
-            } catch (error) {
-              console.warn("Failed to create category:", error);
-            }
-          }
-        } else {
-          // No categories loaded yet, try to create
-          try {
-            const createResponse = await fetch(`${BACKEND_BASE_URL}/api/v1/categories`, {
-              method: "POST",
-              headers: { "Content-Type": "application/json" },
-              body: JSON.stringify({
-                category_name: ocrCategories[0],
-              }),
-            });
-            if (createResponse.ok) {
-              const result = await createResponse.json();
-              if (result.success && result.data) {
-                matchedCategoryId = String(result.data.category_id);
-                setFormData((prev) => ({
-                  ...prev,
-                  categoryId: matchedCategoryId!,
-                  subcategoryId: "",
-                }));
-                showToast("info", "Category Created", `"${ocrCategories[0]}" category was automatically created.`);
-              }
-            }
-          } catch (error) {
-            console.warn("Failed to create category:", error);
-          }
-        }
-      }
-
-      // Handle subcategory (after category is potentially set)
-      const ocrSubcategories = normalizeStringArray(ocrData.Subcategories);
-      const targetCategoryId = matchedCategoryId || formData.categoryId;
-      
-      if (ocrSubcategories.length > 0 && targetCategoryId) {
-        if (subcategoryOptions.length > 0) {
-          const subcategoryMatch = findSubcategoryMatch(ocrSubcategories[0], targetCategoryId);
-          if (subcategoryMatch) {
-            setFormData((prev) => ({
-              ...prev,
-              subcategoryId: subcategoryMatch.id,
-              categoryId: subcategoryMatch.categoryId || prev.categoryId,
-            }));
-          } else {
-            // Subcategory not found - create it gracefully
-            try {
-              const createResponse = await fetch(`${BACKEND_BASE_URL}/api/v1/subcategories`, {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({
-                  subcategory_name: ocrSubcategories[0],
-                  category_id: parseInt(targetCategoryId),
-                }),
-              });
-              if (createResponse.ok) {
-                const result = await createResponse.json();
-                if (result.success && result.data) {
-                  setFormData((prev) => ({
-                    ...prev,
-                    subcategoryId: String(result.data.subcategory_id),
-                  }));
-                  showToast("info", "Subcategory Created", `"${ocrSubcategories[0]}" subcategory was automatically created.`);
-                }
-              }
-            } catch (error) {
-              console.warn("Failed to create subcategory:", error);
-            }
-          }
-        } else if (targetCategoryId) {
-          // No subcategories loaded, try to create
-          try {
-            const createResponse = await fetch(`${BACKEND_BASE_URL}/api/v1/subcategories`, {
-              method: "POST",
-              headers: { "Content-Type": "application/json" },
-              body: JSON.stringify({
-                subcategory_name: ocrSubcategories[0],
-                category_id: parseInt(targetCategoryId),
-              }),
-            });
-            if (createResponse.ok) {
-              const result = await createResponse.json();
-              if (result.success && result.data) {
-                setFormData((prev) => ({
-                  ...prev,
-                  subcategoryId: String(result.data.subcategory_id),
-                }));
-                showToast("info", "Subcategory Created", `"${ocrSubcategories[0]}" subcategory was automatically created.`);
-              }
-            }
-          } catch (error) {
-            console.warn("Failed to create subcategory:", error);
-          }
-        }
-      }
-
       setShowReviewMessage(true);
     };
 
     void autoFillForm();
-  }, [ocrData, categoryOptions, subcategoryOptions, findCategoryMatch, findSubcategoryMatch, showToast]);
+  }, [ocrData, showToast]);
 
   const processOCR = useCallback(
     async (imageFile: File) => {
@@ -529,10 +286,39 @@ const ExpenseForm: React.FC<ExpenseFormProps> = ({ isDarkTheme }) => {
         return;
       }
 
+
+
       setIsProcessingOCR(true);
       try {
         const body = new FormData();
         body.append("file", imageFile);
+
+        // Pass admin_uuid so the backend can fetch categories for GPT context
+        // Priority: admin_id > user_id (if admin role) > undefined
+        let adminUuid: string | undefined;
+        if (userProfile?.admin_id) {
+          adminUuid = userProfile.admin_id;
+        } else if (userProfile?.userRole === 'admin' && userProfile?.user_id) {
+          // If user is an admin but admin_id is not set, use user_id as admin_uuid
+          adminUuid = userProfile.user_id;
+        }
+        
+        // Debug logging
+        console.log("🔍 ExpenseForm - userProfile state:", {
+          hasUserProfile: !!userProfile,
+          admin_id: userProfile?.admin_id,
+          user_id: userProfile?.user_id,
+          userRole: userProfile?.userRole,
+          determined_adminUuid: adminUuid
+        });
+        
+        if (adminUuid) {
+          body.append("admin_uuid", adminUuid);
+          console.log("📤 Sending admin_uuid to backend:", adminUuid);
+        } else {
+          console.log("⚠️ No admin_uuid available - categories will not be scoped");
+          console.log("⚠️ userProfile details:", JSON.stringify(userProfile, null, 2));
+        }
 
         const response = await fetch(RECEIPT_UPLOAD_ENDPOINT, {
           method: "POST",
@@ -557,7 +343,7 @@ const ExpenseForm: React.FC<ExpenseFormProps> = ({ isDarkTheme }) => {
         setIsProcessingOCR(false);
       }
     },
-    [showToast]
+    [showToast, userProfile]
   );
 
   const handleFileUpload = useCallback(
@@ -611,7 +397,6 @@ const ExpenseForm: React.FC<ExpenseFormProps> = ({ isDarkTheme }) => {
     if (!formData.receiptCode.trim()) newErrors.receiptCode = "Receipt code is required";
     if (!formData.vendorName.trim()) newErrors.vendorName = "Vendor name is required";
     if (!formData.date) newErrors.date = "Date is required";
-    if (!formData.categoryId) newErrors.categoryId = "Category is required";
     if (!formData.totalAmount || parseFloat(formData.totalAmount) <= 0) {
       newErrors.totalAmount = "Valid total amount is required";
     }
@@ -648,7 +433,9 @@ const ExpenseForm: React.FC<ExpenseFormProps> = ({ isDarkTheme }) => {
       formPayload.append("user_id", user.id);
       formPayload.append("vendor_name", formData.vendorName);
       formPayload.append("expense_date", formData.date);
-      formPayload.append("category_id", formData.categoryId);
+      if (formData.categoryId) {
+        formPayload.append("category_id", formData.categoryId);
+      }
       if (formData.subcategoryId) {
         formPayload.append("subcategory_id", formData.subcategoryId);
       }
@@ -668,7 +455,7 @@ const ExpenseForm: React.FC<ExpenseFormProps> = ({ isDarkTheme }) => {
         throw new Error("Receipt file is required");
       }
       formPayload.append("receipt_file", uploadedFile);
-      
+
       // Add items as JSON string
       const itemsData = formData.items
         .filter((item) => item.item || item.price)
@@ -858,58 +645,6 @@ const ExpenseForm: React.FC<ExpenseFormProps> = ({ isDarkTheme }) => {
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="categoryId" className="text-primary">
-                Category <span className="text-red-400">*</span>
-              </Label>
-              <Select
-                value={formData.categoryId}
-                onValueChange={(value) => {
-                  setFormData((prev) => ({ ...prev, categoryId: value, subcategoryId: "" }));
-                  setErrors((prev) => ({ ...prev, categoryId: undefined }));
-                }}
-                disabled={categoriesLoading}
-              >
-                <SelectTrigger className={selectTriggerClasses}>
-                  <SelectValue placeholder={categoriesLoading ? "Loading..." : "Select category"} />
-                </SelectTrigger>
-                <SelectContent className={selectContentClasses}>
-                  {categoryOptions.map((cat) => (
-                    <SelectItem key={cat.id} value={cat.id}>
-                      {cat.label}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-              {errors.categoryId && <p className="text-xs text-red-400">{errors.categoryId}</p>}
-            </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="subcategoryId" className="text-primary">
-                Subcategory
-              </Label>
-              <Select
-                value={formData.subcategoryId}
-                onValueChange={(value) => {
-                  setFormData((prev) => ({ ...prev, subcategoryId: value }));
-                }}
-                disabled={!formData.categoryId || subcategoriesLoading}
-              >
-                <SelectTrigger className={selectTriggerClasses}>
-                  <SelectValue
-                    placeholder={!formData.categoryId ? "Select category first" : "Select subcategory"}
-                  />
-                </SelectTrigger>
-                <SelectContent className={selectContentClasses}>
-                  {availableSubcategories.map((sub) => (
-                    <SelectItem key={sub.id} value={sub.id}>
-                      {sub.label}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-
-            <div className="space-y-2">
               <Label htmlFor="totalAmount" className="text-primary">
                 Total Amount <span className="text-red-400">*</span>
               </Label>
@@ -941,6 +676,27 @@ const ExpenseForm: React.FC<ExpenseFormProps> = ({ isDarkTheme }) => {
                 }}
                 className={`${isDarkTheme ? "bg-[#233648]" : "bg-white/90"} border-subtle text-primary`}
                 placeholder="Invoice number"
+              />
+            </div>
+
+            {/* Read-only detected categories/subcategories (from OCR/GPT, before upload) */}
+            <div className="space-y-2">
+              <Label className="text-primary">Detected Category (read-only)</Label>
+              <Input
+                value={detectedCategory}
+                readOnly
+                placeholder="(filled by OCR/GPT)"
+                className={`${isDarkTheme ? "bg-[#233648]" : "bg-white/90"} border-subtle text-primary`}
+              />
+            </div>
+
+            <div className="space-y-2">
+              <Label className="text-primary">Detected Subcategory (read-only)</Label>
+              <Input
+                value={detectedSubcategory}
+                readOnly
+                placeholder="(filled by OCR/GPT)"
+                className={`${isDarkTheme ? "bg-[#233648]" : "bg-white/90"} border-subtle text-primary`}
               />
             </div>
 

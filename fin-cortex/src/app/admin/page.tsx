@@ -24,6 +24,7 @@ import {
   PageHeader, 
   DashboardLayout
 } from "@/components/dashboard";
+import { RouteProtection } from "@/components/auth/RouteProtection";
 
 // Essential KPIs only
 const essentialStats = [
@@ -154,6 +155,7 @@ export default function AdminDashboard() {
   const [activeTab, setActiveTab] = useState("overview");
 
   return (
+    <RouteProtection allowedRoles={['admin']}>
     <DashboardLayout>
       <div className="w-full max-w-full overflow-hidden">
         <PageHeader
@@ -319,5 +321,6 @@ export default function AdminDashboard() {
         </div>
       </div>
     </DashboardLayout>
+    </RouteProtection>
   );
 }

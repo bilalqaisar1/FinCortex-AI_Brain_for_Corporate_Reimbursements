@@ -24,6 +24,8 @@ async def generate_receipt_code() -> dict:
     Returns:
         Dictionary with generated receipt_code
     """
+    logger.info("📥 GET /receipt-code/generate - Request received")
+    
     try:
         supabase = get_supabase_client()
         
@@ -50,19 +52,23 @@ async def generate_receipt_code() -> dict:
         # Generate receipt code: RC-YYYYMMDD-{max_category_id:03d}-{sequence:04d}
         receipt_code = f"RC-{today}-{max_category_id:03d}-{sequence:04d}"
         
-        logger.info("✅ Receipt code generated: %s", receipt_code)
-        
-        return {
+        response_data = {
             "success": True,
             "data": {
                 "receipt_code": receipt_code,
             },
         }
+        logger.info("✅ GET /receipt-code/generate - Receipt code generated: %s", receipt_code)
+        logger.info("📤 GET /receipt-code/generate - Final response: %s", response_data)
+        
+        return response_data
         
     except Exception as e:
-        logger.error("❌ Receipt code generation failed: %s", str(e))
+        error_msg = f"Failed to generate receipt code: {str(e)}"
+        logger.error("❌ GET /receipt-code/generate - Error: %s", error_msg, exc_info=True)
+        logger.error("📤 GET /receipt-code/generate - Error response: status_code=500, detail='%s'", error_msg)
         raise HTTPException(
             status_code=500,
-            detail=f"Failed to generate receipt code: {str(e)}"
+            detail=error_msg
         )
 

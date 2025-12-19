@@ -20,7 +20,7 @@ class Settings:
     vision_api_url: str = "https://vision.googleapis.com/v1/images:annotate?key=AIzaSyCxXYnYE_dhfGJz9ZLndFVpaj1oA-VUkBo"
     
     # OpenAI Configuration
-    openai_api_key: str = "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"
+    openai_api_key: str = "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"
     openai_model: str = "gpt-4o-mini"
     
     # Storage
