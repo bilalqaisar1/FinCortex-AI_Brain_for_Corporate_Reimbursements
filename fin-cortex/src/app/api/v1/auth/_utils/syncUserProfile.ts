@@ -59,8 +59,12 @@ export async function syncUserProfile(
     .maybeSingle();
 
   if (!managerError && managerProfile) {
+<<<<<<< Updated upstream
     // Manager profile found - it already has admin_id in the table as manager_admin_id or admin_id depending on schema. 
     // We return it raw, route.ts handles normalizing it.
+=======
+    // Manager profile found - it already has admin_id in the table
+>>>>>>> Stashed changes
     return managerProfile;
   }
 
@@ -109,4 +113,8 @@ export async function syncUserProfile(
 
   // If user doesn't exist in any table, throw error
   throw new Error("User profile not found in database");
+<<<<<<< Updated upstream
 }
+=======
+}
+>>>>>>> Stashed changes
