@@ -51,7 +51,7 @@ def extract_text_from_image(image_path: str, timeout: Optional[int] = None) -> s
         
         # Make API call
         response = requests.post(
-            settings.vision_api_url,
+            settings.vision_api_url_full,
             json=request_body,
             timeout=timeout,
         )

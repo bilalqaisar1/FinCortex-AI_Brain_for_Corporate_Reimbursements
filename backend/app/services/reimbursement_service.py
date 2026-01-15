@@ -234,7 +234,7 @@ def create_reimbursement(
     try:
         user_response = (
             supabase.table("users")
-            .select("manager_id, department_id")
+            .select("manager_id, department_id, admin_id")
             .eq("user_id", str(submission.user_id))
             .single()
             .execute()
@@ -252,6 +252,11 @@ def create_reimbursement(
             submission.manager_id = None
     if submission.department_id is None and user_row.get("department_id") is not None:
         submission.department_id = user_row["department_id"]
+    if submission.company_id is None and user_row.get("company_id") is not None:
+        try:
+             submission.company_id = UUID(user_row["company_id"])
+        except Exception:
+             pass
 
     # Infer admin_id from manager if missing
     if not submission.admin_id and submission.manager_id:
@@ -293,15 +298,15 @@ def create_reimbursement(
         if submission.company_id is None and submission.manager_id:
             try:
                 cm_resp = (
-                    supabase.table("company_managers")
-                    .select("company_id")
+                    supabase.table("managers")
+                    .select("manager_company_id")
                     .eq("manager_id", str(submission.manager_id))
                     .limit(1)
                     .single()
                     .execute()
                 )
-                if cm_resp.data and cm_resp.data.get("company_id"):
-                    submission.company_id = UUID(cm_resp.data["company_id"])
+                if cm_resp.data and cm_resp.data.get("manager_company_id"):
+                    submission.company_id = UUID(cm_resp.data["manager_company_id"])
             except Exception as exc:
                 logger.warning("Could not fetch company by manager_id: %s", exc)
     

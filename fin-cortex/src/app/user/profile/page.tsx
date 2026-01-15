@@ -4,6 +4,7 @@ import * as React from "react";
 import { useState, useEffect } from "react";
 import Link from "next/link";
 import { useTheme } from "@/hooks/useTheme";
+import { UserNavbar } from "@/components/dashboard/UserNavbar";
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -43,8 +44,6 @@ import {
 
 export default function UserProfilePage() {
   const { isDarkTheme, toggleTheme, themeIcon } = useTheme();
-  const [isScrolled, setIsScrolled] = useState(false);
-  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [editBankOpen, setEditBankOpen] = useState(false);
   const [editPasswordOpen, setEditPasswordOpen] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
@@ -54,36 +53,6 @@ export default function UserProfilePage() {
     claimSubmitted: false,
     reimbursementProcessed: true,
   });
-
-  // Handle scroll effect for navbar
-  useEffect(() => {
-    const handleScroll = () => {
-      setIsScrolled(window.scrollY > 50);
-    };
-
-    window.addEventListener("scroll", handleScroll);
-    return () => window.removeEventListener("scroll", handleScroll);
-  }, []);
-
-  // Handle mobile menu toggle
-  useEffect(() => {
-    const handleClickOutside = (e: MouseEvent) => {
-      const target = e.target as Element;
-      const mobileToggle = document.getElementById("mobileToggle");
-      const navLinks = document.getElementById("navLinks");
-
-      if (mobileToggle && navLinks && !mobileToggle.contains(target) && !navLinks.contains(target)) {
-        setIsMobileMenuOpen(false);
-      }
-    };
-
-    document.addEventListener("click", handleClickOutside);
-    return () => document.removeEventListener("click", handleClickOutside);
-  }, []);
-
-  const handleLinkClick = () => {
-    setIsMobileMenuOpen(false);
-  };
 
   // Mock user data
   const userData = {
@@ -99,101 +68,8 @@ export default function UserProfilePage() {
   return (
     <div className="flex min-h-screen w-full flex-col bg-white dark:bg-slate-950">
       {/* Navbar */}
-      <nav
-        className={`navbar fixed top-0 left-0 right-0 z-50 transition-all duration-300 ${
-          isScrolled ? "scrolled" : ""
-        }`}
-      >
-        <div className="nav-container" style={{ justifyContent: "space-between" }}>
-          {/* Left side - Logo */}
-          <Link href="/user" className="logo">
-            Fincortex
-          </Link>
-
-          {/* Center - Menu Links (hidden on mobile) */}
-          <div className="hidden md:flex items-center gap-8">
-            <Link href="/user" className="nav-link">
-              Home
-            </Link>
-            <Link href="/user/dashboard" className="nav-link">
-              Dashboard
-            </Link>
-            <Link href="/user/claims/history" className="nav-link">
-              Claims
-            </Link>
-            <Link href="/user/profile" className="nav-link active">
-              Profile
-            </Link>
-          </div>
-
-          {/* Right side - Theme toggle & Mobile menu toggle */}
-          <div className="flex items-center gap-4">
-            <button
-              onClick={toggleTheme}
-              className="p-2 rounded-lg transition-all duration-200 hover:bg-opacity-80 text-foreground"
-              aria-label="Toggle theme"
-            >
-              {themeIcon}
-            </button>
-            <button
-              id="mobileToggle"
-              onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
-              className="md:hidden p-2 rounded-lg transition-all duration-200"
-            >
-              <svg
-                className="w-6 h-6"
-                fill="none"
-                stroke="currentColor"
-                viewBox="0 0 24 24"
-              >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth={2}
-                  d="M4 6h16M4 12h16M4 18h16"
-                />
-              </svg>
-            </button>
-          </div>
-        </div>
-
-        {/* Mobile Menu */}
-        {isMobileMenuOpen && (
-          <div
-            id="navLinks"
-            className="md:hidden bg-background border-t border-border"
-          >
-            <Link
-              href="/user"
-              className="block px-4 py-3 text-sm font-medium hover:bg-accent/50 transition-colors"
-              onClick={handleLinkClick}
-            >
-              Home
-            </Link>
-            <Link
-              href="/user/dashboard"
-              className="block px-4 py-3 text-sm font-medium hover:bg-accent/50 transition-colors"
-              onClick={handleLinkClick}
-            >
-              Dashboard
-            </Link>
-            <Link
-              href="/user/claims/history"
-              className="block px-4 py-3 text-sm font-medium hover:bg-accent/50 transition-colors"
-              onClick={handleLinkClick}
-            >
-              Claims
-            </Link>
-            <Link
-              href="/user/profile"
-              className="block px-4 py-3 text-sm font-medium hover:bg-accent/50 transition-colors"
-              onClick={handleLinkClick}
-            >
-              Profile
-            </Link>
-          </div>
-        )}
-      </nav>
+      {/* Navbar */}
+      <UserNavbar toggleTheme={toggleTheme} themeIcon={themeIcon} />
 
       {/* Main Content */}
       <main className="flex-1 w-full pt-20 px-4 md:px-6 lg:px-8 pb-12 bg-white dark:bg-slate-950">

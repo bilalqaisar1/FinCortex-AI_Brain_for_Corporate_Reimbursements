@@ -19,9 +19,8 @@ export async function POST(request: Request) {
           full_name,
           employee_code,
           phone_number: phone_number || null,
+          role: 'admin', // Force admin role for public signup
         },
-        // For email OTP flows, your Supabase project should be configured to send OTP for signup
-        // emailRedirectTo can be added if using magic links instead of OTP
       },
     })
 
@@ -29,7 +28,41 @@ export async function POST(request: Request) {
       return NextResponse.json({ detail: error.message }, { status: 400 })
     }
 
-    return NextResponse.json({ message: 'Signup initiated. Check your email for the verification code.', user_id: data.user?.id || null })
+    const userId = data.user?.id
+    if (userId) {
+      // Insert into admins table
+      const { error: dbError } = await supabaseAdmin
+        .from('admins')
+        .insert({
+          admin_id: userId,
+          full_name,
+          email,
+          password_hash: 'legacy_auth_handled_by_supabase', // Required field in schema
+          phone_number: phone_number || null,
+          role_id: 1, // Admin role ID
+        })
+
+      if (dbError) {
+        console.error('Failed to create admin profile:', dbError)
+      } else {
+        // Create a default company for this admin
+        const { error: companyError } = await supabaseAdmin
+          .from('companies')
+          .insert({
+            admin_id: userId,
+            company_name: `${full_name}'s Organization`,
+          })
+
+        if (companyError) {
+          console.error('Failed to create company for admin:', companyError)
+        }
+      }
+    }
+
+    return NextResponse.json({
+      message: 'Admin signup initiated. Check your email for the verification code.',
+      user_id: userId
+    })
   } catch (err: any) {
     return NextResponse.json({ detail: err?.message || 'Unexpected error' }, { status: 500 })
   }

@@ -27,9 +27,13 @@ from app.services.reimbursement_service import (
     ReimbursementServiceError,
     create_reimbursement,
 )
+from app.services.policy_service import check_policy
 from app.services.storage_service import StorageUploadError, upload_receipt_to_bucket
 from app.services.remote_receipt_service import process_remote_receipt
 from app.services.supabase_rpc_service import get_expense_categories_with_subcategories, SupabaseRPCError
+from app.services.fraud_detection_service import fraud_detection_service
+from app.services.email_service import email_service
+from app.services.supabase_service import get_supabase_client
 from app.config.settings import settings
 
 logger = logging.getLogger(__name__)
@@ -116,13 +120,35 @@ async def upload_receipt(
                 file.filename, file.content_type, admin_uuid)
     
     if not file.content_type or not file.content_type.startswith("image/"):
-        error_msg = "Invalid file type. Please upload an image file (PNG, JPG, JPEG, etc.)"
-        logger.error("❌ POST /receipt/upload - Validation error: %s", error_msg)
-        logger.error("📤 POST /receipt/upload - Error response: status_code=400, detail='%s'", error_msg)
+        # Also allow PDF uploads
+        allowed_types = ["image/jpeg", "image/png", "image/jpg", "application/pdf"]
+        if file.content_type not in allowed_types:
+            error_msg = "Invalid file type. Please upload an image (JPG, PNG) or PDF file."
+            logger.error("❌ POST /receipt/upload - Validation error: %s", error_msg)
+            logger.error("📤 POST /receipt/upload - Error response: status_code=400, detail='%s'", error_msg)
+            raise HTTPException(
+                status_code=400,
+                detail=error_msg,
+            )
+
+    # File size validation - max 5MB (User Story 2.1.1)
+    MAX_FILE_SIZE_MB = 5
+    MAX_FILE_SIZE_BYTES = MAX_FILE_SIZE_MB * 1024 * 1024
+    
+    # Read file content to check size
+    file_content = await file.read()
+    file_size = len(file_content)
+    
+    if file_size > MAX_FILE_SIZE_BYTES:
+        error_msg = f"File size exceeds maximum allowed size of {MAX_FILE_SIZE_MB}MB. Your file is {file_size / (1024 * 1024):.2f}MB."
+        logger.error("❌ POST /receipt/upload - File size validation error: %s", error_msg)
         raise HTTPException(
             status_code=400,
             detail=error_msg,
         )
+    
+    # Reset file position after reading
+    await file.seek(0)
 
     temp_dir = os.path.abspath(settings.temp_dir)
     os.makedirs(temp_dir, exist_ok=True)
@@ -158,6 +184,23 @@ async def upload_receipt(
             admin_uuid=admin_uuid,
             categories_data=categories_data,
         )
+
+        # --- NEW: Policy Engine Checks ---
+        policy_flags = []
+        try:
+            structured = result.get("structured", {})
+            policy_flags = await check_policy({
+                "category_id": structured.get("category_id"),
+                "subcategory_id": structured.get("subcategory_id"),
+                "user_id": None, # Instant feedback doesn't have user_id context yet normally
+                "amount_claimed": structured.get("Total Amount") or structured.get("total_amount"),
+                "vendor_name": structured.get("Vendor Name") or structured.get("vendor_name"),
+                "description": "",
+                "items": [{"item_name": item.get("item")} for item in structured.get("items", [])]
+            })
+            result["policy_flags"] = policy_flags
+        except Exception as policy_exc:
+            logger.error(f"Policy engine execution during upload failed: {policy_exc}")
 
         response_data = {
             "success": True,
@@ -439,6 +482,96 @@ async def create_reimbursement_endpoint(
                 "content_type": storage_result.content_type,
             },
         )
+        
+        reimbursement_id = reimbursement["reimbursement_id"]
+
+        # --- NEW: Policy Engine Checks ---
+        policy_flags = []
+        try:
+            policy_flags = await check_policy({
+                "category_id": parsed_payload.category_id,
+                "subcategory_id": parsed_payload.subcategory_id,
+                "user_id": str(parsed_payload.user_id),
+                "amount_claimed": parsed_payload.total_amount,
+                "vendor_name": parsed_payload.vendor_name,
+                "description": parsed_payload.description,
+                "items": [{"item_name": item.item} for item in parsed_payload.items]
+            })
+            
+            if policy_flags:
+                logger.info(f"🚩 Policy flags detected for claim {reimbursement_id}: {policy_flags}")
+                # Update reimbursement with policy flags if column exists
+                try:
+                    supabase = get_supabase_client()
+                    supabase.table("reimbursements").update({
+                        "policy_flags": policy_flags
+                    }).eq("reimbursement_id", reimbursement_id).execute()
+                except Exception as p_err:
+                    logger.warning(f"Failed to save policy flags to DB: {p_err}")
+        except Exception as policy_exc:
+            logger.error(f"Policy engine execution failed: {policy_exc}")
+
+        # --- NEW: Fraud Detection (User Story 3.2, 2.2.2) ---
+        try:
+            fraud_result = await fraud_detection_service.check_for_fraud(
+                user_id=str(parsed_payload.user_id),
+                receipt_data={
+                    "total_amount": parsed_payload.total_amount,
+                    "vendor_name": parsed_payload.vendor_name,
+                    "purchase_date": parsed_payload.expense_date
+                },
+                claim_amount=float(parsed_payload.total_amount)
+            )
+            
+            if fraud_result.is_suspicious:
+                logger.warning(f"🚩 Claim {reimbursement_id} flagged as suspicious: {fraud_result.flags}")
+                await fraud_detection_service.flag_suspicious_claim(
+                    reimbursement_id=reimbursement_id,
+                    flags=fraud_result.flags,
+                    risk_score=fraud_result.risk_score,
+                    details=fraud_result.details
+                )
+                
+                # Create in-app notification for admin/manager about flagged claim
+                supabase = get_supabase_client()
+                if submission.manager_id:
+                    supabase.table("in_app_notifications").insert({
+                        "user_id": str(submission.manager_id),
+                        "title": "🚩 Suspicious Claim Detected",
+                        "message": f"A claim from {parsed_payload.vendor_name} for ${parsed_payload.total_amount} has been flagged for review.",
+                        "type": "warning",
+                        "category": "claim",
+                        "related_id": reimbursement_id
+                    }).execute()
+        except Exception as fraud_exc:
+            logger.error(f"Fraud detection integration failed: {fraud_exc}")
+
+        # --- NEW: Email Notification (User Story 5.1) ---
+        try:
+            # Fetch user email for notification
+            supabase = get_supabase_client()
+            user_resp = supabase.table("users").select("full_name, email").eq("user_id", str(parsed_payload.user_id)).single().execute()
+            if user_resp.data:
+                user_data = user_resp.data
+                await email_service.notify_claim_submitted(
+                    to_email=user_data["email"],
+                    user_name=user_data["full_name"],
+                    receipt_code=reimbursement["receipt_code"],
+                    amount=parsed_payload.total_amount,
+                    category=str(parsed_payload.category_id)
+                )
+                
+                # Also create in-app notification for user
+                supabase.table("in_app_notifications").insert({
+                    "user_id": str(parsed_payload.user_id),
+                    "title": "🧾 Claim Submitted",
+                    "message": f"Your claim for ${parsed_payload.total_amount} at {parsed_payload.vendor_name} has been submitted.",
+                    "type": "success",
+                    "category": "claim",
+                    "related_id": reimbursement_id
+                }).execute()
+        except Exception as email_exc:
+            logger.error(f"Notification integration failed: {email_exc}")
 
         # Auto-upload compressed copy to storage bucket (test mode)
         attachment_upload = None
@@ -462,6 +595,7 @@ async def create_reimbursement_endpoint(
                 "receipt_code": reimbursement["receipt_code"],
                 "attachment_url": storage_result.public_url,
                 "auto_upload": attachment_upload,
+                "policy_flags": policy_flags
             },
         }
         logger.info("✅ POST /reimbursements - Reimbursement created successfully: reimbursement_id=%s, receipt_code='%s'", 

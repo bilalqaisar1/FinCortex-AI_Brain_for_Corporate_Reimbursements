@@ -4,6 +4,8 @@ Optimized for concurrent requests with proper error handling.
 """
 import json
 import logging
+import base64
+import os
 from typing import Dict, Any, List, Optional
 
 from openai import OpenAI
@@ -33,6 +35,64 @@ def _get_client() -> OpenAI:
     if _client is None:
         _client = OpenAI(api_key=settings.openai_api_key)
     return _client
+
+
+def extract_text_with_openai_vision(image_path: str) -> str:
+    """
+    Use OpenAI's vision capability (GPT-4o-mini) as a fallback OCR.
+    
+    Args:
+        image_path: Path to the image file
+        
+    Returns:
+        Extracted raw text from the image
+        
+    Raises:
+        GPTServiceError: If vision processing fails
+    """
+    try:
+        # Read and encode image
+        with open(image_path, "rb") as image_file:
+            base64_image = base64.b64encode(image_file.read()).decode('utf-8')
+            
+        client = _get_client()
+        
+        # Determine media type based on extension
+        ext = os.path.splitext(image_path)[1].lower()
+        content_type = "image/jpeg"
+        if ext == ".png":
+            content_type = "image/png"
+        elif ext == ".gif":
+            content_type = "image/gif"
+        elif ext == ".webp":
+            content_type = "image/webp"
+
+        response = client.chat.completions.create(
+            model="gpt-4o-mini",
+            messages=[
+                {
+                    "role": "user",
+                    "content": [
+                        {"type": "text", "text": "This is a receipt image. Please perform OCR and extract all readable text content exactly as it appears. If it's not a receipt, just extract all text you see regardless."},
+                        {
+                            "type": "image_url",
+                            "image_url": {
+                                "url": f"data:{content_type};base64,{base64_image}"
+                            },
+                        },
+                    ],
+                }
+            ],
+            max_tokens=2000,
+        )
+        
+        extracted_text = response.choices[0].message.content.strip()
+        logger.info("✅ OpenAI Vision (OCR Fallback) extraction successful")
+        return extracted_text
+
+    except Exception as e:
+        logger.error("❌ OpenAI Vision (OCR Fallback) failed: %s", str(e))
+        raise GPTServiceError(f"OpenAI Vision OCR failed: {str(e)}")
 
 
 def structure_text_with_openai(

@@ -1,9 +1,9 @@
 "use client";
 
-import { useState } from "react";
-import { 
-  BarChart3, 
-  TrendingUp, 
+import { useState, useEffect, useCallback } from "react";
+import {
+  BarChart3,
+  TrendingUp,
   TrendingDown,
   DollarSign,
   Users,
@@ -11,12 +11,14 @@ import {
   Calendar,
   Download,
   Filter,
-  RefreshCw
+  RefreshCw,
+  Loader2
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
+import { useAuth } from "@/context/AuthContext";
 
 interface AnalyticsData {
   period: string;
@@ -30,36 +32,67 @@ interface AnalyticsData {
   topDepartment: string;
   monthlyTrend: number;
   weeklyTrend: number;
+  activeUsers?: number;
 }
 
 interface QuickAnalyticsProps {
-  data?: AnalyticsData;
   onRefresh?: () => void;
   onExport?: () => void;
   className?: string;
 }
 
-const mockData: AnalyticsData = {
+const BACKEND_URL = process.env.NEXT_PUBLIC_BACKEND_URL || 'http://localhost:8000';
+
+const defaultData: AnalyticsData = {
   period: "Last 30 days",
-  totalClaims: 1247,
-  totalAmount: 2500000,
-  averageClaim: 2005,
-  approvedClaims: 1150,
-  pendingClaims: 67,
-  rejectedClaims: 30,
-  topCategory: "Travel",
-  topDepartment: "Engineering",
-  monthlyTrend: 12.5,
-  weeklyTrend: -3.2
+  totalClaims: 0,
+  totalAmount: 0,
+  averageClaim: 0,
+  approvedClaims: 0,
+  pendingClaims: 0,
+  rejectedClaims: 0,
+  topCategory: "N/A",
+  topDepartment: "N/A",
+  monthlyTrend: 0,
+  weeklyTrend: 0,
+  activeUsers: 0
 };
 
-export function QuickAnalytics({ 
-  data = mockData,
+export function QuickAnalytics({
   onRefresh,
   onExport,
-  className 
+  className
 }: QuickAnalyticsProps) {
+  const { user } = useAuth();
   const [selectedPeriod, setSelectedPeriod] = useState<"7d" | "30d" | "90d" | "1y">("30d");
+  const [data, setData] = useState<AnalyticsData>(defaultData);
+  const [isLoading, setIsLoading] = useState(true);
+
+  const fetchAnalytics = useCallback(async () => {
+    setIsLoading(true);
+    try {
+      const adminId = user?.id || '';
+      const response = await fetch(`${BACKEND_URL}/api/v1/admin/analytics?admin_id=${adminId}&period=${selectedPeriod}`);
+      if (!response.ok) throw new Error('Failed to fetch analytics');
+      const result = await response.json();
+      if (result.success && result.data) {
+        setData(result.data);
+      }
+    } catch (error) {
+      console.error('Error fetching analytics:', error);
+    } finally {
+      setIsLoading(false);
+    }
+  }, [user?.id, selectedPeriod]);
+
+  useEffect(() => {
+    fetchAnalytics();
+  }, [fetchAnalytics]);
+
+  const handleRefresh = () => {
+    fetchAnalytics();
+    onRefresh?.();
+  };
 
   const formatCurrency = (amount: number) => {
     return new Intl.NumberFormat('en-PK', {
@@ -92,7 +125,7 @@ export function QuickAnalytics({
               <BarChart3 className="w-6 h-6 mr-2 text-purple-500" />
               Quick Analytics
             </CardTitle>
-            
+
             <div className="flex items-center space-x-2">
               <select
                 value={selectedPeriod}
@@ -104,19 +137,20 @@ export function QuickAnalytics({
                 <option value="90d">Last 90 days</option>
                 <option value="1y">Last year</option>
               </select>
-              
-              <Button 
-                size="sm" 
+
+              <Button
+                size="sm"
                 variant="outline"
-                onClick={onRefresh}
+                onClick={handleRefresh}
+                disabled={isLoading}
                 className="h-8 px-3"
               >
-                <RefreshCw className="w-3 h-3 mr-1" />
+                {isLoading ? <Loader2 className="w-3 h-3 mr-1 animate-spin" /> : <RefreshCw className="w-3 h-3 mr-1" />}
                 Refresh
               </Button>
-              
-              <Button 
-                size="sm" 
+
+              <Button
+                size="sm"
                 variant="outline"
                 onClick={onExport}
                 className="h-8 px-3"
@@ -200,7 +234,7 @@ export function QuickAnalytics({
               <div>
                 <p className="text-sm font-medium text-slate-600 dark:text-slate-400">Active Users</p>
                 <p className="text-2xl font-bold text-slate-900 dark:text-slate-100">
-                  {Math.floor(data.totalClaims * 0.8).toLocaleString()}
+                  {(data.activeUsers || 0).toLocaleString()}
                 </p>
                 <p className="text-xs text-slate-500 dark:text-slate-500 mt-1">
                   This period

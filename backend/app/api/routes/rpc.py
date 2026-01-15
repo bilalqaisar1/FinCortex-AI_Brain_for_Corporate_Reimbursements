@@ -209,6 +209,49 @@ async def get_users_by_manager_endpoint(
         raise HTTPException(status_code=500, detail=error_msg)
 
 
+@router.get("/rpc/managers-by-admin")
+async def get_managers_by_admin_endpoint(
+    admin_id: str = Query(..., description="Admin UUID to fetch managers"),
+) -> Dict[str, Any]:
+    """
+    Get all managers for a given admin.
+    
+    Args:
+        admin_id: Admin UUID to filter managers
+    
+    Returns:
+        JSON response with managers array
+    
+    Raises:
+        HTTPException: If RPC call fails
+    """
+    logger.info("📥 GET /rpc/managers-by-admin - Request received: admin_id='%s'", admin_id)
+    
+    try:
+        from app.services.supabase_rpc_service import get_managers_by_admin
+        
+        managers = get_managers_by_admin(admin_id)
+        response_data = {
+            "success": True,
+            "data": {
+                "admin_id": admin_id,
+                "managers": managers,
+                "count": len(managers),
+            },
+        }
+        logger.info("✅ GET /rpc/managers-by-admin - Successful: admin_id='%s', count=%d", 
+                   admin_id, len(managers))
+        return response_data
+    except SupabaseRPCError as e:
+        error_msg = str(e)
+        logger.error("❌ GET /rpc/managers-by-admin - Failed: %s", error_msg, exc_info=True)
+        raise HTTPException(status_code=500, detail=error_msg)
+    except Exception as e:
+        error_msg = f"Failed to fetch managers by admin: {str(e)}"
+        logger.error("❌ GET /rpc/managers-by-admin - Unexpected error: %s", error_msg, exc_info=True)
+        raise HTTPException(status_code=500, detail=error_msg)
+
+
 @router.get("/rpc/reimbursements-by-manager")
 async def get_reimbursements_by_manager_endpoint(
     manager_id: str = Query(..., description="Manager UUID to fetch reimbursements"),

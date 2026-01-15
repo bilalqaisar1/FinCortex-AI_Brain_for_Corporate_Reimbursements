@@ -514,11 +514,13 @@ body:not(.light-theme) .navbar.scrolled {
   transform: translateX(-50%);
 }
 
-.nav-links li a:hover {
+.nav-links li a:hover,
+.nav-links li a.active {
   color: var(--text-primary);
 }
 
-.nav-links li a:hover::after {
+.nav-links li a:hover::after,
+.nav-links li a.active::after {
   width: 100%;
 }
 

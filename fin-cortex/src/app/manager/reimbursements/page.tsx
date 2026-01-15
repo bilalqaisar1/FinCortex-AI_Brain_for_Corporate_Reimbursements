@@ -80,6 +80,7 @@ export default function ReimbursementsPage() {
     const receiptCode = reimb.receipt_code || "N/A";
     const userName = reimb.user_name || "Unknown User";
     const vendorName = reimb.vendor_name || "Unknown Vendor";
+
     const status = reimb.status || "pending";
 
     const matchesSearch =
@@ -117,13 +118,32 @@ export default function ReimbursementsPage() {
             iconColor="text-purple-600 dark:text-purple-400"
             iconBgColor="bg-purple-100 dark:bg-purple-900/30"
             actions={
-              <Button
-                variant="outline"
-                className="hover:bg-purple-50 hover:border-purple-200"
-              >
-                <Download className="w-4 h-4 mr-2" />
-                Export
-              </Button>
+              <div className="flex space-x-2">
+                <Button
+                  variant="outline"
+                  className="hover:bg-green-50 hover:border-green-200 text-green-700 dark:text-green-400"
+                  onClick={() => {
+                    if (!userProfile?.user_id) return;
+                    const url = `http://localhost:8000/api/v1/export/excel?manager_id=${userProfile.user_id}${statusFilter !== 'all' ? `&status=${statusFilter}` : ''}`;
+                    window.open(url, '_blank');
+                  }}
+                >
+                  <Download className="w-4 h-4 mr-2" />
+                  Excel
+                </Button>
+                <Button
+                  variant="outline"
+                  className="hover:bg-blue-50 hover:border-blue-200 text-blue-700 dark:text-blue-400"
+                  onClick={() => {
+                    if (!userProfile?.user_id) return;
+                    const url = `http://localhost:8000/api/v1/export/pdf?manager_id=${userProfile.user_id}${statusFilter !== 'all' ? `&status=${statusFilter}` : ''}`;
+                    window.open(url, '_blank');
+                  }}
+                >
+                  <Eye className="w-4 h-4 mr-2" />
+                  PDF Report
+                </Button>
+              </div>
             }
           />
 
@@ -168,105 +188,162 @@ export default function ReimbursementsPage() {
             </CardContent>
           </Card>
 
-          {/* Reimbursements List */}
-          <Card className="bg-white/80 dark:bg-slate-900/80 backdrop-blur-sm border-slate-200 dark:border-slate-700 shadow-lg">
-            <CardHeader>
-              <CardTitle className="flex items-center justify-between">
-                <span className="flex items-center">
-                  <Receipt className="w-5 h-5 mr-2 text-purple-600 dark:text-purple-400" />
-                  <span className="text-slate-900 dark:text-slate-100">All Reimbursements ({filteredReimbursements.length})</span>
-                </span>
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              {loading ? (
-                <div className="flex items-center justify-center py-12">
-                  <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-purple-600"></div>
-                </div>
-              ) : error ? (
-                <div className="text-center py-12 text-red-500">
-                  <AlertCircle className="w-12 h-12 mx-auto mb-2" />
-                  <p>{error}</p>
-                </div>
-              ) : filteredReimbursements.length === 0 ? (
-                <div className="text-center py-12">
-                  <Receipt className="w-16 h-16 mx-auto text-slate-400 dark:text-slate-500 mb-4" />
-                  <p className="text-slate-600 dark:text-slate-300 mb-4">
-                    {searchQuery || statusFilter !== "all"
-                      ? "No reimbursements found matching your filters."
-                      : "No reimbursements found."}
-                  </p>
-                </div>
-              ) : (
-                <div className="space-y-4">
-                  {filteredReimbursements.map((reimb) => (
-                    <div
-                      key={reimb.reimbursement_id}
-                      className="flex flex-col md:flex-row items-start md:items-center justify-between p-4 bg-slate-50 dark:bg-slate-800 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors gap-4"
-                    >
-                      <div className="flex-1 min-w-0 space-y-2">
-                        <div className="flex items-center space-x-3">
-                          <h3 className="font-semibold text-slate-900 dark:text-slate-100">
-                            {reimb.receipt_code || "No Code"}
-                          </h3>
-                          {reimb.status && (
-                            <Badge className={statusColors[reimb.status as keyof typeof statusColors] || "bg-slate-100 text-slate-700"}>
-                              {reimb.status.charAt(0).toUpperCase() + reimb.status.slice(1)}
-                            </Badge>
-                          )}
-                        </div>
-                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-2 text-sm text-slate-600 dark:text-slate-400">
-                          <div className="flex items-center space-x-2">
-                            <User className="w-4 h-4" />
-                            <span>{reimb.user_name || "Unknown User"}</span>
-                          </div>
-                          <div className="flex items-center space-x-2">
-                            <Building2 className="w-4 h-4" />
-                            <span>{reimb.vendor_name || "Unknown Vendor"}</span>
-                          </div>
-                          <div className="flex items-center space-x-2">
-                            <DollarSign className="w-4 h-4" />
-                            <span>Claimed: {formatCurrency(reimb.amount_claimed, reimb.currency)}</span>
-                          </div>
-                          <div className="flex items-center space-x-2">
-                            <Calendar className="w-4 h-4" />
-                            <span>{formatDate(reimb.created_at)}</span>
-                          </div>
-                        </div>
-                        {reimb.amount_approved !== null && reimb.amount_approved !== undefined && (
-                          <div className="flex items-center space-x-2 text-sm">
-                            <CheckCircle className="w-4 h-4 text-green-500" />
-                            <span className="text-green-600 dark:text-green-400">
-                              Approved: {formatCurrency(reimb.amount_approved, reimb.currency)}
-                            </span>
-                          </div>
-                        )}
-                      </div>
-                      <div className="flex items-center space-x-2">
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={() => {
-                            if (!reimb.user_id) {
-                              console.error("User ID is missing for reimbursement", reimb.reimbursement_id);
-                              return;
-                            }
-                            router.push(`/manager/reimbursements/${reimb.reimbursement_id}?userId=${reimb.user_id}`);
-                          }}
-                          disabled={!reimb.user_id}
-                          title={!reimb.user_id ? "User ID missing" : "View Details"}
-                          className="hover:bg-purple-50 dark:hover:bg-slate-700"
-                        >
-                          <Eye className="w-4 h-4 mr-1" />
-                          View Details
-                        </Button>
-                      </div>
+          {/* Pending Claims Section */}
+          {(() => {
+            const pendingReimbursements = filteredReimbursements.filter(
+              (reimb) => reimb.status === "pending" || reimb.status === "under_review"
+            );
+            const processedReimbursements = filteredReimbursements.filter(
+              (reimb) => reimb.status === "approved" || reimb.status === "rejected"
+            );
+
+            const renderReimbursementItem = (reimb: Reimbursement) => (
+              <div
+                key={reimb.reimbursement_id}
+                className="flex flex-col md:flex-row items-start md:items-center justify-between p-4 bg-slate-50 dark:bg-slate-800 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors gap-4"
+              >
+                <div className="flex-1 min-w-0 space-y-2">
+                  <div className="flex items-center space-x-3">
+                    <h3 className="font-semibold text-slate-900 dark:text-slate-100">
+                      {reimb.receipt_code || "No Code"}
+                    </h3>
+                    {reimb.status && (
+                      <Badge className={statusColors[reimb.status as keyof typeof statusColors] || "bg-slate-100 text-slate-700"}>
+                        {reimb.status.charAt(0).toUpperCase() + reimb.status.slice(1)}
+                      </Badge>
+                    )}
+                  </div>
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-2 text-sm text-slate-600 dark:text-slate-400">
+                    <div className="flex items-center space-x-2">
+                      <User className="w-4 h-4" />
+                      <span>{reimb.user_name || "Unknown User"}</span>
                     </div>
-                  ))}
+                    <div className="flex items-center space-x-2">
+                      <Building2 className="w-4 h-4" />
+                      <span>{reimb.vendor_name || "Unknown Vendor"}</span>
+                    </div>
+                    <div className="flex items-center space-x-2">
+                      <DollarSign className="w-4 h-4" />
+                      <span>Claimed: {formatCurrency(reimb.amount_claimed, reimb.currency)}</span>
+                    </div>
+                    <div className="flex items-center space-x-2">
+                      <Calendar className="w-4 h-4" />
+                      <span>{formatDate(reimb.created_at)}</span>
+                    </div>
+                  </div>
+                  {reimb.amount_approved !== null && reimb.amount_approved !== undefined && (
+                    <div className="flex items-center space-x-2 text-sm">
+                      <CheckCircle className="w-4 h-4 text-green-500" />
+                      <span className="text-green-600 dark:text-green-400">
+                        Approved: {formatCurrency(reimb.amount_approved, reimb.currency)}
+                      </span>
+                    </div>
+                  )}
                 </div>
-              )}
-            </CardContent>
-          </Card>
+                <div className="flex items-center space-x-2">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => {
+                      if (!reimb.user_id) {
+                        console.error("User ID is missing for reimbursement", reimb.reimbursement_id);
+                        return;
+                      }
+                      router.push(`/manager/reimbursements/${reimb.reimbursement_id}?userId=${reimb.user_id}`);
+                    }}
+                    disabled={!reimb.user_id}
+                    title={!reimb.user_id ? "User ID missing" : "View Details"}
+                    className="hover:bg-purple-50 dark:hover:bg-slate-700"
+                  >
+                    <Eye className="w-4 h-4 mr-1" />
+                    View Details
+                  </Button>
+                </div>
+              </div>
+            );
+
+            return (
+              <>
+                {/* Pending Claims Section */}
+                <Card className="mb-6 bg-white/80 dark:bg-slate-900/80 backdrop-blur-sm border-yellow-200 dark:border-yellow-700 shadow-lg">
+                  <CardHeader>
+                    <CardTitle className="flex items-center justify-between">
+                      <span className="flex items-center">
+                        <Clock className="w-5 h-5 mr-2 text-yellow-600 dark:text-yellow-400" />
+                        <span className="text-slate-900 dark:text-slate-100">Pending Claims ({pendingReimbursements.length})</span>
+                      </span>
+                      <Badge className="bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-400">
+                        Requires Review
+                      </Badge>
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    {loading ? (
+                      <div className="flex items-center justify-center py-12">
+                        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-yellow-600"></div>
+                      </div>
+                    ) : error ? (
+                      <div className="text-center py-12 text-red-500">
+                        <AlertCircle className="w-12 h-12 mx-auto mb-2" />
+                        <p>{error}</p>
+                      </div>
+                    ) : pendingReimbursements.length === 0 ? (
+                      <div className="text-center py-8">
+                        <CheckCircle className="w-12 h-12 mx-auto text-green-400 dark:text-green-500 mb-4" />
+                        <p className="text-slate-600 dark:text-slate-300">
+                          No pending claims to review. All caught up!
+                        </p>
+                      </div>
+                    ) : (
+                      <div className="space-y-4">
+                        {pendingReimbursements.map(renderReimbursementItem)}
+                      </div>
+                    )}
+                  </CardContent>
+                </Card>
+
+                {/* All Reimbursements (Processed) Section */}
+                <Card className="bg-white/80 dark:bg-slate-900/80 backdrop-blur-sm border-slate-200 dark:border-slate-700 shadow-lg">
+                  <CardHeader>
+                    <CardTitle className="flex items-center justify-between">
+                      <span className="flex items-center">
+                        <Receipt className="w-5 h-5 mr-2 text-purple-600 dark:text-purple-400" />
+                        <span className="text-slate-900 dark:text-slate-100">All Reimbursements ({processedReimbursements.length})</span>
+                      </span>
+                      <Badge className="bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300">
+                        Approved / Rejected
+                      </Badge>
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    {loading ? (
+                      <div className="flex items-center justify-center py-12">
+                        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-purple-600"></div>
+                      </div>
+                    ) : error ? (
+                      <div className="text-center py-12 text-red-500">
+                        <AlertCircle className="w-12 h-12 mx-auto mb-2" />
+                        <p>{error}</p>
+                      </div>
+                    ) : processedReimbursements.length === 0 ? (
+                      <div className="text-center py-8">
+                        <Receipt className="w-12 h-12 mx-auto text-slate-400 dark:text-slate-500 mb-4" />
+                        <p className="text-slate-600 dark:text-slate-300">
+                          {searchQuery || statusFilter !== "all"
+                            ? "No processed reimbursements found matching your filters."
+                            : "No processed reimbursements yet."}
+                        </p>
+                      </div>
+                    ) : (
+                      <div className="space-y-4">
+                        {processedReimbursements.map(renderReimbursementItem)}
+                      </div>
+                    )}
+                  </CardContent>
+                </Card>
+              </>
+            );
+          })()}
         </div>
       </ManagerLayout>
     </RouteProtection>

@@ -427,3 +427,33 @@ def test_rpc_function() -> None:
         raise
 
 
+def get_managers_by_admin(admin_id: str) -> List[Dict[str, Any]]:
+    """
+    Fetch managers for a given admin.
+
+    Args:
+        admin_id: Admin UUID to filter managers.
+
+    Returns:
+        List of dicts with manager data.
+    """
+    try:
+        supabase = get_supabase_client()
+
+        # We query the 'managers' table directly
+        response = supabase.from_("managers") \
+            .select("*, roles(role_name), manager_department:departments(*)") \
+            .eq("manager_admin_id", admin_id) \
+            .execute()
+
+        result = response.data
+
+        logger.info("✅ Supabase: get_managers_by_admin successful for admin %s", admin_id)
+        return result
+
+    except Exception as e:
+        error_msg = f"Failed to fetch managers by admin: {str(e)}"
+        logger.error("❌ Supabase: Unexpected error - %s", error_msg)
+        raise SupabaseRPCError(error_msg) from e
+
+

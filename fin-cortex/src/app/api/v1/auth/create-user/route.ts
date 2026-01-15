@@ -49,9 +49,12 @@ export async function POST(request: Request) {
         // We use supabaseAdmin to query the 'managers' table with the caller ID
         const { data: managerProfile, error: managerError } = await supabaseAdmin
             .from('managers')
-            .select('manager_id')
+            .select('manager_id, manager_company_id, manager_admin_id')
             .eq('manager_id', caller.id) // Assuming manager_id maps to auth user id
             .single()
+
+        const managerCompanyId = managerProfile?.manager_company_id || null
+        const managerAdminId = managerProfile?.manager_admin_id || null
 
         if (managerError || !managerProfile) {
             return NextResponse.json(
@@ -84,7 +87,7 @@ export async function POST(request: Request) {
 
         // Password Validation
         // Min 8 chars, at least 1 letter and 1 number
-        const passwordRegex = /^(?=.*[A-Za-z])(?=.*\d)[A-Za-z\d@$!%*#?&]{8,}$/
+        const passwordRegex = /^(?=.*[a-zA-Z])(?=.*\d).{8,}$/
         if (!password || !passwordRegex.test(password)) {
             return NextResponse.json({ detail: 'Password must be at least 8 characters and contain both letters and numbers' }, { status: 400 })
         }
@@ -169,6 +172,7 @@ export async function POST(request: Request) {
             .insert({
                 user_id: userId,
                 manager_id: finalManagerId,
+                admin_id: managerAdminId,
                 department_id: department_id || null,
                 full_name: sanitizedFullName,
                 employee_code: employee_code,

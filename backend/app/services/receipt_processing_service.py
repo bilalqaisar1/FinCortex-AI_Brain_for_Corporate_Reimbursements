@@ -6,7 +6,7 @@ import logging
 from typing import Dict, Any, List, Optional
 
 from app.services.vision_service import extract_text_from_image, VisionServiceError
-from app.services.gpt_service import structure_text_with_openai, GPTServiceError
+from app.services.gpt_service import structure_text_with_openai, extract_text_with_openai_vision, GPTServiceError
 
 logger = logging.getLogger(__name__)
 
@@ -40,7 +40,14 @@ def process_receipt(
     """
     try:
         # Step 1: Extract text using Google Vision
-        raw_text = extract_text_from_image(image_path)
+        try:
+            raw_text = extract_text_from_image(image_path)
+            logger.info("✅ OCR extraction: Google Vision successful")
+        except VisionServiceError as e:
+            logger.warning("⚠️ Google Vision failed: %s. Falling back to OpenAI OCR.", str(e))
+            # Fallback to OpenAI Vision OCR
+            raw_text = extract_text_with_openai_vision(image_path)
+            logger.info("✅ OCR extraction: OpenAI Fallback successful")
         
         if not raw_text:
             raise ReceiptProcessingError("No text extracted from image. Please ensure the image contains readable text.")

@@ -101,6 +101,7 @@ const ExpenseForm: React.FC<ExpenseFormProps> = ({ isDarkTheme }) => {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [errors, setErrors] = useState<FormErrors>({});
   const [showReviewMessage, setShowReviewMessage] = useState(false);
+  const [policyFlags, setPolicyFlags] = useState<any[]>([]);
 
   // Derived read-only category/subcategory from GPT/OCR; kept in formData for payload consistency
   // Derived read-only category/subcategory from GPT/OCR; shown on form (read-only)
@@ -302,7 +303,7 @@ const ExpenseForm: React.FC<ExpenseFormProps> = ({ isDarkTheme }) => {
           // If user is an admin but admin_id is not set, use user_id as admin_uuid
           adminUuid = userProfile.user_id;
         }
-        
+
         // Debug logging
         console.log("🔍 ExpenseForm - userProfile state:", {
           hasUserProfile: !!userProfile,
@@ -311,7 +312,7 @@ const ExpenseForm: React.FC<ExpenseFormProps> = ({ isDarkTheme }) => {
           userRole: userProfile?.userRole,
           determined_adminUuid: adminUuid
         });
-        
+
         if (adminUuid) {
           body.append("admin_uuid", adminUuid);
           console.log("📤 Sending admin_uuid to backend:", adminUuid);
@@ -332,10 +333,17 @@ const ExpenseForm: React.FC<ExpenseFormProps> = ({ isDarkTheme }) => {
 
         const structured = payload.data?.structured || {};
         const rawText = payload.data?.raw_text || "";
+        const flags = payload.data?.policy_flags || [];
         setOcrData(structured);
         setOcrStructured(structured);
         setOcrRawText(rawText);
-        showToast("success", "Receipt Processed", "Fields have been auto-filled. Please review and make corrections if needed.");
+        setPolicyFlags(flags);
+
+        if (flags.length > 0) {
+          showToast("warning", "Policy Flags Detected", "Some potential policy violations were detected. Please review.");
+        } else {
+          showToast("success", "Receipt Processed", "Fields have been auto-filled. Please review and make corrections if needed.");
+        }
       } catch (error) {
         console.error("OCR processing failed", error);
         showToast("error", "Processing Failed", "Unable to extract data from receipt. Please try again.");
@@ -579,6 +587,35 @@ const ExpenseForm: React.FC<ExpenseFormProps> = ({ isDarkTheme }) => {
                 <p className="text-xs text-muted">
                   Some fields have been auto-filled from your receipt. Please verify and edit any incorrect information.
                 </p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Policy Engine Warnings */}
+      {policyFlags.length > 0 && (
+        <Card className="glass-effect border-red-500/30 bg-red-500/10 relative z-50 animate-pulse-slow">
+          <CardContent className="pt-6">
+            <div className="flex items-start gap-3">
+              <AlertCircle className="size-5 text-red-500 mt-0.5" />
+              <div className="flex-1">
+                <p className="text-sm font-bold text-red-500 mb-2">
+                  Policy Violations Detected
+                </p>
+                <ul className="space-y-2">
+                  {policyFlags.map((flag, idx) => (
+                    <li key={idx} className="flex items-start gap-2 text-xs text-red-700 dark:text-red-400">
+                      <div className={`size-1.5 rounded-full mt-1.5 shrink-0 ${flag.severity === 'critical' ? 'bg-red-500' : 'bg-orange-500'}`} />
+                      <span>{flag.message}</span>
+                    </li>
+                  ))}
+                </ul>
+                <div className="mt-3 p-2 bg-red-500/20 rounded border border-red-500/30">
+                  <p className="text-[10px] text-red-600 dark:text-red-400 font-medium">
+                    IMPORTANT: Flagged claims may require additional manager justification or could be automatically rejected based on company policy.
+                  </p>
+                </div>
               </div>
             </div>
           </CardContent>

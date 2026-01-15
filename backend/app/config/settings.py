@@ -4,23 +4,23 @@ Optimized for production use with all credentials embedded.
 """
 from functools import lru_cache
 from typing import Optional
+from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
-class Settings:
-    """Application configuration with hardcoded credentials."""
-    
+class Settings(BaseSettings):
+    """Application configuration with environment variable support."""
     
     # Supabase Configuration
-    supabase_url: str = "https://dczlyrrkjnxbmqkbgtgz.supabase.co"
-    supabase_service_role_key: str = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImRjemx5cnJram54Ym1xa2JndGd6Iiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc1ODE5MDEzNCwiZXhwIjoyMDczNzY2MTM0fQ.K5iOUvSwC1erFvE6qpHacm1XdpVtV_btfiSjqLgpYig"
-    supabase_anon_key: str = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImRjemx5cnJram54Ym1xa2JndGd6Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTgxOTAxMzQsImV4cCI6MjA3Mzc2NjEzNH0.7hrt0vvZbguthdjU2CG6BynxpkYvoyXkBFhZBfwYxWc"
+    supabase_url: str
+    supabase_service_role_key: str
+    supabase_anon_key: str
     
     # Google Vision API Configuration
-    google_vision_api_key: str = "AIzaSyCxXYnYE_dhfGJz9ZLndFVpaj1oA-VUkBo"
-    vision_api_url: str = "https://vision.googleapis.com/v1/images:annotate?key=AIzaSyCxXYnYE_dhfGJz9ZLndFVpaj1oA-VUkBo"
+    google_vision_api_key: Optional[str] = None
+    vision_api_url: Optional[str] = None
     
     # OpenAI Configuration
-    openai_api_key: str = "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"
+    openai_api_key: Optional[str] = None
     openai_model: str = "gpt-4o-mini"
     
     # Storage
@@ -31,6 +31,21 @@ class Settings:
     temp_dir: str = "temp"
     max_upload_size_mb: int = 10
     request_timeout_seconds: int = 30
+
+    model_config = SettingsConfigDict(
+        env_file=".env",
+        env_file_encoding="utf-8",
+        extra="ignore"
+    )
+
+    @property
+    def vision_api_url_full(self) -> str:
+        """Construct the full Vision API URL if not explicitly provided."""
+        if self.vision_api_url:
+            return self.vision_api_url
+        if self.google_vision_api_key:
+            return f"https://vision.googleapis.com/v1/images:annotate?key={self.google_vision_api_key}"
+        return ""
 
 
 @lru_cache(maxsize=1)

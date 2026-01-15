@@ -10,6 +10,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/com
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Separator } from "@/components/ui/separator";
+import { Textarea } from "@/components/ui/textarea"; // Added
 import {
     ArrowLeft,
     Receipt,
@@ -34,7 +35,7 @@ import { useAuth } from "@/context/AuthContext";
 import { fetchReimbursementDetail } from "@/app/api/v1/manager/fetch-reimbursements/detail";
 import { ReimbursementDetail } from "@/types/reimbursement-detail";
 import Image from "next/image";
-import { Dialog, DialogContent, DialogTrigger, DialogTitle } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogTrigger, DialogTitle, DialogHeader, DialogDescription, DialogFooter } from "@/components/ui/dialog"; // Updated imports
 import { VisuallyHidden } from "@radix-ui/react-visually-hidden";
 
 const statusColors = {
@@ -50,15 +51,6 @@ export default function ReimbursementDetailPage({ params }: { params: Promise<{ 
     const { reimbursementId } = use(params);
     const { userProfile } = useAuth();
 
-    // We need the user_id to fetch details. In a real app, this should probably come from the
-    // previous page or be handled by the backend knowing the relationship.
-    // For now, we'll try to get it from query params or fail gracefully if the API requires it
-    // But wait! The updated backend function takes p_user_id. The previous list page had this data.
-    // Let's assume for this implementation we pass userId via query param for simplicity,
-    // OR we can't reliably get it if the user navigates directly.
-    // CRITICAL FIX: The backend function REQUIRES user_id. We must get it. 
-    // Ideally, the backend endpoint shouldn't require user_id if manager_id and reimbursement_id are provided (as reimbursement_id is unique).
-    // However, proceeding with the provided RPC signature. We'll use a query param `userId`.
     const userIdParam = searchParams.get('userId');
     const userId = userIdParam === "undefined" ? null : userIdParam;
 
@@ -66,27 +58,73 @@ export default function ReimbursementDetailPage({ params }: { params: Promise<{ 
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
 
+    // Approval Logic State
+    const [decisionType, setDecisionType] = useState<"approved" | "rejected" | null>(null);
+    const [isDialogOpen, setIsDialogOpen] = useState(false);
+    const [comment, setComment] = useState("");
+    const [isProcessing, setIsProcessing] = useState(false);
+
+    const loadDetail = async () => {
+        if (!userProfile?.user_id || !userId) {
+            if (!userId && !loading) setError("Missing User ID. Unable to load details.");
+            return;
+        }
+
+        try {
+            setLoading(true);
+            const response = await fetchReimbursementDetail(userProfile.user_id, userId, reimbursementId);
+            setDetail(response.data);
+        } catch (err) {
+            console.error("Failed to load reimbursement detail:", err);
+            setError("Failed to load reimbursement details.");
+        } finally {
+            setLoading(false);
+        }
+    };
+
     useEffect(() => {
-        const loadDetail = async () => {
-            if (!userProfile?.user_id || !userId) {
-                if (!userId && !loading) setError("Missing User ID. Unable to load details.");
-                return;
-            }
-
-            try {
-                setLoading(true);
-                const response = await fetchReimbursementDetail(userProfile.user_id, userId, reimbursementId);
-                setDetail(response.data);
-            } catch (err) {
-                console.error("Failed to load reimbursement detail:", err);
-                setError("Failed to load reimbursement details.");
-            } finally {
-                setLoading(false);
-            }
-        };
-
         loadDetail();
     }, [userProfile?.user_id, userId, reimbursementId]);
+
+    const handleApprove = () => {
+        setDecisionType("approved");
+        setIsDialogOpen(true);
+    };
+
+    const handleReject = () => {
+        setDecisionType("rejected");
+        setIsDialogOpen(true);
+    };
+
+    const confirmDecision = async () => {
+        if (!decisionType) return;
+        if (decisionType === "rejected" && !comment.trim()) return;
+
+        setIsProcessing(true);
+        try {
+            const baseUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
+            const response = await fetch(`${baseUrl}/api/v1/reimbursements/${reimbursementId}/status`, {
+                method: "PUT",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                    status: decisionType,
+                    comments: comment,
+                    approver_id: userProfile?.user_id
+                })
+            });
+            const payload = await response.json();
+            if (payload.success) {
+                setIsDialogOpen(false);
+                setComment("");
+                setDecisionType(null);
+                loadDetail(); // Refresh data to show new status
+            }
+        } catch (error) {
+            console.error("Failed to update status:", error);
+        } finally {
+            setIsProcessing(false);
+        }
+    };
 
     const formatDate = (dateString?: string | null) => {
         if (!dateString) return "N/A";
@@ -124,7 +162,7 @@ export default function ReimbursementDetailPage({ params }: { params: Promise<{ 
     return (
         <RouteProtection allowedRoles={['manager']}>
             <ManagerLayout>
-                <div className="w-full max-w-5xl mx-auto space-y-6">
+                <div className="w-full max-w-5xl mx-auto space-y-6 pb-20"> {/* Added padding bottom for fixed footer if needed, but using inline for now */}
                     <div className="flex items-center justify-between">
                         <Button
                             variant="ghost"
@@ -135,14 +173,14 @@ export default function ReimbursementDetailPage({ params }: { params: Promise<{ 
                             Back to Reimbursements
                         </Button>
 
-                        {detail && (
-                            <div className="flex gap-2">
+                        <div className="flex gap-2">
+                            {detail && (
                                 <Button variant="outline" size="sm">
                                     <Download className="w-4 h-4 mr-2" />
                                     Download PDF
                                 </Button>
-                            </div>
-                        )}
+                            )}
+                        </div>
                     </div>
 
                     {loading ? (
@@ -328,7 +366,7 @@ export default function ReimbursementDetailPage({ params }: { params: Promise<{ 
                                                                     <DialogTitle>Attachment Preview</DialogTitle>
                                                                 </VisuallyHidden>
                                                                 <div className="relative w-full h-[80vh] bg-black/90 rounded-lg flex items-center justify-center">
-                                                                    {file.file_type.startsWith("image/") && (
+                                                                    {file.file_type.startsWith("image/") ? (
                                                                         <div className="relative w-full h-full">
                                                                             <Image
                                                                                 src={getImageUrl(file.file_path)}
@@ -337,9 +375,7 @@ export default function ReimbursementDetailPage({ params }: { params: Promise<{ 
                                                                                 className="object-contain"
                                                                             />
                                                                         </div>
-                                                                    )}
-                                                                    {/* Fallback for non-images (like PDF) if we had a viewer, currently just same placeholder logic or download link */}
-                                                                    {!file.file_type.startsWith("image/") && (
+                                                                    ) : (
                                                                         <div className="text-white text-center">
                                                                             <FileText className="w-16 h-16 mx-auto mb-4 text-slate-400" />
                                                                             <p>Preview not available for this file type.</p>
@@ -446,9 +482,105 @@ export default function ReimbursementDetailPage({ params }: { params: Promise<{ 
                                     )}
                                 </div>
                             </div>
+
+                            {/* Bottom Action Bar */}
+                            {detail.status.toLowerCase() === 'pending' && (
+                                <Card className="mt-6 border-t-4 border-t-purple-500 shadow-lg bg-slate-50 dark:bg-slate-800/50">
+                                    <CardContent className="flex items-center justify-between p-6">
+                                        <div className="space-y-1">
+                                            <h3 className="text-lg font-semibold text-slate-900 dark:text-slate-100">Review Action</h3>
+                                            <p className="text-sm text-slate-500 dark:text-slate-400">
+                                                Please review the claim details and attachments before making a decision.
+                                            </p>
+                                        </div>
+                                        <div className="flex gap-4">
+                                            <Button
+                                                size="lg"
+                                                onClick={handleReject}
+                                                className="bg-red-600 hover:bg-red-700 text-white px-8 shadow-sm hover:shadow-md transition-all font-semibold"
+                                            >
+                                                <XCircle className="w-5 h-5 mr-2" />
+                                                Reject Claim
+                                            </Button>
+                                            <Button
+                                                size="lg"
+                                                onClick={handleApprove}
+                                                className="bg-green-600 hover:bg-green-700 text-white px-8 shadow-sm hover:shadow-md transition-all font-semibold"
+                                            >
+                                                <CheckCircle className="w-5 h-5 mr-2" />
+                                                Approve Claim
+                                            </Button>
+                                        </div>
+                                    </CardContent>
+                                </Card>
+                            )}
                         </>
                     )}
                 </div>
+
+                {/* Confirm Dialog */}
+                <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
+                    <DialogContent className="bg-white dark:bg-slate-900">
+                        <DialogHeader>
+                            <DialogTitle>
+                                {decisionType === "approved" ? "Approve" : "Reject"} Reimbursement
+                            </DialogTitle>
+                            <DialogDescription>
+                                {decisionType === "approved"
+                                    ? "Are you sure you want to approve this reimbursement claim?"
+                                    : "Are you sure you want to reject this reimbursement claim? Please provide a reason for the user."}
+                            </DialogDescription>
+                        </DialogHeader>
+                        <div className="space-y-4 py-4">
+                            <div>
+                                <label className="text-sm font-medium text-slate-700 dark:text-slate-300 mb-2 block">
+                                    {decisionType === "approved" ? "Comments (Optional)" : "Reason for Rejection *"}
+                                </label>
+                                <Textarea
+                                    value={comment}
+                                    onChange={(e) => setComment(e.target.value)}
+                                    placeholder={decisionType === "approved"
+                                        ? "Add any comments..."
+                                        : "Please provide a reason for rejection..."}
+                                    className="min-h-[100px] bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700"
+                                    required={decisionType === "rejected"}
+                                />
+                            </div>
+                        </div>
+                        <DialogFooter>
+                            <Button
+                                variant="outline"
+                                onClick={() => {
+                                    setIsDialogOpen(false);
+                                    setComment("");
+                                    setDecisionType(null);
+                                }}
+                                disabled={isProcessing}
+                            >
+                                Cancel
+                            </Button>
+                            <Button
+                                onClick={confirmDecision}
+                                disabled={isProcessing || (decisionType === "rejected" && !comment.trim())}
+                                className={decisionType === "approved"
+                                    ? "bg-green-600 hover:bg-green-700"
+                                    : "bg-red-600 hover:bg-red-700"}
+                            >
+                                {isProcessing ? (
+                                    <div className="flex items-center space-x-2">
+                                        <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                                        <span>Processing...</span>
+                                    </div>
+                                ) : (
+                                    <>
+                                        {decisionType === "approved" ? "Approve" : "Reject"}
+                                    </>
+                                )}
+                            </Button>
+                        </DialogFooter>
+                    </DialogContent>
+                </Dialog>
+
             </ManagerLayout>
         </RouteProtection>
     );

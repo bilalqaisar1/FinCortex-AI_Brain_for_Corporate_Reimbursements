@@ -93,9 +93,10 @@ export default function CreateUserPage() {
         return;
       }
 
-      // Validate password length
-      if (formData.password.length < 8) {
-        showToast('error', 'Invalid Password', 'Password must be at least 8 characters long');
+      // Validate password length and complexity
+      const passwordRegex = /^(?=.*[a-zA-Z])(?=.*\d).{8,}$/;
+      if (!passwordRegex.test(formData.password)) {
+        showToast('error', 'Invalid Password', 'Password must be at least 8 characters long and contain both letters and numbers');
         setIsLoading(false);
         return;
       }
@@ -354,7 +355,7 @@ export default function CreateUserPage() {
                       />
                     </div>
                     <p className="text-xs text-slate-500 dark:text-slate-400">
-                      Must be at least 8 characters long
+                      Must be at least 8 characters long and contain both letters and numbers
                     </p>
                   </div>
 

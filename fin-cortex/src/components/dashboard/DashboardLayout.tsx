@@ -18,6 +18,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { NotificationCenter } from "@/components/NotificationCenter";
 
 interface DashboardLayoutProps {
   children: ReactNode;
@@ -38,7 +39,7 @@ export function DashboardLayout({ children, className }: DashboardLayoutProps) {
 
   const userInitials = displayName
     .split(" ")
-    .map((n) => n[0])
+    .map((n: string) => n[0])
     .join("")
     .toUpperCase()
     .slice(0, 2);
@@ -46,9 +47,9 @@ export function DashboardLayout({ children, className }: DashboardLayoutProps) {
   // Determine profile link based on user role
   const getProfileHref = () => {
     if (!user || !userProfile) return "/login";
-    
+
     const role = userProfile.userRole;
-    
+
     if (role === 'admin') {
       return "/admin";
     } else if (role === 'manager') {
@@ -56,12 +57,12 @@ export function DashboardLayout({ children, className }: DashboardLayoutProps) {
     } else if (role === 'user') {
       return "/user/profile";
     }
-    
+
     // Fallback
     if (userProfile.employee_code !== undefined) {
       return "/user/profile";
     }
-    
+
     return "/admin";
   };
 
@@ -78,11 +79,11 @@ export function DashboardLayout({ children, className }: DashboardLayoutProps) {
     <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-100 dark:from-slate-900 dark:via-blue-900 dark:to-indigo-900 transition-all duration-300">
       {/* Desktop Layout */}
       <div className="hidden lg:flex h-screen overflow-hidden">
-        <AdminSidebar 
-          collapsed={sidebarCollapsed} 
+        <AdminSidebar
+          collapsed={sidebarCollapsed}
           onToggle={toggleSidebar}
         />
-        
+
         {/* Main Content */}
         <div className="flex-1 flex flex-col min-w-0 transition-all duration-300">
           {/* Top Header - Enhanced Responsiveness */}
@@ -97,7 +98,7 @@ export function DashboardLayout({ children, className }: DashboardLayoutProps) {
                 >
                   <Menu className="w-4 h-4 sm:w-5 sm:h-5" />
                 </Button>
-                
+
                 <div className="relative hidden sm:block">
                   <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-slate-400 dark:text-slate-500" />
                   <input
@@ -107,11 +108,11 @@ export function DashboardLayout({ children, className }: DashboardLayoutProps) {
                   />
                 </div>
               </div>
-              
+
               <div className="flex items-center space-x-2 sm:space-x-4">
-                <Button 
-                  variant="ghost" 
-                  size="sm" 
+                <Button
+                  variant="ghost"
+                  size="sm"
                   onClick={toggleTheme}
                   className="hover:bg-blue-50 dark:hover:bg-slate-800 transition-all duration-200"
                 >
@@ -121,12 +122,9 @@ export function DashboardLayout({ children, className }: DashboardLayoutProps) {
                     <Moon className="w-4 h-4 sm:w-5 sm:h-5 text-slate-600" />
                   )}
                 </Button>
-                
-                <Button variant="ghost" size="sm" className="hover:bg-blue-50 dark:hover:bg-slate-800 relative">
-                  <Bell className="w-4 h-4 sm:w-5 sm:h-5" />
-                  <span className="absolute -top-1 -right-1 w-2 h-2 bg-red-500 rounded-full"></span>
-                </Button>
-                
+
+                <NotificationCenter />
+
                 {/* User Profile Dropdown */}
                 <DropdownMenu>
                   <DropdownMenuTrigger asChild>
@@ -174,7 +172,7 @@ export function DashboardLayout({ children, className }: DashboardLayoutProps) {
               </div>
             </div>
           </header>
-          
+
           {/* Page Content - Enhanced Responsiveness */}
           <main className={cn("flex-1 p-3 sm:p-4 lg:p-6 overflow-auto min-w-0", className)}>
             <div className="max-w-full overflow-x-auto">
@@ -200,17 +198,17 @@ export function DashboardLayout({ children, className }: DashboardLayoutProps) {
                   <AdminSidebar />
                 </SheetContent>
               </Sheet>
-              
+
               <div className="w-7 h-7 sm:w-8 sm:h-8 bg-gradient-to-br from-blue-500 to-purple-600 rounded-lg flex items-center justify-center shadow-lg">
                 <span className="text-white font-bold text-xs sm:text-sm">F</span>
               </div>
               <span className="text-base sm:text-lg font-bold text-slate-900 dark:text-slate-100">FinCortex</span>
             </div>
-            
+
             <div className="flex items-center space-x-1 sm:space-x-2">
-              <Button 
-                variant="ghost" 
-                size="sm" 
+              <Button
+                variant="ghost"
+                size="sm"
                 onClick={toggleTheme}
                 className="hover:bg-blue-50 dark:hover:bg-slate-800 transition-all duration-200"
               >
@@ -220,12 +218,9 @@ export function DashboardLayout({ children, className }: DashboardLayoutProps) {
                   <Moon className="w-4 h-4 sm:w-5 sm:h-5 text-slate-600" />
                 )}
               </Button>
-              
-              <Button variant="ghost" size="sm" className="hover:bg-blue-50 dark:hover:bg-slate-800 relative">
-                <Bell className="w-4 h-4 sm:w-5 sm:h-5" />
-                <span className="absolute -top-1 -right-1 w-2 h-2 bg-red-500 rounded-full"></span>
-              </Button>
-              
+
+              <NotificationCenter />
+
               {/* Mobile User Profile */}
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
@@ -273,7 +268,7 @@ export function DashboardLayout({ children, className }: DashboardLayoutProps) {
             </div>
           </div>
         </header>
-        
+
         {/* Mobile Content - Enhanced */}
         <main className={cn("p-3 sm:p-4 overflow-auto min-h-screen", className)}>
           {children}

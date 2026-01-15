@@ -42,3 +42,27 @@ export interface TeamMembersResponse {
         count: number;
     };
 }
+
+export interface ManagerMember {
+    manager_id: string;
+    manager_admin_id: string;
+    manager_department_id: number | null;
+    full_name: string;
+    employee_code: string | null;
+    email: string;
+    phone_number: string | null;
+    role_id: number | null;
+    status: string | null;
+    created_at: string;
+    updated_at: string | null;
+    manager_department?: Department;
+}
+
+export interface ManagersResponse {
+    success: boolean;
+    data: {
+        admin_id: string;
+        managers: ManagerMember[];
+        count: number;
+    };
+}

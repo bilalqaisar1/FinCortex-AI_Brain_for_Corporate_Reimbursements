@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Separator } from "@/components/ui/separator";
-import { 
+import {
   LayoutDashboard,
   Users,
   FileText,
@@ -26,7 +26,8 @@ import {
   Plus,
   Search,
   Clock,
-  AlertTriangle
+  AlertTriangle,
+  Home
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -46,12 +47,17 @@ interface AdminSidebarProps {
 
 const sidebarItems: SidebarItem[] = [
   {
+    title: "Home",
+    href: "/",
+    icon: Home,
+  },
+  {
     title: "Dashboard",
     href: "/admin",
     icon: LayoutDashboard,
   },
   {
-    title: "Users",
+    title: "Managers",
     href: "/admin/users",
     icon: Users,
   },
@@ -61,9 +67,9 @@ const sidebarItems: SidebarItem[] = [
     icon: DollarSign,
   },
   {
-    title: "Approvals",
-    href: "/admin/approvals",
-    icon: Clock,
+    title: "Policy Rules",
+    href: "/admin/policy-rules",
+    icon: Shield,
   },
   {
     title: "Violations",
@@ -77,25 +83,25 @@ const sidebarItems: SidebarItem[] = [
   },
 ];
 
-export function AdminSidebar({ 
-  className, 
-  collapsed = false, 
-  onToggle 
+export function AdminSidebar({
+  className,
+  collapsed = false,
+  onToggle
 }: AdminSidebarProps) {
   const pathname = usePathname();
   const [expandedItems, setExpandedItems] = useState<string[]>([]);
 
   const toggleExpanded = (title: string) => {
-    setExpandedItems(prev => 
-      prev.includes(title) 
+    setExpandedItems(prev =>
+      prev.includes(title)
         ? prev.filter(item => item !== title)
         : [...prev, title]
     );
   };
 
   const isActive = (href: string) => {
-    if (href === "/admin") {
-      return pathname === "/admin";
+    if (href === "/" || href === "/admin") {
+      return pathname === href;
     }
     return pathname.startsWith(href);
   };
@@ -114,8 +120,8 @@ export function AdminSidebar({
             className={cn(
               "flex items-center space-x-3 px-3 py-2 rounded-lg text-sm font-medium transition-all duration-200 group",
               "hover:bg-blue-50 dark:hover:bg-slate-800 hover:text-purple-700 dark:hover:text-purple-400",
-              isItemActive 
-                ? "bg-purple-100 dark:bg-purple-900/30 text-purple-700 dark:text-purple-400 shadow-sm" 
+              isItemActive
+                ? "bg-purple-100 dark:bg-purple-900/30 text-purple-700 dark:text-purple-400 shadow-sm"
                 : "text-slate-600 dark:text-slate-400",
               level > 0 && "ml-4",
               collapsed && "justify-center px-2"
@@ -125,7 +131,7 @@ export function AdminSidebar({
               "w-4 h-4 flex-shrink-0",
               isItemActive ? "text-blue-600 dark:text-blue-400" : "text-slate-400 dark:text-slate-500 group-hover:text-blue-600 dark:group-hover:text-blue-400"
             )} />
-            
+
             {!collapsed && (
               <>
                 <span className="flex-1 truncate">{item.title}</span>
@@ -179,7 +185,7 @@ export function AdminSidebar({
             <span className="text-lg font-bold text-slate-900 dark:text-slate-100">FinCortex</span>
           </div>
         )}
-        
+
         <Button
           variant="ghost"
           size="sm"
@@ -197,14 +203,14 @@ export function AdminSidebar({
       {/* Quick Actions */}
       {!collapsed && (
         <div className="p-4 space-y-2">
-          <Button 
+          <Button
             className="w-full bg-gradient-to-r from-blue-500 to-purple-600 hover:from-blue-600 hover:to-purple-700 text-white"
             size="sm"
           >
             <Plus className="w-4 h-4 mr-2" />
             Quick Add
           </Button>
-          
+
           <div className="relative">
             <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-slate-400 dark:text-slate-500" />
             <input

@@ -1,99 +1,123 @@
 "use client";
 
-import { useState } from "react";
-import { 
-  DollarSign, 
-  TrendingUp, 
+import { useState, useEffect } from "react";
+import {
+  DollarSign,
+  TrendingUp,
   TrendingDown,
   AlertTriangle,
   CheckCircle,
   Building2,
   BarChart3,
-  Calendar
+  Calendar,
+  Plus,
+  Loader2
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "@/components/ui/dialog";
 import { cn } from "@/lib/utils";
-
-interface BudgetData {
-  companyId: string;
-  companyName: string;
-  totalBudget: number;
-  usedAmount: number;
-  remainingAmount: number;
-  utilizationPercentage: number;
-  status: "healthy" | "warning" | "critical";
-  lastUpdated: string;
-  monthlyLimit: number;
-  monthlyUsed: number;
-}
+import {
+  fetchBudgets,
+  createBudget,
+  addFundsToBudget,
+  type Budget,
+  type CreateBudgetInput
+} from "@/app/api/v1/admin/budget-api";
 
 interface BudgetOverviewProps {
-  budgets?: BudgetData[];
   onViewDetails?: (companyId: string) => void;
   onAddBudget?: () => void;
   className?: string;
 }
 
-const mockBudgets: BudgetData[] = [
-  {
-    companyId: "C-001",
-    companyName: "TechCorp Solutions",
-    totalBudget: 500000,
-    usedAmount: 320000,
-    remainingAmount: 180000,
-    utilizationPercentage: 64,
-    status: "healthy",
-    lastUpdated: "2 hours ago",
-    monthlyLimit: 50000,
-    monthlyUsed: 35000
-  },
-  {
-    companyId: "C-002",
-    companyName: "FinanceHub Ltd",
-    totalBudget: 300000,
-    usedAmount: 280000,
-    remainingAmount: 20000,
-    utilizationPercentage: 93,
-    status: "critical",
-    lastUpdated: "1 hour ago",
-    monthlyLimit: 30000,
-    monthlyUsed: 28000
-  },
-  {
-    companyId: "C-003",
-    companyName: "MarketingPro Inc",
-    totalBudget: 200000,
-    usedAmount: 120000,
-    remainingAmount: 80000,
-    utilizationPercentage: 60,
-    status: "healthy",
-    lastUpdated: "3 hours ago",
-    monthlyLimit: 20000,
-    monthlyUsed: 15000
-  },
-  {
-    companyId: "C-004",
-    companyName: "StartupXYZ",
-    totalBudget: 100000,
-    usedAmount: 85000,
-    remainingAmount: 15000,
-    utilizationPercentage: 85,
-    status: "warning",
-    lastUpdated: "4 hours ago",
-    monthlyLimit: 10000,
-    monthlyUsed: 8500
-  }
-];
-
-export function BudgetOverview({ 
-  budgets = mockBudgets,
+export function BudgetOverview({
   onViewDetails,
   onAddBudget,
-  className 
+  className
 }: BudgetOverviewProps) {
+  const [budgets, setBudgets] = useState<Budget[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const [selectedPeriod, setSelectedPeriod] = useState<"monthly" | "quarterly" | "yearly">("monthly");
+
+  // Add budget dialog state
+  const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
+  const [isAddingBudget, setIsAddingBudget] = useState(false);
+  const [newBudget, setNewBudget] = useState<CreateBudgetInput>({
+    company_name: "",
+    total_amount: 0,
+    monthly_limit: 0,
+    currency: "PKR"
+  });
+
+  // Add funds dialog state
+  const [isAddFundsDialogOpen, setIsAddFundsDialogOpen] = useState(false);
+  const [selectedBudgetId, setSelectedBudgetId] = useState<string | null>(null);
+  const [fundsAmount, setFundsAmount] = useState(0);
+  const [isAddingFunds, setIsAddingFunds] = useState(false);
+
+  useEffect(() => {
+    loadBudgets();
+  }, []);
+
+  const loadBudgets = async () => {
+    try {
+      setLoading(true);
+      setError(null);
+      const data = await fetchBudgets();
+      setBudgets(data);
+    } catch (err) {
+      console.error("Failed to load budgets:", err);
+      setError("Failed to load budgets. Please try again.");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleAddBudget = async () => {
+    try {
+      setIsAddingBudget(true);
+      await createBudget(newBudget);
+      setIsAddDialogOpen(false);
+      setNewBudget({ company_name: "", total_amount: 0, monthly_limit: 0, currency: "PKR" });
+      await loadBudgets();
+    } catch (err) {
+      console.error("Failed to add budget:", err);
+      alert("Failed to create budget. Please try again.");
+    } finally {
+      setIsAddingBudget(false);
+    }
+  };
+
+  const handleAddFunds = async () => {
+    if (!selectedBudgetId || fundsAmount <= 0) return;
+
+    try {
+      setIsAddingFunds(true);
+      await addFundsToBudget(selectedBudgetId, fundsAmount);
+      setIsAddFundsDialogOpen(false);
+      setFundsAmount(0);
+      setSelectedBudgetId(null);
+      await loadBudgets();
+    } catch (err) {
+      console.error("Failed to add funds:", err);
+      alert("Failed to add funds. Please try again.");
+    } finally {
+      setIsAddingFunds(false);
+    }
+  };
 
   const getStatusColor = (status: string) => {
     switch (status) {
@@ -122,10 +146,35 @@ export function BudgetOverview({
     }).format(amount);
   };
 
-  const totalBudget = budgets.reduce((sum, budget) => sum + budget.totalBudget, 0);
-  const totalUsed = budgets.reduce((sum, budget) => sum + budget.usedAmount, 0);
+  const totalBudget = budgets.reduce((sum, budget) => sum + budget.total_amount, 0);
+  const totalUsed = budgets.reduce((sum, budget) => sum + budget.used_amount, 0);
   const totalRemaining = totalBudget - totalUsed;
   const overallUtilization = totalBudget > 0 ? (totalUsed / totalBudget) * 100 : 0;
+
+  if (loading) {
+    return (
+      <div className={cn("flex items-center justify-center py-12", className)}>
+        <Loader2 className="w-8 h-8 animate-spin text-blue-600" />
+        <span className="ml-2 text-slate-600">Loading budgets...</span>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <Card className={cn("bg-red-50 border-red-200", className)}>
+        <CardContent className="pt-6">
+          <div className="flex items-center text-red-700">
+            <AlertTriangle className="w-5 h-5 mr-2" />
+            <span>{error}</span>
+            <Button variant="outline" size="sm" className="ml-4" onClick={loadBudgets}>
+              Retry
+            </Button>
+          </div>
+        </CardContent>
+      </Card>
+    );
+  }
 
   return (
     <div className={cn("space-y-6", className)}>
@@ -205,107 +254,209 @@ export function BudgetOverview({
               Company Budgets
             </CardTitle>
             <div className="flex items-center space-x-2">
-              <Button 
-                size="sm" 
-                variant="outline"
-                onClick={onAddBudget}
-                className="h-8 px-3"
-              >
-                <DollarSign className="w-3 h-3 mr-1" />
-                Add Budget
-              </Button>
+              <Dialog open={isAddDialogOpen} onOpenChange={setIsAddDialogOpen}>
+                <DialogTrigger asChild>
+                  <Button size="sm" variant="outline" className="h-8 px-3">
+                    <Plus className="w-3 h-3 mr-1" />
+                    Add Budget
+                  </Button>
+                </DialogTrigger>
+                <DialogContent>
+                  <DialogHeader>
+                    <DialogTitle>Add New Budget</DialogTitle>
+                    <DialogDescription>
+                      Create a new budget allocation for a company
+                    </DialogDescription>
+                  </DialogHeader>
+                  <div className="grid gap-4 py-4">
+                    <div className="grid gap-2">
+                      <Label htmlFor="company_name">Company Name</Label>
+                      <Input
+                        id="company_name"
+                        value={newBudget.company_name}
+                        onChange={(e) => setNewBudget({ ...newBudget, company_name: e.target.value })}
+                        placeholder="e.g. TechCorp Solutions"
+                      />
+                    </div>
+                    <div className="grid gap-2">
+                      <Label htmlFor="total_amount">Total Budget (PKR)</Label>
+                      <Input
+                        id="total_amount"
+                        type="number"
+                        value={newBudget.total_amount || ""}
+                        onChange={(e) => setNewBudget({ ...newBudget, total_amount: Number(e.target.value) })}
+                        placeholder="e.g. 500000"
+                      />
+                    </div>
+                    <div className="grid gap-2">
+                      <Label htmlFor="monthly_limit">Monthly Limit (PKR)</Label>
+                      <Input
+                        id="monthly_limit"
+                        type="number"
+                        value={newBudget.monthly_limit || ""}
+                        onChange={(e) => setNewBudget({ ...newBudget, monthly_limit: Number(e.target.value) })}
+                        placeholder="e.g. 50000"
+                      />
+                    </div>
+                  </div>
+                  <DialogFooter>
+                    <Button variant="outline" onClick={() => setIsAddDialogOpen(false)}>
+                      Cancel
+                    </Button>
+                    <Button onClick={handleAddBudget} disabled={isAddingBudget || !newBudget.company_name || !newBudget.total_amount}>
+                      {isAddingBudget ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : null}
+                      Create Budget
+                    </Button>
+                  </DialogFooter>
+                </DialogContent>
+              </Dialog>
             </div>
           </div>
         </CardHeader>
-        
+
         <CardContent className="space-y-4">
-          {budgets.map((budget, index) => (
-            <div 
-              key={budget.companyId}
-              className="p-4 bg-slate-50 dark:bg-slate-800 rounded-lg border border-slate-200 dark:border-slate-700 hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors"
-            >
-              <div className="flex items-center justify-between mb-3">
-                <div className="flex items-center space-x-3">
-                  <h3 className="font-semibold text-slate-900 dark:text-slate-100">
-                    {budget.companyName}
-                  </h3>
-                  <Badge 
-                    variant="outline"
-                    className={cn("text-xs flex items-center space-x-1", getStatusColor(budget.status))}
-                  >
-                    {getStatusIcon(budget.status)}
-                    <span className="capitalize">{budget.status}</span>
-                  </Badge>
-                </div>
-                <div className="text-right">
-                  <p className="text-sm text-slate-500 dark:text-slate-400">
-                    Updated {budget.lastUpdated}
-                  </p>
-                </div>
-              </div>
-
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
-                <div>
-                  <p className="text-sm text-slate-600 dark:text-slate-400">Total Budget</p>
-                  <p className="font-semibold text-slate-900 dark:text-slate-100">
-                    {formatCurrency(budget.totalBudget)}
-                  </p>
-                </div>
-                <div>
-                  <p className="text-sm text-slate-600 dark:text-slate-400">Used Amount</p>
-                  <p className="font-semibold text-slate-900 dark:text-slate-100">
-                    {formatCurrency(budget.usedAmount)}
-                  </p>
-                </div>
-                <div>
-                  <p className="text-sm text-slate-600 dark:text-slate-400">Remaining</p>
-                  <p className="font-semibold text-slate-900 dark:text-slate-100">
-                    {formatCurrency(budget.remainingAmount)}
-                  </p>
-                </div>
-              </div>
-
-              {/* Progress Bar */}
-              <div className="mb-4">
-                <div className="flex items-center justify-between mb-2">
-                  <span className="text-sm font-medium text-slate-700 dark:text-slate-300">
-                    Budget Utilization
-                  </span>
-                  <span className="text-sm font-medium text-slate-700 dark:text-slate-300">
-                    {budget.utilizationPercentage.toFixed(1)}%
-                  </span>
-                </div>
-                <div className="w-full bg-slate-200 dark:bg-slate-700 rounded-full h-2">
-                  <div 
-                    className={cn(
-                      "h-2 rounded-full transition-all duration-300",
-                      budget.status === "critical" ? "bg-red-500" :
-                      budget.status === "warning" ? "bg-yellow-500" : "bg-green-500"
-                    )}
-                    style={{ width: `${Math.min(budget.utilizationPercentage, 100)}%` }}
-                  />
-                </div>
-              </div>
-
-              {/* Monthly Usage */}
-              <div className="flex items-center justify-between">
-                <div className="text-sm text-slate-600 dark:text-slate-400">
-                  <Calendar className="w-4 h-4 inline mr-1" />
-                  Monthly: {formatCurrency(budget.monthlyUsed)} / {formatCurrency(budget.monthlyLimit)}
-                </div>
-                <Button 
-                  size="sm" 
-                  variant="outline"
-                  onClick={() => onViewDetails?.(budget.companyId)}
-                  className="h-8 px-3"
-                >
-                  View Details
-                </Button>
-              </div>
+          {budgets.length === 0 ? (
+            <div className="text-center py-12 text-slate-500">
+              <DollarSign className="w-16 h-16 mx-auto mb-4 text-slate-300" />
+              <p className="text-lg font-medium">No budgets configured</p>
+              <p className="text-sm">Click "Add Budget" to create your first budget allocation</p>
             </div>
-          ))}
+          ) : (
+            budgets.map((budget) => (
+              <div
+                key={budget.budget_id}
+                className="p-4 bg-slate-50 dark:bg-slate-800 rounded-lg border border-slate-200 dark:border-slate-700 hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors"
+              >
+                <div className="flex items-center justify-between mb-3">
+                  <div className="flex items-center space-x-3">
+                    <h3 className="font-semibold text-slate-900 dark:text-slate-100">
+                      {budget.company_name}
+                    </h3>
+                    <Badge
+                      variant="outline"
+                      className={cn("text-xs flex items-center space-x-1", getStatusColor(budget.status))}
+                    >
+                      {getStatusIcon(budget.status)}
+                      <span className="capitalize">{budget.status}</span>
+                    </Badge>
+                  </div>
+                  <div className="text-right">
+                    <p className="text-sm text-slate-500 dark:text-slate-400">
+                      Updated {budget.last_updated ? new Date(budget.last_updated).toLocaleDateString() : 'N/A'}
+                    </p>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
+                  <div>
+                    <p className="text-sm text-slate-600 dark:text-slate-400">Total Budget</p>
+                    <p className="font-semibold text-slate-900 dark:text-slate-100">
+                      {formatCurrency(budget.total_amount)}
+                    </p>
+                  </div>
+                  <div>
+                    <p className="text-sm text-slate-600 dark:text-slate-400">Used Amount</p>
+                    <p className="font-semibold text-slate-900 dark:text-slate-100">
+                      {formatCurrency(budget.used_amount)}
+                    </p>
+                  </div>
+                  <div>
+                    <p className="text-sm text-slate-600 dark:text-slate-400">Remaining</p>
+                    <p className="font-semibold text-slate-900 dark:text-slate-100">
+                      {formatCurrency(budget.remaining_amount)}
+                    </p>
+                  </div>
+                </div>
+
+                {/* Progress Bar */}
+                <div className="mb-4">
+                  <div className="flex items-center justify-between mb-2">
+                    <span className="text-sm font-medium text-slate-700 dark:text-slate-300">
+                      Budget Utilization
+                    </span>
+                    <span className="text-sm font-medium text-slate-700 dark:text-slate-300">
+                      {budget.utilization_percentage.toFixed(1)}%
+                    </span>
+                  </div>
+                  <div className="w-full bg-slate-200 dark:bg-slate-700 rounded-full h-2">
+                    <div
+                      className={cn(
+                        "h-2 rounded-full transition-all duration-300",
+                        budget.status === "critical" ? "bg-red-500" :
+                          budget.status === "warning" ? "bg-yellow-500" : "bg-green-500"
+                      )}
+                      style={{ width: `${Math.min(budget.utilization_percentage, 100)}%` }}
+                    />
+                  </div>
+                </div>
+
+                {/* Monthly Usage */}
+                <div className="flex items-center justify-between">
+                  <div className="text-sm text-slate-600 dark:text-slate-400">
+                    <Calendar className="w-4 h-4 inline mr-1" />
+                    Monthly: {formatCurrency(budget.monthly_used)} / {formatCurrency(budget.monthly_limit)}
+                  </div>
+                  <div className="flex items-center space-x-2">
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={() => {
+                        setSelectedBudgetId(budget.budget_id);
+                        setIsAddFundsDialogOpen(true);
+                      }}
+                      className="h-8 px-3"
+                    >
+                      <Plus className="w-3 h-3 mr-1" />
+                      Add Funds
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={() => onViewDetails?.(budget.company_id)}
+                      className="h-8 px-3"
+                    >
+                      View Details
+                    </Button>
+                  </div>
+                </div>
+              </div>
+            ))
+          )}
         </CardContent>
       </Card>
+
+      {/* Add Funds Dialog */}
+      <Dialog open={isAddFundsDialogOpen} onOpenChange={setIsAddFundsDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Add Funds to Budget</DialogTitle>
+            <DialogDescription>
+              Enter the amount to add to this budget
+            </DialogDescription>
+          </DialogHeader>
+          <div className="grid gap-4 py-4">
+            <div className="grid gap-2">
+              <Label htmlFor="funds_amount">Amount (PKR)</Label>
+              <Input
+                id="funds_amount"
+                type="number"
+                value={fundsAmount || ""}
+                onChange={(e) => setFundsAmount(Number(e.target.value))}
+                placeholder="e.g. 100000"
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setIsAddFundsDialogOpen(false)}>
+              Cancel
+            </Button>
+            <Button onClick={handleAddFunds} disabled={isAddingFunds || fundsAmount <= 0}>
+              {isAddingFunds ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : null}
+              Add Funds
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

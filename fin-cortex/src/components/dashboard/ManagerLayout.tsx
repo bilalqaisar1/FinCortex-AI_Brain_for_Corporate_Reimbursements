@@ -18,6 +18,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { NotificationCenter } from "@/components/NotificationCenter";
 
 interface ManagerLayoutProps {
   children: ReactNode;
@@ -38,7 +39,7 @@ export function ManagerLayout({ children, className }: ManagerLayoutProps) {
 
   const userInitials = displayName
     .split(" ")
-    .map((n) => n[0])
+    .map((n: string) => n[0])
     .join("")
     .toUpperCase()
     .slice(0, 2);
@@ -56,11 +57,11 @@ export function ManagerLayout({ children, className }: ManagerLayoutProps) {
     <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-100 dark:from-slate-900 dark:via-blue-900 dark:to-indigo-900 transition-all duration-300">
       {/* Desktop Layout */}
       <div className="hidden lg:flex h-screen overflow-hidden">
-        <ManagerSidebar 
-          collapsed={sidebarCollapsed} 
+        <ManagerSidebar
+          collapsed={sidebarCollapsed}
           onToggle={toggleSidebar}
         />
-        
+
         {/* Main Content */}
         <div className="flex-1 flex flex-col min-w-0 transition-all duration-300">
           {/* Top Header - Sticky */}
@@ -75,7 +76,7 @@ export function ManagerLayout({ children, className }: ManagerLayoutProps) {
                 >
                   <Menu className="w-4 h-4 sm:w-5 sm:h-5" />
                 </Button>
-                
+
                 <div className="flex items-center space-x-3">
                   <div className="w-8 h-8 bg-gradient-to-br from-blue-500 to-purple-600 rounded-lg flex items-center justify-center shadow-lg">
                     <span className="text-white font-bold text-sm">F</span>
@@ -86,11 +87,11 @@ export function ManagerLayout({ children, className }: ManagerLayoutProps) {
                   </div>
                 </div>
               </div>
-              
+
               <div className="flex items-center space-x-2 sm:space-x-4">
-                <Button 
-                  variant="ghost" 
-                  size="sm" 
+                <Button
+                  variant="ghost"
+                  size="sm"
                   onClick={toggleTheme}
                   className="hover:bg-blue-50 dark:hover:bg-slate-800 transition-all duration-200"
                   title="Toggle theme"
@@ -101,12 +102,9 @@ export function ManagerLayout({ children, className }: ManagerLayoutProps) {
                     <Moon className="w-4 h-4 sm:w-5 sm:h-5 text-slate-600" />
                   )}
                 </Button>
-                
-                <Button variant="ghost" size="sm" className="hover:bg-blue-50 dark:hover:bg-slate-800 relative">
-                  <Bell className="w-4 h-4 sm:w-5 sm:h-5" />
-                  <span className="absolute -top-1 -right-1 w-2 h-2 bg-red-500 rounded-full"></span>
-                </Button>
-                
+
+                <NotificationCenter />
+
                 {/* User Profile Dropdown */}
                 <DropdownMenu>
                   <DropdownMenuTrigger asChild>
@@ -154,7 +152,7 @@ export function ManagerLayout({ children, className }: ManagerLayoutProps) {
               </div>
             </div>
           </header>
-          
+
           {/* Page Content */}
           <main className={cn("flex-1 p-3 sm:p-4 lg:p-6 overflow-auto min-w-0", className)}>
             <div className="max-w-full overflow-x-auto">
@@ -180,7 +178,7 @@ export function ManagerLayout({ children, className }: ManagerLayoutProps) {
                   <ManagerSidebar />
                 </SheetContent>
               </Sheet>
-              
+
               <div className="w-7 h-7 sm:w-8 sm:h-8 bg-gradient-to-br from-blue-500 to-purple-600 rounded-lg flex items-center justify-center shadow-lg">
                 <span className="text-white font-bold text-xs sm:text-sm">F</span>
               </div>
@@ -189,11 +187,11 @@ export function ManagerLayout({ children, className }: ManagerLayoutProps) {
                 <span className="text-xs text-slate-500 dark:text-slate-400">Manager</span>
               </div>
             </div>
-            
+
             <div className="flex items-center space-x-1 sm:space-x-2">
-              <Button 
-                variant="ghost" 
-                size="sm" 
+              <Button
+                variant="ghost"
+                size="sm"
                 onClick={toggleTheme}
                 className="hover:bg-blue-50 dark:hover:bg-slate-800 transition-all duration-200"
               >
@@ -203,12 +201,9 @@ export function ManagerLayout({ children, className }: ManagerLayoutProps) {
                   <Moon className="w-4 h-4 sm:w-5 sm:h-5 text-slate-600" />
                 )}
               </Button>
-              
-              <Button variant="ghost" size="sm" className="hover:bg-blue-50 dark:hover:bg-slate-800 relative">
-                <Bell className="w-4 h-4 sm:w-5 sm:h-5" />
-                <span className="absolute -top-1 -right-1 w-2 h-2 bg-red-500 rounded-full"></span>
-              </Button>
-              
+
+              <NotificationCenter />
+
               {/* Mobile User Profile */}
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
@@ -256,7 +251,7 @@ export function ManagerLayout({ children, className }: ManagerLayoutProps) {
             </div>
           </div>
         </header>
-        
+
         {/* Mobile Content */}
         <main className={cn("p-3 sm:p-4 overflow-auto min-h-screen", className)}>
           {children}
