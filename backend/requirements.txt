@@ -17,3 +17,5 @@ postgrest>=0.16
 storage3>=0.7
 realtime>=1.0
 Pillow>=10.4
+azure-ai-documentintelligence>=1.0.0
+azure-core>=1.30.0

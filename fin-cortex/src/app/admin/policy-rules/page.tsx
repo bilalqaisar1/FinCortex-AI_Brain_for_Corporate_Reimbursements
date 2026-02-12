@@ -42,6 +42,7 @@ import {
     PageHeader,
     DashboardLayout
 } from "@/components/dashboard";
+import { useAuth } from "@/context/AuthContext";
 import { RouteProtection } from "@/components/auth/RouteProtection";
 import {
     fetchPolicyRules,
@@ -93,16 +94,21 @@ export default function PolicyRulesPage() {
         severity: "high"
     });
 
+    const { userProfile } = useAuth();
+
     useEffect(() => {
-        loadData();
-    }, []);
+        if (userProfile?.user_id) {
+            loadData();
+        }
+    }, [userProfile?.user_id]);
 
     const loadData = async () => {
+        if (!userProfile?.user_id) return;
         try {
             setLoading(true);
             setError(null);
             const [rulesData, typesData] = await Promise.all([
-                fetchPolicyRules(),
+                fetchPolicyRules(userProfile.user_id),
                 fetchRuleTypes()
             ]);
             setRules(rulesData);
@@ -118,7 +124,7 @@ export default function PolicyRulesPage() {
     const handleAddRule = async () => {
         try {
             setIsSaving(true);
-            await createPolicyRule(formData);
+            await createPolicyRule(formData, userProfile?.user_id);
             setIsAddDialogOpen(false);
             resetForm();
             await loadData();
@@ -134,7 +140,7 @@ export default function PolicyRulesPage() {
         if (!selectedRule) return;
         try {
             setIsSaving(true);
-            await updatePolicyRule(selectedRule.rule_id, formData);
+            await updatePolicyRule(selectedRule.rule_id, formData, userProfile?.user_id);
             setIsEditDialogOpen(false);
             setSelectedRule(null);
             resetForm();
@@ -151,7 +157,7 @@ export default function PolicyRulesPage() {
         if (!selectedRule) return;
         try {
             setIsSaving(true);
-            await deletePolicyRule(selectedRule.rule_id);
+            await deletePolicyRule(selectedRule.rule_id, userProfile?.user_id);
             setIsDeleteDialogOpen(false);
             setSelectedRule(null);
             await loadData();

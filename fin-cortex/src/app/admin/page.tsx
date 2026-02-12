@@ -97,11 +97,11 @@ export default function AdminDashboard() {
         ]);
 
         setStats(statsData);
-        if (statsData.company_name) {
+        if (statsData?.company_name) {
           setCompanyName(statsData.company_name);
         }
-        setPendingApprovals(approvalsData);
-        setRecentActivity(activityData);
+        setPendingApprovals(approvalsData || []);
+        setRecentActivity(activityData || []);
       } catch (err) {
         console.error("Failed to load dashboard data:", err);
         setError("Failed to load dashboard data. Please try again.");
@@ -117,35 +117,35 @@ export default function AdminDashboard() {
   const essentialStats = stats ? [
     {
       title: "Total Claims",
-      value: stats.total_claims.value.toLocaleString(),
-      change: stats.total_claims.change,
-      changeType: stats.total_claims.change.startsWith("+") ? "positive" as const : "neutral" as const,
+      value: stats.total_claims?.value?.toLocaleString() || "0",
+      change: stats.total_claims?.change || "0%",
+      changeType: stats.total_claims?.change?.startsWith("+") ? "positive" as const : "neutral" as const,
       icon: Activity,
-      description: stats.total_claims.description
+      description: stats.total_claims?.description || "This month"
     },
     {
       title: "Pending Approvals",
-      value: stats.pending_approvals.value.toString(),
-      change: stats.pending_approvals.change,
+      value: stats.pending_approvals?.value?.toString() || "0",
+      change: stats.pending_approvals?.change || "0",
       changeType: "warning" as const,
       icon: Clock,
-      description: stats.pending_approvals.description
+      description: stats.pending_approvals?.description || "Require attention"
     },
     {
       title: "Budget Used",
-      value: `${stats.budget_utilization.value}%`,
-      change: stats.budget_utilization.change,
-      changeType: stats.budget_utilization.change.startsWith("-") ? "positive" as const : "neutral" as const,
+      value: `${stats.budget_utilization?.value || 0}%`,
+      change: stats.budget_utilization?.change || "0%",
+      changeType: stats.budget_utilization?.change?.startsWith("-") ? "positive" as const : "neutral" as const,
       icon: DollarSign,
-      description: stats.budget_utilization.description
+      description: stats.budget_utilization?.description || "Utilization"
     },
     {
       title: "Policy Violations",
-      value: stats.policy_violations.value.toString(),
-      change: stats.policy_violations.change,
-      changeType: stats.policy_violations.value > 0 ? "negative" as const : "positive" as const,
+      value: stats.policy_violations?.value?.toString() || "0",
+      change: stats.policy_violations?.change || "0",
+      changeType: (stats.policy_violations?.value || 0) > 0 ? "negative" as const : "positive" as const,
       icon: AlertTriangle,
-      description: stats.policy_violations.description
+      description: stats.policy_violations?.description || "Potential issues"
     }
   ] : [];
 
@@ -159,11 +159,11 @@ export default function AdminDashboard() {
         iconBgColor="bg-blue-100"
         actions={
           <div className="flex items-center space-x-2">
-            <Button variant="outline" className="hover:bg-blue-50 hover:border-blue-200">
+            <Button variant="outline" className="hover:bg-blue-50 hover:border-blue-200" onClick={() => router.push("/admin/analytics")}>
               <Eye className="w-4 h-4 mr-2" />
               View All
             </Button>
-            <Button className="bg-gradient-to-r from-blue-500 to-purple-600 hover:from-blue-600 hover:to-purple-700 text-white">
+            <Button className="bg-gradient-to-r from-blue-500 to-purple-600 hover:from-blue-600 hover:to-purple-700 text-white" onClick={() => router.push("/admin/users/create")}>
               <Plus className="w-4 h-4 mr-2" />
               Quick Add
             </Button>

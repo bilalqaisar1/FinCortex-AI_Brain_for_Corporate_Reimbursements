@@ -38,13 +38,14 @@ def process_receipt(
     Raises:
         ReceiptProcessingError: If any step fails
     """
+    # Step 1: Extract text using Azure Document Intelligence
     try:
-        # Step 1: Extract text using Google Vision
         try:
-            raw_text = extract_text_from_image(image_path)
-            logger.info("✅ OCR extraction: Google Vision successful")
-        except VisionServiceError as e:
-            logger.warning("⚠️ Google Vision failed: %s. Falling back to OpenAI OCR.", str(e))
+            from app.services.azure_document_intelligence_service import extract_text_with_azure, AzureDocumentIntelligenceError
+            raw_text = extract_text_with_azure(image_path)
+            logger.info("✅ OCR extraction: Azure Document Intelligence successful")
+        except (AzureDocumentIntelligenceError, ImportError) as e:
+            logger.warning("⚠️ Azure OCR failed: %s. Falling back to OpenAI OCR.", str(e))
             # Fallback to OpenAI Vision OCR
             raw_text = extract_text_with_openai_vision(image_path)
             logger.info("✅ OCR extraction: OpenAI Fallback successful")

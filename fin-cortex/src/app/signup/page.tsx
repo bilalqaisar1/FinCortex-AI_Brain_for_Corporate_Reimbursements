@@ -5,10 +5,10 @@ import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { 
-  Eye, 
-  EyeOff, 
-  Mail, 
+import {
+  Eye,
+  EyeOff,
+  Mail,
   Lock,
   ArrowLeft,
   User,
@@ -27,15 +27,15 @@ export default function SignupPage() {
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const { isDarkTheme, toggleTheme, themeIcon } = useTheme();
-  const { signUp } = useAuth();
+  const { signUp, signIn } = useAuth();
   const router = useRouter();
   const [formData, setFormData] = useState({
     fullName: "",
     email: "",
     password: "",
     confirmPassword: "",
-    employeeCode: "",
     phoneNumber: "",
+    companyName: "",
     agreeToTerms: false
   });
 
@@ -83,20 +83,26 @@ export default function SignupPage() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsLoading(true);
-    
+
     try {
       const { data, error } = await signUp(formData.email, formData.password, {
         full_name: formData.fullName,
-        employee_code: formData.employeeCode,
-        phone_number: formData.phoneNumber
+        phone_number: formData.phoneNumber,
+        company_name: formData.companyName
       });
 
       if (error) {
-        console.error('Signup error:', error);
+        console.error('Signup error details:', error.message || error);
         // Error handling is now done in AuthContext with toast notifications
       } else if (data?.user_id || data?.message) {
-        // Redirect to OTP page
-        router.push(`/otp?email=${encodeURIComponent(formData.email)}`);
+        // Auto-login after successful signup
+        const loginResult = await signIn(formData.email, formData.password);
+        if (!loginResult.error) {
+          router.push('/admin');
+        } else {
+          // If auto-login fails, redirect to login page
+          router.push('/login');
+        }
       }
     } catch (error) {
       console.error('Signup error:', error);
@@ -128,7 +134,7 @@ export default function SignupPage() {
               <p className="text-xs text-muted -mt-1">AI-Powered</p>
             </div>
           </Link>
-          
+
           <div className="flex items-center space-x-4">
             <button
               onClick={toggleTheme}
@@ -136,8 +142,8 @@ export default function SignupPage() {
             >
               <span className="text-xl">{themeIcon}</span>
             </button>
-            <Link 
-              href="/" 
+            <Link
+              href="/"
               className="flex items-center space-x-2 text-muted hover:text-primary transition-colors group"
             >
               <ArrowLeft className="w-4 h-4 group-hover:-translate-x-1 transition-transform" />
@@ -157,7 +163,7 @@ export default function SignupPage() {
                 <Users className="w-8 h-8 text-primary" />
               </div>
               <h1 className="text-3xl font-bold text-primary mb-2">
-                Create your account
+                Create admin account
               </h1>
               <p className="text-muted">
                 Join FinCortex and start managing reimbursements
@@ -209,27 +215,6 @@ export default function SignupPage() {
                 </div>
               </div>
 
-              {/* Employee Code Field */}
-              <div className="space-y-2">
-                <Label htmlFor="employeeCode" className="text-sm font-medium text-secondary">
-                  Employee Code *
-                </Label>
-                <div className="relative">
-                  <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                    <User className="h-5 w-5 text-muted" />
-                  </div>
-                  <Input
-                    id="employeeCode"
-                    name="employeeCode"
-                    type="text"
-                    value={formData.employeeCode}
-                    onChange={handleInputChange}
-                    className="pl-10 h-12 bg-card border-subtle text-primary placeholder-muted focus:border-accent focus:ring-accent/20 rounded-xl"
-                    placeholder="Enter your employee code"
-                    required
-                  />
-                </div>
-              </div>
 
               {/* Phone Number Field */}
               <div className="space-y-2">
@@ -248,6 +233,28 @@ export default function SignupPage() {
                     onChange={handleInputChange}
                     className="pl-10 h-12 bg-card border-subtle text-primary placeholder-muted focus:border-accent focus:ring-accent/20 rounded-xl"
                     placeholder="Enter your phone number"
+                  />
+                </div>
+              </div>
+
+              {/* Company Name Field */}
+              <div className="space-y-2">
+                <Label htmlFor="companyName" className="text-sm font-medium text-secondary">
+                  Company Name *
+                </Label>
+                <div className="relative">
+                  <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                    <Shield className="h-5 w-5 text-muted" />
+                  </div>
+                  <Input
+                    id="companyName"
+                    name="companyName"
+                    type="text"
+                    value={formData.companyName}
+                    onChange={handleInputChange}
+                    className="pl-10 h-12 bg-card border-subtle text-primary placeholder-muted focus:border-accent focus:ring-accent/20 rounded-xl"
+                    placeholder="Enter your organization name"
+                    required
                   />
                 </div>
               </div>
@@ -283,7 +290,7 @@ export default function SignupPage() {
                     )}
                   </button>
                 </div>
-                
+
                 {/* Password Requirements - Only show if password has content and not all requirements met */}
                 {formData.password.length > 0 && !allRequirementsMet && (
                   <div className="mt-3 p-4 bg-slate-50 dark:bg-slate-800 rounded-lg border border-slate-200 dark:border-slate-700">
@@ -337,7 +344,7 @@ export default function SignupPage() {
                     )}
                   </button>
                 </div>
-                
+
                 {/* Password Match Indicator */}
                 {formData.confirmPassword.length > 0 && (
                   <div className="mt-2 flex items-center space-x-2 text-sm">
@@ -380,9 +387,9 @@ export default function SignupPage() {
               </div>
 
               {/* Create Account Button */}
-              <Button 
+              <Button
                 type="submit"
-                disabled={isLoading || !formData.agreeToTerms || !allRequirementsMet || !passwordsMatch}
+                disabled={isLoading || !formData.agreeToTerms || !allRequirementsMet || !passwordsMatch || !formData.companyName}
                 className="w-full h-12 btn-primary text-white font-medium disabled:opacity-50 rounded-xl"
               >
                 {isLoading ? (
@@ -395,23 +402,14 @@ export default function SignupPage() {
                 )}
               </Button>
 
-              {/* OTP Page Link for Review */}
-              <div className="mt-4 text-center">
-                <Link 
-                  href="/otp" 
-                  className="text-sm text-accent hover:text-accent/80 font-medium transition-colors"
-                >
-                  → Review OTP Verification Page
-                </Link>
-              </div>
             </form>
 
             {/* Sign In Link */}
             <div className="mt-8 text-center">
               <p className="text-sm text-muted">
                 Already have an account?{" "}
-                <Link 
-                  href="/login" 
+                <Link
+                  href="/login"
                   className="text-accent hover:text-accent/80 font-medium transition-colors"
                 >
                   Sign in

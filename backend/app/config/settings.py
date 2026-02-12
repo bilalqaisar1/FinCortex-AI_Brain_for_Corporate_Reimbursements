@@ -23,6 +23,10 @@ class Settings(BaseSettings):
     openai_api_key: Optional[str] = None
     openai_model: str = "gpt-4o-mini"
     
+    # Azure Document Intelligence Configuration
+    azure_endpoint: Optional[str] = None
+    azure_key: Optional[str] = None
+    
     # Storage
     receipts_bucket: str = "receipts-bucket"
     receipts_folder: str = "receipts"

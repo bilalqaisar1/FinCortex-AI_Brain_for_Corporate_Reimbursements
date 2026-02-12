@@ -1,10 +1,10 @@
 "use client";
 
 import { useState } from "react";
-import { 
-  AlertTriangle, 
-  Eye, 
-  CheckCircle, 
+import {
+  AlertTriangle,
+  Eye,
+  CheckCircle,
   XCircle,
   User,
   DollarSign,
@@ -21,21 +21,8 @@ import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
 
-interface PolicyViolation {
-  id: string;
-  userId: string;
-  userName: string;
-  reimbursementId: string;
-  amount: string;
-  violationType: "restricted_item" | "amount_exceeded" | "unauthorized_vendor" | "duplicate_claim" | "policy_breach";
-  description: string;
-  severity: "low" | "medium" | "high" | "critical";
-  status: "pending" | "reviewed" | "resolved" | "dismissed";
-  detectedAt: string;
-  category: string;
-  department: string;
-  manager: string;
-}
+// Import from generic api file or define here matching API
+import { PolicyViolation } from "@/app/api/v1/admin/policy-rules-api";
 
 interface PolicyViolationsProps {
   violations?: PolicyViolation[];
@@ -45,75 +32,12 @@ interface PolicyViolationsProps {
   className?: string;
 }
 
-const mockViolations: PolicyViolation[] = [
-  {
-    id: "V-001",
-    userId: "U-001",
-    userName: "John Smith",
-    reimbursementId: "R-001",
-    amount: "PKR 3,000",
-    violationType: "restricted_item",
-    description: "Alcohol purchase not allowed under company policy",
-    severity: "high",
-    status: "pending",
-    detectedAt: "2 hours ago",
-    category: "Meals",
-    department: "Engineering",
-    manager: "Sarah Ahmed"
-  },
-  {
-    id: "V-002",
-    userId: "U-002",
-    userName: "Sarah Ahmed",
-    reimbursementId: "R-002",
-    amount: "PKR 15,000",
-    violationType: "amount_exceeded",
-    description: "Travel expense exceeds monthly limit by PKR 5,000",
-    severity: "medium",
-    status: "reviewed",
-    detectedAt: "4 hours ago",
-    category: "Travel",
-    department: "Marketing",
-    manager: "Ali Khan"
-  },
-  {
-    id: "V-003",
-    userId: "U-003",
-    userName: "Ali Khan",
-    reimbursementId: "R-003",
-    amount: "PKR 8,000",
-    violationType: "duplicate_claim",
-    description: "Similar receipt submitted within 30 days",
-    severity: "critical",
-    status: "pending",
-    detectedAt: "6 hours ago",
-    category: "Equipment",
-    department: "Sales",
-    manager: "John Smith"
-  },
-  {
-    id: "V-004",
-    userId: "U-004",
-    userName: "Maria Garcia",
-    reimbursementId: "R-004",
-    amount: "PKR 2,500",
-    violationType: "unauthorized_vendor",
-    description: "Vendor not in approved list",
-    severity: "low",
-    status: "resolved",
-    detectedAt: "1 day ago",
-    category: "Office Supplies",
-    department: "IT",
-    manager: "Sarah Ahmed"
-  }
-];
-
-export function PolicyViolations({ 
-  violations = mockViolations,
+export function PolicyViolations({
+  violations = [],
   onView,
   onResolve,
   onDismiss,
-  className 
+  className
 }: PolicyViolationsProps) {
   const [searchTerm, setSearchTerm] = useState("");
   const [severityFilter, setSeverityFilter] = useState<"all" | "low" | "medium" | "high" | "critical">("all");
@@ -121,11 +45,11 @@ export function PolicyViolations({
 
   const filteredViolations = violations.filter(violation => {
     const matchesSearch = violation.userName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         violation.description.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         violation.reimbursementId.toLowerCase().includes(searchTerm.toLowerCase());
+      violation.description.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      violation.reimbursementId.toLowerCase().includes(searchTerm.toLowerCase());
     const matchesSeverity = severityFilter === "all" || violation.severity === severityFilter;
     const matchesStatus = statusFilter === "all" || violation.status === statusFilter;
-    
+
     return matchesSearch && matchesSeverity && matchesStatus;
   });
 
@@ -171,7 +95,7 @@ export function PolicyViolations({
   };
 
   const formatViolationType = (type: string) => {
-    return type.split('_').map(word => 
+    return type.split('_').map(word =>
       word.charAt(0).toUpperCase() + word.slice(1)
     ).join(' ');
   };
@@ -186,7 +110,7 @@ export function PolicyViolations({
             Policy Violations
           </CardTitle>
         </CardHeader>
-        
+
         <CardContent className="space-y-4">
           {/* Search and Filters */}
           <div className="flex flex-col sm:flex-row space-y-4 sm:space-y-0 sm:space-x-4">
@@ -199,7 +123,7 @@ export function PolicyViolations({
                 className="pl-10"
               />
             </div>
-            
+
             <div className="flex space-x-2">
               <select
                 value={severityFilter}
@@ -212,7 +136,7 @@ export function PolicyViolations({
                 <option value="medium">Medium</option>
                 <option value="low">Low</option>
               </select>
-              
+
               <select
                 value={statusFilter}
                 onChange={(e) => setStatusFilter(e.target.value as any)}
@@ -234,7 +158,7 @@ export function PolicyViolations({
         <CardContent className="p-0">
           <div className="space-y-0">
             {filteredViolations.map((violation, index) => (
-              <div 
+              <div
                 key={violation.id}
                 className={cn(
                   "p-4 border-b border-slate-200 dark:border-slate-700 last:border-b-0 hover:bg-slate-50 dark:hover:bg-slate-700 transition-colors",
@@ -247,74 +171,74 @@ export function PolicyViolations({
                     <div className={cn(
                       "w-10 h-10 rounded-lg flex items-center justify-center",
                       violation.severity === "critical" ? "bg-red-100 text-red-600" :
-                      violation.severity === "high" ? "bg-orange-100 text-orange-600" :
-                      violation.severity === "medium" ? "bg-yellow-100 text-yellow-600" :
-                      "bg-blue-100 text-blue-600"
+                        violation.severity === "high" ? "bg-orange-100 text-orange-600" :
+                          violation.severity === "medium" ? "bg-yellow-100 text-yellow-600" :
+                            "bg-blue-100 text-blue-600"
                     )}>
                       {getViolationIcon(violation.violationType)}
                     </div>
-                    
+
                     {/* Violation Info */}
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center space-x-2 mb-2">
                         <h3 className="font-semibold text-slate-900 dark:text-slate-100">
                           {formatViolationType(violation.violationType)}
                         </h3>
-                        <Badge 
+                        <Badge
                           variant="outline"
                           className={cn("text-xs flex items-center space-x-1", getSeverityColor(violation.severity))}
                         >
                           {getSeverityIcon(violation.severity)}
                           <span className="capitalize">{violation.severity}</span>
                         </Badge>
-                        <Badge 
+                        <Badge
                           variant="outline"
                           className={cn("text-xs", getStatusColor(violation.status))}
                         >
                           {violation.status}
                         </Badge>
                       </div>
-                      
+
                       <div className="space-y-2">
                         <p className="text-sm text-slate-700 dark:text-slate-300">
                           {violation.description}
                         </p>
-                        
+
                         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 text-sm">
                           <div className="flex items-center space-x-2 text-slate-600 dark:text-slate-400">
                             <User className="w-4 h-4" />
                             <span>{violation.userName}</span>
                           </div>
-                          
+
                           <div className="flex items-center space-x-2 text-slate-600 dark:text-slate-400">
                             <DollarSign className="w-4 h-4" />
                             <span>{violation.amount}</span>
                           </div>
-                          
+
                           <div className="flex items-center space-x-2 text-slate-600 dark:text-slate-400">
                             <FileText className="w-4 h-4" />
                             <span>{violation.reimbursementId}</span>
                           </div>
-                          
+
                           <div className="flex items-center space-x-2 text-slate-600 dark:text-slate-400">
                             <Calendar className="w-4 h-4" />
                             <span>{violation.detectedAt}</span>
                           </div>
                         </div>
-                        
+
                         <div className="text-xs text-slate-500 dark:text-slate-500">
-                          <span className="font-medium">Category:</span> {violation.category} • 
-                          <span className="font-medium"> Department:</span> {violation.department} • 
+                          <span className="font-medium">Category:</span> {violation.category} •
+                          <span className="font-medium"> Department:</span> {violation.department} •
                           <span className="font-medium"> Manager:</span> {violation.manager}
                         </div>
                       </div>
                     </div>
                   </div>
-                  
+
                   {/* Actions */}
                   <div className="flex items-center space-x-2">
-                    <Button 
-                      size="sm" 
+                    <Button
+                      size="sm"
                       variant="outline"
                       onClick={() => onView?.(violation.id)}
                       className="h-8 px-3"
@@ -322,11 +246,11 @@ export function PolicyViolations({
                       <Eye className="w-3 h-3 mr-1" />
                       View
                     </Button>
-                    
+
                     {violation.status === "pending" && (
                       <>
-                        <Button 
-                          size="sm" 
+                        <Button
+                          size="sm"
                           variant="outline"
                           onClick={() => onResolve?.(violation.id)}
                           className="h-8 px-3 text-green-600 hover:text-green-700 hover:bg-green-50"
@@ -334,9 +258,9 @@ export function PolicyViolations({
                           <CheckCircle className="w-3 h-3 mr-1" />
                           Resolve
                         </Button>
-                        
-                        <Button 
-                          size="sm" 
+
+                        <Button
+                          size="sm"
                           variant="outline"
                           onClick={() => onDismiss?.(violation.id)}
                           className="h-8 px-3 text-red-600 hover:text-red-700 hover:bg-red-50"
@@ -350,7 +274,7 @@ export function PolicyViolations({
                 </div>
               </div>
             ))}
-            
+
             {filteredViolations.length === 0 && (
               <div className="text-center py-12">
                 <AlertTriangle className="w-12 h-12 text-slate-400 mx-auto mb-4" />

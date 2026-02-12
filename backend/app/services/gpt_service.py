@@ -155,8 +155,8 @@ def structure_text_with_openai(
 Output must ALWAYS be a valid JSON dictionary with exactly these top-level keys:
 - "Vendor Name": string
 - "Date": string
-- "Categories": string           // human-friendly category name for display
-- "Subcategories": string        // human-friendly subcategory name for display
+- "Categories": string           // human-friendly primary category name for display
+- "Subcategories": string        // human-friendly primary subcategory name for display
 - "category_id": number|null     // pick ID from the allowed list; null if no good match
 - "subcategory_id": number|null  // pick ID from the allowed list; null if no good match
 - "items": array of objects
@@ -167,16 +167,24 @@ Output must ALWAYS be a valid JSON dictionary with exactly these top-level keys:
 For each object in "items", use exactly this structure:
 - "item": string            // item name
 - "price": string           // price for this line or unit, including currency symbol if present
+- "quantity": string         // quantity (default "1" if not specified)
+- "category": string         // human-friendly category name for THIS specific item
+- "subcategory": string      // human-friendly subcategory name for THIS specific item
+- "category_id": number|null // category ID from the allowed list for THIS item; null if no match
+- "subcategory_id": number|null // subcategory ID from the allowed list for THIS item; null if no match
+- "reimbursable": boolean    // true if item falls into an allowed category; false if it does NOT (e.g. alcohol, personal items, tobacco, entertainment, gifts)
 
 Rules:
 1. If any field is missing or unreadable in the OCR text, infer a reasonable value from context (vendor, items, layout).
 2. If you cannot infer a text field, set it to an empty string "".
+3. Each item MUST have its own category assignment. Different items on the same receipt can have DIFFERENT categories.
 4. Detect and correct obviously wrong prices, such as values that are off by orders of magnitude (for example, "Bread 29000" should likely be "29.00" or "2.90" depending on the rest of the receipt). Fix common OCR issues like missing decimals, extra zeros, or misread characters.
 5. Ensure that the prices in "items" are as consistent as possible with the "Total Amount". If the printed total looks wrong but item prices look reasonable, prefer correcting the total.
-6. Infer "Categories" and "Subcategories" based on the vendor and item names (for example: groceries, meals, transport, fuel, lodging, office supplies).
-7. If an admin-scoped list of Categories/Subcategories is provided, choose from that list; if no suitable match, set category_id and subcategory_id to null. Always prefer IDs from that list and reflect the chosen names in Categories/Subcategories.
-8. Do not include any keys other than the ones specified above.
-9. Return JSON only. Do not include explanations, markdown, or any text around the JSON.{categories_hint}
+6. Infer item-level "category" and "subcategory" based on each item's name and context (for example: groceries, meals, transport, fuel, lodging, office supplies).
+7. If an admin-scoped list of Categories/Subcategories is provided below, match each item to the best-fit category from that list. If an item does NOT fit ANY allowed category (e.g. alcohol, tobacco, personal entertainment, gifts), set reimbursable=false and set the item's category_id and subcategory_id to null.
+8. The top-level "Categories" and "Subcategories" should reflect the MOST COMMON or PRIMARY category among the reimbursable items.
+9. Do not include any keys other than the ones specified above.
+10. Return JSON only. Do not include explanations, markdown, or any text around the JSON.{categories_hint}
 
 The input is raw OCR text of a single receipt."""
 

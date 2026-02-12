@@ -7,7 +7,7 @@ export const supabase = supabaseClient
 // Auth helper functions
 export const auth = {
   // Sign up with email and password - Use backend API
-  async signUp(email: string, password: string, userData: { full_name: string; employee_code: string; phone_number?: string }) {
+  async signUp(email: string, password: string, userData: { full_name: string; phone_number?: string; company_name?: string }) {
     try {
       const response = await fetch(`/api/v1/auth/signup`, {
         method: 'POST',
@@ -18,15 +18,16 @@ export const auth = {
           email,
           password,
           full_name: userData.full_name,
-          employee_code: userData.employee_code,
-          phone_number: userData.phone_number
+          phone_number: userData.phone_number,
+          company_name: userData.company_name
         })
       });
 
       const result = await response.json();
-      
+
       if (!response.ok) {
-        return { data: null, error: { message: result.detail || 'Signup failed' } };
+        console.error('Signup API error:', result);
+        return { data: null, error: { message: result.detail || result.message || 'Signup failed' } };
       }
 
       return { data: result, error: null };
@@ -38,11 +39,11 @@ export const auth = {
   // Sign in with email and password
   async signIn(email: string, password: string) {
     try {
-    const { data, error } = await supabase.auth.signInWithPassword({
-      email,
-      password
-    })
-      
+      const { data, error } = await supabase.auth.signInWithPassword({
+        email,
+        password
+      })
+
       // Handle refresh token errors
       if (error && (error.message?.includes('refresh') || error.message?.includes('Invalid Refresh Token') || error.message?.includes('Refresh Token Not Found'))) {
         console.warn('Refresh token error detected during sign in, clearing session');
@@ -50,8 +51,8 @@ export const auth = {
           // Silently handle sign out errors
         });
       }
-      
-    return { data, error }
+
+      return { data, error }
     } catch (error: any) {
       // Handle unexpected errors
       if (error?.message?.includes('refresh') || error?.message?.includes('Invalid Refresh Token') || error?.message?.includes('Refresh Token Not Found')) {
@@ -90,7 +91,7 @@ export const auth = {
       });
 
       const result = await response.json();
-      
+
       if (!response.ok) {
         return { data: null, error: { message: result.detail || 'OTP verification failed' } };
       }
@@ -115,7 +116,7 @@ export const auth = {
       });
 
       const result = await response.json();
-      
+
       if (!response.ok) {
         return { data: null, error: { message: result.detail || 'Failed to resend OTP' } };
       }
@@ -141,8 +142,8 @@ export const auth = {
   // Get session
   async getSession() {
     try {
-    const { data: { session }, error } = await supabase.auth.getSession()
-      
+      const { data: { session }, error } = await supabase.auth.getSession()
+
       // Handle refresh token errors
       if (error && (error.message?.includes('refresh') || error.message?.includes('Invalid Refresh Token') || error.message?.includes('Refresh Token Not Found'))) {
         console.warn('Refresh token error detected, clearing session');
@@ -152,8 +153,8 @@ export const auth = {
         });
         return { session: null, error: null };
       }
-      
-    return { session, error }
+
+      return { session, error }
     } catch (error: any) {
       // Handle unexpected errors
       if (error?.message?.includes('refresh') || error?.message?.includes('Invalid Refresh Token') || error?.message?.includes('Refresh Token Not Found')) {

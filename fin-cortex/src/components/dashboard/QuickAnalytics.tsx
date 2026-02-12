@@ -63,7 +63,7 @@ export function QuickAnalytics({
   onExport,
   className
 }: QuickAnalyticsProps) {
-  const { user } = useAuth();
+  const { userProfile } = useAuth();
   const [selectedPeriod, setSelectedPeriod] = useState<"7d" | "30d" | "90d" | "1y">("30d");
   const [data, setData] = useState<AnalyticsData>(defaultData);
   const [isLoading, setIsLoading] = useState(true);
@@ -71,7 +71,7 @@ export function QuickAnalytics({
   const fetchAnalytics = useCallback(async () => {
     setIsLoading(true);
     try {
-      const adminId = user?.id || '';
+      const adminId = userProfile?.user_id || '';
       const response = await fetch(`${BACKEND_URL}/api/v1/admin/analytics?admin_id=${adminId}&period=${selectedPeriod}`);
       if (!response.ok) throw new Error('Failed to fetch analytics');
       const result = await response.json();
@@ -83,7 +83,7 @@ export function QuickAnalytics({
     } finally {
       setIsLoading(false);
     }
-  }, [user?.id, selectedPeriod]);
+  }, [userProfile?.user_id, selectedPeriod]);
 
   useEffect(() => {
     fetchAnalytics();

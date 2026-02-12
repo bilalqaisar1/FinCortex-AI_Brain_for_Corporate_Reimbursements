@@ -1,10 +1,10 @@
 "use client";
 
 import { useState } from "react";
-import { 
-  Users, 
-  Plus, 
-  Search, 
+import {
+  Users,
+  Plus,
+  Search,
   Filter,
   Edit,
   Trash2,
@@ -96,13 +96,13 @@ const mockUsers: User[] = [
   }
 ];
 
-export function UserManagement({ 
+export function UserManagement({
   users = mockUsers,
   onAddUser,
   onEditUser,
   onDeleteUser,
   onToggleStatus,
-  className 
+  className
 }: UserManagementProps) {
   const [searchTerm, setSearchTerm] = useState("");
   const [roleFilter, setRoleFilter] = useState<"all" | "admin" | "manager" | "user">("all");
@@ -110,11 +110,11 @@ export function UserManagement({
 
   const filteredUsers = users.filter(user => {
     const matchesSearch = user.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         user.email.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         user.employeeCode.toLowerCase().includes(searchTerm.toLowerCase());
+      user.email.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      user.employeeCode.toLowerCase().includes(searchTerm.toLowerCase());
     const matchesRole = roleFilter === "all" || user.role === roleFilter;
     const matchesStatus = statusFilter === "all" || user.status === statusFilter;
-    
+
     return matchesSearch && matchesRole && matchesStatus;
   });
 
@@ -153,31 +153,31 @@ export function UserManagement({
           <div className="flex flex-col sm:flex-row sm:items-center justify-between space-y-4 sm:space-y-0">
             <CardTitle className="text-xl font-semibold text-slate-900 dark:text-slate-100 flex items-center">
               <Users className="w-6 h-6 mr-2 text-blue-500" />
-              User Management
+              Manager Management
             </CardTitle>
-            <Button 
+            <Button
               onClick={onAddUser}
               className="bg-gradient-to-r from-blue-500 to-purple-600 hover:from-blue-600 hover:to-purple-700 text-white"
             >
               <Plus className="w-4 h-4 mr-2" />
-              Add User
+              Add Manager
             </Button>
           </div>
         </CardHeader>
-        
+
         <CardContent className="space-y-4">
           {/* Search and Filters */}
           <div className="flex flex-col sm:flex-row space-y-4 sm:space-y-0 sm:space-x-4">
             <div className="relative flex-1">
               <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-slate-400" />
               <Input
-                placeholder="Search users..."
+                placeholder="Search managers..."
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
                 className="pl-10"
               />
             </div>
-            
+
             <div className="flex space-x-2">
               <select
                 value={roleFilter}
@@ -189,7 +189,7 @@ export function UserManagement({
                 <option value="manager">Manager</option>
                 <option value="user">User</option>
               </select>
-              
+
               <select
                 value={statusFilter}
                 onChange={(e) => setStatusFilter(e.target.value as any)}
@@ -210,7 +210,7 @@ export function UserManagement({
         <CardContent className="p-0">
           <div className="space-y-0">
             {filteredUsers.map((user, index) => (
-              <div 
+              <div
                 key={user.id}
                 className={cn(
                   "p-4 border-b border-slate-200 dark:border-slate-700 last:border-b-0 hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors",
@@ -223,34 +223,34 @@ export function UserManagement({
                     <div className="w-10 h-10 bg-gradient-to-br from-blue-500 to-purple-600 rounded-full flex items-center justify-center text-white font-semibold text-sm">
                       {user.name.split(' ').map(n => n[0]).join('')}
                     </div>
-                    
+
                     {/* User Info */}
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center space-x-2 mb-1">
                         <h3 className="font-semibold text-slate-900 dark:text-slate-100 truncate">
                           {user.name}
                         </h3>
-                        <Badge 
+                        <Badge
                           variant="outline"
                           className={cn("text-xs flex items-center space-x-1", getRoleColor(user.role))}
                         >
                           {getRoleIcon(user.role)}
                           <span className="capitalize">{user.role}</span>
                         </Badge>
-                        <Badge 
+                        <Badge
                           variant="outline"
                           className={cn("text-xs", getStatusColor(user.status))}
                         >
                           {user.status}
                         </Badge>
                       </div>
-                      
+
                       <div className="space-y-1">
                         <div className="flex items-center space-x-2 text-sm text-slate-600 dark:text-slate-400">
                           <Mail className="w-3 h-3" />
                           <span className="truncate">{user.email}</span>
                         </div>
-                        
+
                         <div className="flex items-center space-x-4 text-sm text-slate-500 dark:text-slate-500">
                           <div className="flex items-center space-x-1">
                             <Building2 className="w-3 h-3" />
@@ -264,31 +264,31 @@ export function UserManagement({
                             <span>Joined {new Date(user.createdAt).toLocaleDateString()}</span>
                           </div>
                         </div>
-                        
+
                         {user.phone && (
                           <div className="flex items-center space-x-2 text-sm text-slate-500 dark:text-slate-500">
                             <Phone className="w-3 h-3" />
                             <span>{user.phone}</span>
                           </div>
                         )}
-                        
+
                         <div className="text-xs text-slate-500 dark:text-slate-500">
                           Last active: {user.lastActive}
                         </div>
                       </div>
                     </div>
                   </div>
-                  
+
                   {/* Actions */}
                   <div className="flex items-center space-x-2">
-                    <Button 
-                      size="sm" 
+                    <Button
+                      size="sm"
                       variant="outline"
                       onClick={() => onToggleStatus?.(user.id)}
                       className={cn(
                         "h-8 px-3",
-                        user.status === "active" 
-                          ? "text-red-600 hover:text-red-700 hover:bg-red-50" 
+                        user.status === "active"
+                          ? "text-red-600 hover:text-red-700 hover:bg-red-50"
                           : "text-green-600 hover:text-green-700 hover:bg-green-50"
                       )}
                     >
@@ -304,9 +304,9 @@ export function UserManagement({
                         </>
                       )}
                     </Button>
-                    
-                    <Button 
-                      size="sm" 
+
+                    <Button
+                      size="sm"
                       variant="outline"
                       onClick={() => onEditUser?.(user.id)}
                       className="h-8 px-3"
@@ -314,9 +314,9 @@ export function UserManagement({
                       <Edit className="w-3 h-3 mr-1" />
                       Edit
                     </Button>
-                    
-                    <Button 
-                      size="sm" 
+
+                    <Button
+                      size="sm"
                       variant="outline"
                       onClick={() => onDeleteUser?.(user.id)}
                       className="h-8 px-3 text-red-600 hover:text-red-700 hover:bg-red-50"
@@ -327,11 +327,11 @@ export function UserManagement({
                 </div>
               </div>
             ))}
-            
+
             {filteredUsers.length === 0 && (
               <div className="text-center py-12">
                 <Users className="w-12 h-12 text-slate-400 mx-auto mb-4" />
-                <p className="text-slate-500 dark:text-slate-400">No users found</p>
+                <p className="text-slate-500 dark:text-slate-400">No managers found</p>
                 <p className="text-sm text-slate-400 dark:text-slate-500">
                   Try adjusting your search or filters
                 </p>

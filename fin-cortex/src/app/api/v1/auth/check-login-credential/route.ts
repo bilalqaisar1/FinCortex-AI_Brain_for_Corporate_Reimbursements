@@ -72,6 +72,23 @@ export async function POST(request: Request) {
                 // We just return the Auth success data
             }
 
+            // Block inactive managers from logging in
+            if (data.role === 'manager') {
+                const { data: mgrData } = await supabaseAdmin
+                    .from('managers')
+                    .select('status')
+                    .eq('manager_id', authData.user.id)
+                    .single();
+
+                if (mgrData && mgrData.status === 'inactive') {
+                    console.log(`🚫 [Check Credentials] Inactive manager blocked: ${email}`);
+                    return NextResponse.json(
+                        { detail: 'Your account has been deactivated by the admin. Please contact your administrator.' },
+                        { status: 403 }
+                    )
+                }
+            }
+
             return NextResponse.json({
                 success: true,
                 data: {
@@ -85,6 +102,26 @@ export async function POST(request: Request) {
         }
 
         console.log(`✅ [Check Credentials] Successful RPC login for: ${email}`);
+
+        // Block inactive managers from logging in
+        console.log(`🔎 [Check Credentials] Checking status for role=${data.role}, uuid=${data.useruuid}`);
+        if (data.role === 'manager' && data.useruuid) {
+            const { data: mgrData, error: mgrError } = await supabaseAdmin
+                .from('managers')
+                .select('status')
+                .eq('manager_id', data.useruuid)
+                .single();
+
+            console.log(`🔎 [Check Credentials] Manager status query result:`, JSON.stringify(mgrData), 'error:', mgrError?.message);
+
+            if (mgrData && mgrData.status === 'inactive') {
+                console.log(`🚫 [Check Credentials] Inactive manager blocked: ${email}`);
+                return NextResponse.json(
+                    { detail: 'Your account has been deactivated by the admin. Please contact your administrator.' },
+                    { status: 403 }
+                )
+            }
+        }
 
         // Return the RPC response
         return NextResponse.json({
@@ -105,4 +142,3 @@ export async function POST(request: Request) {
         )
     }
 }
-

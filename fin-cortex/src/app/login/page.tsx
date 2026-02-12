@@ -172,8 +172,12 @@ export default function LoginPage() {
 
       showToast('success', 'Login Successful', `Welcome back, ${userName}! Redirecting to home...`);
 
-      // Always redirect to home page - dashboard button will link to correct dashboard based on role
-      router.push('/');
+      // Redirect to correct dashboard based on role
+      const dashboardPath = data.role === 'admin' ? "/admin" :
+        data.role === 'manager' ? "/manager" :
+          "/user/dashboard";
+
+      router.push(dashboardPath);
 
     } catch (error) {
       console.error('Login error:', error);

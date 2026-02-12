@@ -27,8 +27,8 @@ export async function GET(request: Request) {
             .limit(50)
 
         if (error) {
-            console.error('❌ [API] Error fetching notifications:', error.message);
-            return NextResponse.json({ detail: error.message }, { status: 500 })
+            console.error(`❌ [API] database error fetching notifications for ${userId}:`, error);
+            return NextResponse.json({ detail: 'Database error fetching notifications', code: error.code }, { status: 500 })
         }
 
         return NextResponse.json(data || [])

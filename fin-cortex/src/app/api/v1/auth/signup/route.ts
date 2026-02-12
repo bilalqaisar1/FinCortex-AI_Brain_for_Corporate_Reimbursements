@@ -5,26 +5,25 @@ import { supabaseAdmin } from '@/lib/supabaseAdmin'
 export async function POST(request: Request) {
   try {
     const body = await request.json()
-    const { email, password, full_name, employee_code, phone_number } = body || {}
+    const { email, password, full_name, phone_number, company_name } = body || {}
 
-    if (!email || !password || !full_name || !employee_code) {
+    if (!email || !password || !full_name || !company_name) {
       return NextResponse.json({ detail: 'Missing required fields' }, { status: 400 })
     }
 
-    const { data, error } = await supabaseAdmin.auth.signUp({
+    const { data, error } = await supabaseAdmin.auth.admin.createUser({
       email,
       password,
-      options: {
-        data: {
-          full_name,
-          employee_code,
-          phone_number: phone_number || null,
-          role: 'admin', // Force admin role for public signup
-        },
+      email_confirm: true,
+      user_metadata: {
+        full_name,
+        phone_number: phone_number || null,
+        role: 'admin', // Force admin role for public signup
       },
     })
 
     if (error) {
+      console.error('Signup error:', error.message);
       return NextResponse.json({ detail: error.message }, { status: 400 })
     }
 
@@ -44,13 +43,15 @@ export async function POST(request: Request) {
 
       if (dbError) {
         console.error('Failed to create admin profile:', dbError)
+        await supabaseAdmin.auth.admin.deleteUser(userId)
+        return NextResponse.json({ detail: `Database error: ${dbError.message}` }, { status: 400 })
       } else {
         // Create a default company for this admin
         const { error: companyError } = await supabaseAdmin
           .from('companies')
           .insert({
             admin_id: userId,
-            company_name: `${full_name}'s Organization`,
+            company_name: company_name,
           })
 
         if (companyError) {
@@ -60,7 +61,7 @@ export async function POST(request: Request) {
     }
 
     return NextResponse.json({
-      message: 'Admin signup initiated. Check your email for the verification code.',
+      message: 'Admin account created successfully.',
       user_id: userId
     })
   } catch (err: any) {

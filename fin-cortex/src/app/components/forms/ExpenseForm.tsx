@@ -3,7 +3,7 @@
 import * as React from "react";
 import { useState, useRef, useCallback, useEffect } from "react";
 import { useRouter } from "next/navigation";
-import { Upload, X, CheckCircle2, AlertCircle, Loader2, Info } from "lucide-react";
+import { Upload, X, CheckCircle2, AlertCircle, Loader2, Info, Receipt, FileText, LayoutGrid, ListPlus, Send, Sparkles, Plus, Tag, Ban, DollarSign } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import {
@@ -47,7 +47,7 @@ interface FormData {
   address: string;
   totalAmount: string;
   invoiceNumber: string;
-  items: Array<{ item: string; price: string; quantity: string }>;
+  items: Array<{ item: string; price: string; quantity: string; category?: string; subcategory?: string; reimbursable?: boolean }>;
   receiptType: string;
   vendorType: string;
   description: string;
@@ -67,7 +67,7 @@ interface OCRData {
   Date?: string;
   Categories?: string | string[];
   Subcategories?: string | string[];
-  items?: Array<{ item: string; price: string }>;
+  items?: Array<{ item: string; price: string; quantity?: string; category?: string; subcategory?: string; category_id?: number | null; subcategory_id?: number | null; reimbursable?: boolean }>;
   Address?: string;
   "Total Amount"?: string;
   "Invoice Number"?: string;
@@ -88,7 +88,7 @@ const ExpenseForm: React.FC<ExpenseFormProps> = ({ isDarkTheme }) => {
     address: "",
     totalAmount: "",
     invoiceNumber: "",
-    items: [{ item: "", price: "", quantity: "" }],
+    items: [{ item: "", price: "", quantity: "", category: "", subcategory: "", reimbursable: true }],
     receiptType: "",
     vendorType: "",
     description: "",
@@ -262,12 +262,15 @@ const ExpenseForm: React.FC<ExpenseFormProps> = ({ isDarkTheme }) => {
           updated.invoiceNumber = String(ocrData["Invoice Number"]).trim();
         }
 
-        // Items - improved parsing
+        // Items - improved parsing with per-item category
         if (ocrData.items && Array.isArray(ocrData.items) && ocrData.items.length > 0) {
           updated.items = ocrData.items.map((item: any) => ({
             item: String(item.item || "").trim(),
             price: parseAmount(String(item.price || "")),
             quantity: item.quantity ? String(item.quantity).trim() : "1",
+            category: String(item.category || "").trim(),
+            subcategory: String(item.subcategory || "").trim(),
+            reimbursable: item.reimbursable !== false,
           })).filter((item) => item.item || item.price); // Remove empty items
         }
 
@@ -380,7 +383,7 @@ const ExpenseForm: React.FC<ExpenseFormProps> = ({ isDarkTheme }) => {
   const addItemRow = () => {
     setFormData((prev) => ({
       ...prev,
-      items: [...prev.items, { item: "", price: "", quantity: "" }],
+      items: [...prev.items, { item: "", price: "", quantity: "", category: "", subcategory: "", reimbursable: true }],
     }));
   };
 
@@ -391,7 +394,7 @@ const ExpenseForm: React.FC<ExpenseFormProps> = ({ isDarkTheme }) => {
     }));
   };
 
-  const updateItem = (index: number, field: "item" | "price" | "quantity", value: string) => {
+  const updateItem = (index: number, field: "item" | "price" | "quantity" | "category" | "subcategory", value: string) => {
     setFormData((prev) => {
       const newItems = [...prev.items];
       newItems[index] = { ...newItems[index], [field]: value };
@@ -493,7 +496,33 @@ const ExpenseForm: React.FC<ExpenseFormProps> = ({ isDarkTheme }) => {
       }
 
       showToast("success", "Claim Submitted", "Your reimbursement claim has been submitted successfully.");
-      router.push("/user/dashboard");
+
+      // Build invoice data and redirect to invoice page
+      const invoiceData = {
+        reimbursement_id: payload.data?.reimbursement_id,
+        receipt_code: payload.data?.receipt_code || formData.receiptCode,
+        vendor_name: formData.vendorName,
+        date: formData.date,
+        total_amount: formData.totalAmount,
+        invoice_number: formData.invoiceNumber,
+        category: detectedCategory,
+        subcategory: detectedSubcategory,
+        address: formData.address,
+        description: formData.description,
+        items: formData.items,
+        user_name: userProfile?.full_name || "",
+        user_email: userProfile?.email || "",
+        employee_code: userProfile?.employee_code || "",
+        department: userProfile?.departments?.department_name || "",
+        manager: userProfile?.managers?.full_name || "",
+        receipt_type: receiptTypeOptions.find(r => r.id === formData.receiptType)?.label || "",
+        vendor_type: vendorTypeOptions.find(v => v.id === formData.vendorType)?.label || "",
+        policy_flags: policyFlags,
+      };
+
+      // Store invoice data in sessionStorage for the invoice page
+      sessionStorage.setItem("invoiceData", JSON.stringify(invoiceData));
+      router.push(`/user/claims/invoice/${payload.data?.reimbursement_id || "new"}`);
     } catch (error) {
       console.error("Submission failed", error);
       showToast("error", "Submission Failed", error instanceof Error ? error.message : "Please try again.");
@@ -508,21 +537,29 @@ const ExpenseForm: React.FC<ExpenseFormProps> = ({ isDarkTheme }) => {
   return (
     <form onSubmit={handleSubmit} className="max-w-4xl mx-auto space-y-6">
       {/* Receipt Upload Section */}
-      <Card className="glass-effect border-subtle">
-        <CardHeader>
-          <CardTitle className="text-lg md:text-xl text-primary">Receipt Upload</CardTitle>
-          <CardDescription>Upload a receipt image to auto-fill form fields</CardDescription>
+      <Card className="glass-effect-hover border-subtle overflow-hidden relative group">
+        <div className="absolute inset-0 bg-primary/5 opacity-0 group-hover:opacity-100 transition-opacity" />
+        <CardHeader className="relative z-10">
+          <div className="flex items-center gap-2 mb-1">
+            <Upload className="size-5 text-primary" />
+            <CardTitle className="text-lg md:text-xl text-primary">Receipt Upload</CardTitle>
+          </div>
+          <CardDescription>Upload a receipt image to auto-fill form fields using AI</CardDescription>
         </CardHeader>
-        <CardContent className="space-y-4">
+        <CardContent className="space-y-4 relative z-10">
           {!uploadedFile && (
             <div
               onClick={() => fileInputRef.current?.click()}
-              className="relative flex flex-col items-center justify-center p-8 border-2 border-dashed border-subtle rounded-xl bg-[#233648]/30 hover:bg-[#233648]/50 cursor-pointer transition-all hover:border-primary/50"
+              className="relative flex flex-col items-center justify-center p-12 border-2 border-dashed border-subtle rounded-xl bg-primary/5 hover:bg-primary/10 cursor-pointer transition-all hover:border-primary/50 group/upload"
             >
-              <Upload className="size-12 text-primary mb-4" />
-              <p className="text-sm font-medium text-primary mb-1">Upload Receipt</p>
-              <p className="text-xs text-muted text-center">Click to select or drag and drop</p>
-              <p className="text-xs text-muted mt-2">PNG, JPG up to 10MB</p>
+              <div className="size-16 bg-primary/10 rounded-full flex items-center justify-center mb-4 group-hover/upload:scale-110 transition-transform">
+                <Upload className="size-8 text-primary" />
+              </div>
+              <p className="text-sm font-bold text-primary mb-1">Upload Receipt</p>
+              <p className="text-xs text-muted text-center max-w-[200px]">Click to select or drag and drop PNG, JPG up to 10MB</p>
+
+              {/* Subtle animated border effect on hover */}
+              <div className="absolute inset-0 rounded-xl border-2 border-primary/0 group-hover/upload:border-primary/20 transition-all pointer-events-none" />
             </div>
           )}
 
@@ -549,9 +586,16 @@ const ExpenseForm: React.FC<ExpenseFormProps> = ({ isDarkTheme }) => {
                 </button>
               </div>
               {isProcessingOCR && (
-                <div className="mt-4 flex items-center gap-3 p-4 bg-[#233648] rounded-lg">
-                  <Loader2 className="size-5 text-primary animate-spin" />
-                  <span className="text-sm text-primary">Processing receipt with OCR...</span>
+                <div className="mt-4 p-4 rounded-xl bg-primary/5 border border-primary/20 flex items-start gap-3 relative z-10 animate-pulse">
+                  <Loader2 className="size-5 text-primary mt-0.5 animate-spin" />
+                  <div className="flex-1">
+                    <p className="text-sm font-bold text-primary mb-0.5">
+                      Processing receipt with OCR...
+                    </p>
+                    <p className="text-xs text-muted">
+                      AI is analyzing your document to automatically extract merchant, date, and amount details.
+                    </p>
+                  </div>
                 </div>
               )}
             </div>
@@ -576,16 +620,18 @@ const ExpenseForm: React.FC<ExpenseFormProps> = ({ isDarkTheme }) => {
 
       {/* Review Message */}
       {showReviewMessage && ocrData && (
-        <Card className="glass-effect border-emerald-500/20 bg-emerald-500/10 relative z-50">
+        <Card className="glass-effect border-emerald-500/20 bg-emerald-500/10 relative z-50 animate-bounce-in">
           <CardContent className="pt-6">
             <div className="flex items-start gap-3">
-              <Info className="size-5 text-emerald-400 mt-0.5" />
-              <div className="flex-1">
-                <p className="text-sm font-medium text-emerald-400 mb-1">
+              <div className="p-2 bg-emerald-500/20 rounded-full">
+                <CheckCircle2 className="size-4 text-emerald-400" />
+              </div>
+              <div className="flex-1 pt-1">
+                <p className="text-sm font-bold text-emerald-400 mb-0.5">
                   Review the fields below and make corrections if needed
                 </p>
                 <p className="text-xs text-muted">
-                  Some fields have been auto-filled from your receipt. Please verify and edit any incorrect information.
+                  AI has auto-filled the form from your receipt. Please verify and edit any incorrect information.
                 </p>
               </div>
             </div>
@@ -623,12 +669,18 @@ const ExpenseForm: React.FC<ExpenseFormProps> = ({ isDarkTheme }) => {
       )}
 
       {/* Auto-filled Fields Section */}
-      <Card className="glass-effect border-subtle">
+      <Card className="glass-effect border-subtle relative overflow-hidden">
+        <div className="absolute top-0 right-0 p-4 opacity-10">
+          <Sparkles className="size-20 text-primary" />
+        </div>
         <CardHeader>
-          <CardTitle className="text-lg md:text-xl text-primary">Auto-filled Information</CardTitle>
-          <CardDescription>Review and edit the extracted information</CardDescription>
+          <div className="flex items-center gap-2 mb-1">
+            <FileText className="size-5 text-primary" />
+            <CardTitle className="text-lg md:text-xl text-primary">Extracted Details</CardTitle>
+          </div>
+          <CardDescription>Verify the information extracted by AI</CardDescription>
         </CardHeader>
-        <CardContent className="space-y-6">
+        <CardContent className="space-y-8">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             <div className="space-y-2">
               <Label htmlFor="receiptCode" className="text-primary">
@@ -754,57 +806,192 @@ const ExpenseForm: React.FC<ExpenseFormProps> = ({ isDarkTheme }) => {
           </div>
 
           {/* Items Section */}
-          <div className="space-y-4">
+          <div className="space-y-4 pt-4 border-t border-subtle">
             <div className="flex items-center justify-between">
-              <Label className="text-primary">Items</Label>
-              <Button type="button" variant="outline" size="sm" onClick={addItemRow}>
+              <div className="flex items-center gap-2">
+                <LayoutGrid className="size-4 text-primary/70" />
+                <Label className="text-sm font-bold text-primary">Itemized Breakdown</Label>
+              </div>
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={addItemRow}
+                className="h-8 gap-1.5 border-primary/20 hover:bg-primary/5 text-primary"
+              >
+                <Plus className="size-3.5" />
                 Add Item
               </Button>
             </div>
-            {formData.items.map((item, index) => (
-              <div key={index} className="grid grid-cols-12 gap-2 items-end">
-                <div className="col-span-5 space-y-2">
-                  <Input
-                    placeholder="Item name"
-                    value={item.item}
-                    onChange={(e) => updateItem(index, "item", e.target.value)}
-                    className={`${isDarkTheme ? "bg-[#233648]" : "bg-white/90"} border-subtle text-primary`}
-                  />
+
+            {/* Reimbursable Items */}
+            {formData.items.filter(i => i.reimbursable !== false).length > 0 && (
+              <div className="space-y-3">
+                <div className="flex items-center gap-2">
+                  <CheckCircle2 className="size-3.5 text-emerald-400" />
+                  <span className="text-xs font-semibold text-emerald-400 uppercase tracking-wider">Reimbursable Items</span>
                 </div>
-                <div className="col-span-2 space-y-2">
-                  <Input
-                    type="number"
-                    placeholder="Qty"
-                    value={item.quantity}
-                    onChange={(e) => updateItem(index, "quantity", e.target.value)}
-                    className={`${isDarkTheme ? "bg-[#233648]" : "bg-white/90"} border-subtle text-primary`}
-                  />
+                {/* Column Headers */}
+                <div className="grid grid-cols-12 gap-2 px-3">
+                  <div className="col-span-5">
+                    <span className="text-[11px] font-semibold text-muted uppercase tracking-wider">Item Name</span>
+                  </div>
+                  <div className="col-span-2">
+                    <span className="text-[11px] font-semibold text-muted uppercase tracking-wider">Qty</span>
+                  </div>
+                  <div className="col-span-4">
+                    <span className="text-[11px] font-semibold text-muted uppercase tracking-wider">Price</span>
+                  </div>
+                  <div className="col-span-1"></div>
                 </div>
-                <div className="col-span-4 space-y-2">
-                  <Input
-                    type="number"
-                    step="0.01"
-                    placeholder="Price"
-                    value={item.price}
-                    onChange={(e) => updateItem(index, "price", e.target.value)}
-                    className={`${isDarkTheme ? "bg-[#233648]" : "bg-white/90"} border-subtle text-primary`}
-                  />
-                </div>
-                <div className="col-span-1">
-                  {formData.items.length > 1 && (
-                    <Button
-                      type="button"
-                      variant="outline"
-                      size="sm"
-                      onClick={() => removeItemRow(index)}
-                      className="w-full"
-                    >
-                      <X className="size-4" />
-                    </Button>
-                  )}
-                </div>
+                {formData.items.map((item, index) => {
+                  if (item.reimbursable === false) return null;
+                  return (
+                    <div key={index} className="rounded-lg border border-emerald-500/20 bg-emerald-500/5 p-3 space-y-2">
+                      <div className="grid grid-cols-12 gap-2 items-end">
+                        <div className="col-span-5 space-y-1">
+                          <Input
+                            placeholder="Item name"
+                            value={item.item}
+                            onChange={(e) => updateItem(index, "item", e.target.value)}
+                            className={`${isDarkTheme ? "bg-[#233648]" : "bg-white/90"} border-subtle text-primary`}
+                          />
+                        </div>
+                        <div className="col-span-2 space-y-1">
+                          <Input
+                            type="number"
+                            placeholder="Qty"
+                            value={item.quantity}
+                            onChange={(e) => updateItem(index, "quantity", e.target.value)}
+                            className={`${isDarkTheme ? "bg-[#233648]" : "bg-white/90"} border-subtle text-primary`}
+                          />
+                        </div>
+                        <div className="col-span-4 space-y-1">
+                          <Input
+                            type="number"
+                            step="0.01"
+                            placeholder="Price"
+                            value={item.price}
+                            onChange={(e) => updateItem(index, "price", e.target.value)}
+                            className={`${isDarkTheme ? "bg-[#233648]" : "bg-white/90"} border-subtle text-primary`}
+                          />
+                        </div>
+                        <div className="col-span-1">
+                          {formData.items.length > 1 && (
+                            <Button
+                              type="button"
+                              variant="outline"
+                              size="sm"
+                              onClick={() => removeItemRow(index)}
+                              className="w-full"
+                            >
+                              <X className="size-4" />
+                            </Button>
+                          )}
+                        </div>
+                      </div>
+                      {/* Category badge */}
+                      {(item.category || item.subcategory) && (
+                        <div className="flex items-center gap-2 flex-wrap">
+                          {item.category && (
+                            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-medium bg-primary/10 text-primary border border-primary/20">
+                              <Tag className="size-2.5" />
+                              {item.category}
+                            </span>
+                          )}
+                          {item.subcategory && (
+                            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-medium bg-blue-500/10 text-blue-400 border border-blue-500/20">
+                              {item.subcategory}
+                            </span>
+                          )}
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
               </div>
-            ))}
+            )}
+
+            {/* Non-Reimbursable Items */}
+            {formData.items.filter(i => i.reimbursable === false).length > 0 && (
+              <div className="space-y-3 mt-4">
+                <div className="flex items-center gap-2">
+                  <Ban className="size-3.5 text-red-400" />
+                  <span className="text-xs font-semibold text-red-400 uppercase tracking-wider">Not Reimbursable</span>
+                </div>
+                {formData.items.map((item, index) => {
+                  if (item.reimbursable !== false) return null;
+                  return (
+                    <div key={index} className="rounded-lg border border-red-500/20 bg-red-500/5 p-3 space-y-2 opacity-75">
+                      <div className="grid grid-cols-12 gap-2 items-end">
+                        <div className="col-span-5 space-y-1">
+                          <Input
+                            placeholder="Item name"
+                            value={item.item}
+                            onChange={(e) => updateItem(index, "item", e.target.value)}
+                            className={`${isDarkTheme ? "bg-[#233648]" : "bg-white/90"} border-subtle text-primary line-through`}
+                            readOnly
+                          />
+                        </div>
+                        <div className="col-span-2 space-y-1">
+                          <Input
+                            type="number"
+                            placeholder="Qty"
+                            value={item.quantity}
+                            className={`${isDarkTheme ? "bg-[#233648]" : "bg-white/90"} border-subtle text-primary line-through`}
+                            readOnly
+                          />
+                        </div>
+                        <div className="col-span-4 space-y-1">
+                          <Input
+                            type="number"
+                            step="0.01"
+                            placeholder="Price"
+                            value={item.price}
+                            className={`${isDarkTheme ? "bg-[#233648]" : "bg-white/90"} border-subtle text-primary line-through`}
+                            readOnly
+                          />
+                        </div>
+                        <div className="col-span-1">
+                          <Button
+                            type="button"
+                            variant="outline"
+                            size="sm"
+                            onClick={() => removeItemRow(index)}
+                            className="w-full text-red-400"
+                          >
+                            <X className="size-4" />
+                          </Button>
+                        </div>
+                      </div>
+                      {/* Category badge */}
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-medium bg-red-500/10 text-red-400 border border-red-500/20">
+                          <Ban className="size-2.5" />
+                          {item.category || "Not categorized"} — Not Allowed
+                        </span>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+
+            {/* Reimbursable Total */}
+            {formData.items.length > 0 && (
+              <div className="flex items-center justify-between pt-3 mt-2 border-t border-subtle">
+                <div className="flex items-center gap-2">
+                  <DollarSign className="size-4 text-emerald-400" />
+                  <span className="text-sm font-semibold text-primary">Reimbursable Total</span>
+                </div>
+                <span className="text-lg font-bold text-emerald-400">
+                  PKR {formData.items
+                    .filter(i => i.reimbursable !== false)
+                    .reduce((sum, i) => sum + (parseFloat(i.price) || 0) * (parseFloat(i.quantity) || 1), 0)
+                    .toFixed(2)}
+                </span>
+              </div>
+            )}
           </div>
         </CardContent>
       </Card>
@@ -812,8 +999,11 @@ const ExpenseForm: React.FC<ExpenseFormProps> = ({ isDarkTheme }) => {
       {/* Manual Fields Section */}
       <Card className="glass-effect border-subtle">
         <CardHeader>
-          <CardTitle className="text-lg md:text-xl text-primary">Additional Information</CardTitle>
-          <CardDescription>Fill in the remaining details manually</CardDescription>
+          <div className="flex items-center gap-2 mb-1">
+            <ListPlus className="size-5 text-primary" />
+            <CardTitle className="text-lg md:text-xl text-primary">Additional Information</CardTitle>
+          </div>
+          <CardDescription>Categorize and describe your expense</CardDescription>
         </CardHeader>
         <CardContent className="space-y-6">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
@@ -887,13 +1077,13 @@ const ExpenseForm: React.FC<ExpenseFormProps> = ({ isDarkTheme }) => {
         </CardContent>
       </Card>
 
-      {/* Submit Button */}
-      <div className="flex flex-col sm:flex-row gap-4 pt-4">
+      {/* Submit Button Section */}
+      <div className="flex flex-col sm:flex-row gap-4 pt-6 items-center justify-end">
         <Button
           type="button"
-          variant="outline"
+          variant="ghost"
           onClick={() => router.back()}
-          className="flex-1 sm:flex-initial border-subtle"
+          className="w-full sm:w-auto order-2 sm:order-1 text-muted hover:text-primary transition-colors"
           disabled={isSubmitting}
         >
           Cancel
@@ -901,19 +1091,24 @@ const ExpenseForm: React.FC<ExpenseFormProps> = ({ isDarkTheme }) => {
         <Button
           type="submit"
           disabled={isSubmitting}
-          className="flex-1 sm:flex-initial bg-primary hover:bg-primary/90"
+          className="w-full sm:min-w-[200px] order-1 sm:order-2 h-12 relative overflow-hidden group shadow-lg shadow-primary/20 hover:shadow-primary/30 active:scale-[0.98] transition-all"
         >
-          {isSubmitting ? (
-            <>
-              <Loader2 className="size-4 mr-2 animate-spin" />
-              Submitting...
-            </>
-          ) : (
-            <>
-              <CheckCircle2 className="size-4 mr-2" />
-              Submit Claim
-            </>
-          )}
+          {/* Custom Gradient Background */}
+          <div className="absolute inset-0 bg-primary-gradient group-hover:opacity-90 transition-opacity" />
+
+          <div className="relative z-10 flex items-center justify-center gap-2 font-bold text-white">
+            {isSubmitting ? (
+              <>
+                <Loader2 className="size-5 animate-spin" />
+                <span>Submitting...</span>
+              </>
+            ) : (
+              <>
+                <Send className="size-5 group-hover:translate-x-1 group-hover:-translate-y-1 transition-transform" />
+                <span>Submit Claim</span>
+              </>
+            )}
+          </div>
         </Button>
       </div>
     </form>

@@ -172,7 +172,10 @@ export async function POST(request: Request) {
             .insert({
                 user_id: userId,
                 manager_id: finalManagerId,
-                admin_id: managerAdminId,
+                // admin_id is a self-referencing FK to users(user_id).
+                // The manager's admin_id may not exist in the users table,
+                // so we leave it null to avoid FK constraint violations.
+                admin_id: null,
                 department_id: department_id || null,
                 full_name: sanitizedFullName,
                 employee_code: employee_code,

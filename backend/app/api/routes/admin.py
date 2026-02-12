@@ -20,33 +20,52 @@ async def get_admin_stats(admin_id: Optional[str] = None) -> Dict[str, Any]:
     """
     Get dashboard statistics for admin.
     Returns: total claims, pending approvals, budget utilization, policy violations.
-    If admin_id is provided, filters by that admin's company.
+    REQUIRES admin_id to filter by that admin's company.
     """
     logger.info(f"📥 GET /admin/stats (admin_id: {admin_id})")
+    if not admin_id:
+        # For security and multi-tenancy, we return empty stats if no admin_id provided
+        logger.warning("No admin_id provided to /admin/stats")
+        return {
+            "success": True,
+            "company_name": "No Admin Resolved",
+            "data": _get_empty_stats_data()
+        }
+
     supabase = get_supabase_client()
     
     company_id = None
-    company_name = "All Companies"
+    company_name = "Your Company"
     
-    if admin_id:
-        logger.info(f"Resolving company for admin_id: {admin_id}")
-        try:
-            # Resolve company for this admin
-            # Try companies table (standard link)
-            comp_resp = supabase.table("companies").select("company_id, company_name").eq("admin_id", admin_id).execute()
-            if comp_resp.data and len(comp_resp.data) > 0:
-                company_id = comp_resp.data[0].get("company_id")
-                company_name = comp_resp.data[0].get("company_name", "Your Company")
-                logger.info(f"Resolved company_id: {company_id}, company_name: {company_name}")
-            else:
-                # Fallback: check users table for company_id/admin_id match
-                user_resp = supabase.table("users").select("company_id").eq("user_id", admin_id).execute()
-                if user_resp.data and len(user_resp.data) > 0:
-                    company_id = user_resp.data[0].get("company_id")
-                    company_name = "Your Company"
-                    logger.info(f"Resolved company_id from users: {company_id}")
-        except Exception as e:
-            logger.warning(f"Could not resolve company for admin {admin_id}: {e}")
+    logger.info(f"Resolving company for admin_id: {admin_id}")
+    try:
+        # Resolve company for this admin
+        # Try companies table (standard link)
+        comp_resp = supabase.table("companies").select("company_id, company_name").eq("admin_id", admin_id).execute()
+        if comp_resp.data and len(comp_resp.data) > 0:
+            company_id = comp_resp.data[0].get("company_id")
+            company_name = comp_resp.data[0].get("company_name", "Your Company")
+            logger.info(f"Resolved company_id: {company_id}, company_name: {company_name}")
+        else:
+            # Check users table as fallback
+            user_resp = supabase.table("users").select("company_id").eq("user_id", admin_id).execute()
+            if user_resp.data and len(user_resp.data) > 0:
+                company_id = user_resp.data[0].get("company_id")
+                logger.info(f"Resolved company_id from users: {company_id}")
+                
+        if not company_id:
+            logger.warning(f"Could not resolve company for admin {admin_id}")
+            return {
+                "success": True,
+                "data": _get_empty_stats_data(company_name="New Account")
+            }
+    except Exception as e:
+        logger.error(f"Error resolving company for admin {admin_id}: {e}")
+        return {
+            "success": False, 
+            "error": f"Resolution error: {str(e)}",
+            "data": _get_empty_stats_data(company_name="Error State")
+        }
     
     try:
         now = datetime.now()
@@ -57,19 +76,17 @@ async def get_admin_stats(admin_id: Optional[str] = None) -> Dict[str, Any]:
         first_day_last_month = (first_day_this_month - timedelta(days=1)).replace(day=1)
         
         # This month's claims
-        query = supabase.table("reimbursements").select("reimbursement_id", count="exact")
-        if company_id:
-            query = query.eq("company_id", company_id)
-        
-        this_month_resp = query.gte("created_at", first_day_this_month.isoformat()).limit(1).execute()
+        this_month_resp = supabase.table("reimbursements").select("reimbursement_id", count="exact") \
+            .eq("company_id", company_id) \
+            .gte("created_at", first_day_this_month.isoformat()) \
+            .limit(1) \
+            .execute()
         this_month_count = this_month_resp.count or 0
         
         # Last month's claims (for change calculation)
-        query_last = supabase.table("reimbursements").select("reimbursement_id", count="exact")
-        if company_id:
-            query_last = query_last.eq("company_id", company_id)
-            
-        last_month_resp = query_last.gte("created_at", first_day_last_month.isoformat()) \
+        last_month_resp = supabase.table("reimbursements").select("reimbursement_id", count="exact") \
+            .eq("company_id", company_id) \
+            .gte("created_at", first_day_last_month.isoformat()) \
             .lt("created_at", first_day_this_month.isoformat()) \
             .limit(1) \
             .execute()
@@ -83,19 +100,19 @@ async def get_admin_stats(admin_id: Optional[str] = None) -> Dict[str, Any]:
             change_str = "+100%" if this_month_count > 0 else "0%"
         
         # 2. Pending Approvals
-        query_pending = supabase.table("reimbursements").select("reimbursement_id", count="exact").eq("status", "pending")
-        if company_id:
-            query_pending = query_pending.eq("company_id", company_id)
-            
-        pending_resp = query_pending.limit(1).execute()
+        pending_resp = supabase.table("reimbursements").select("reimbursement_id", count="exact") \
+            .eq("status", "pending") \
+            .eq("company_id", company_id) \
+            .limit(1).execute()
         pending_count = pending_resp.count or 0
         
         # New pending (last 24 hours)
         yesterday = now - timedelta(days=1)
-        query_new_pending = supabase.table("reimbursements").select("reimbursement_id", count="exact").eq("status", "pending").gte("created_at", yesterday.isoformat())
-        if company_id:
-            query_new_pending = query_new_pending.eq("company_id", company_id)
-        new_pending_resp = query_new_pending.limit(1).execute()
+        new_pending_resp = supabase.table("reimbursements").select("reimbursement_id", count="exact") \
+            .eq("status", "pending") \
+            .eq("company_id", company_id) \
+            .gte("created_at", yesterday.isoformat()) \
+            .limit(1).execute()
         new_pending = new_pending_resp.count or 0
         
         # 3. Budget Utilization
@@ -169,8 +186,8 @@ async def get_admin_stats(admin_id: Optional[str] = None) -> Dict[str, Any]:
         
         return {
             "success": True,
-            "company_name": company_name,
             "data": {
+                "company_name": company_name,
                 "total_claims": {
                     "value": this_month_count,
                     "change": change_str,
@@ -198,7 +215,8 @@ async def get_admin_stats(admin_id: Optional[str] = None) -> Dict[str, Any]:
         logger.error(f"Error fetching admin stats: {e}")
         return {
             "success": False,
-            "error": str(e)
+            "error": str(e),
+            "data": _get_empty_stats_data(company_name=company_name)
         }
 
 
@@ -223,8 +241,10 @@ async def get_pending_approvals(admin_id: Optional[str] = None) -> Dict[str, Any
             .select("reimbursement_id, receipt_code, user_id, amount_claimed, category_id, status, created_at, flags, users(full_name), expense_categories(category_name)") \
             .eq("status", "pending")
         
-        if company_id:
-            query = query.eq("company_id", company_id)
+        if not company_id:
+            return {"success": True, "data": []}
+            
+        query = query.eq("company_id", company_id)
             
         try:
             resp = query.order("created_at", desc=True).limit(10).execute()
@@ -234,8 +254,9 @@ async def get_pending_approvals(admin_id: Optional[str] = None) -> Dict[str, Any
                 query = supabase.table("reimbursements") \
                     .select("reimbursement_id, receipt_code, user_id, amount_claimed, category_id, status, created_at, users(full_name), expense_categories(category_name)") \
                     .eq("status", "pending")
-                if company_id:
-                    query = query.eq("company_id", company_id)
+                if not company_id:
+                    return {"success": True, "data": []}
+                query = query.eq("company_id", company_id)
                 resp = query.order("created_at", desc=True).limit(10).execute()
             else:
                 raise e
@@ -307,8 +328,10 @@ async def get_recent_activity(admin_id: Optional[str] = None) -> Dict[str, Any]:
         query = supabase.table("reimbursements") \
             .select("reimbursement_id, receipt_code, status, amount_claimed, created_at, updated_at, users(full_name)")
             
-        if company_id:
-            query = query.eq("company_id", company_id)
+        if not company_id:
+            return {"success": True, "data": []}
+            
+        query = query.eq("company_id", company_id)
             
         resp = query.order("updated_at", desc=True).limit(10).execute()
         
@@ -403,8 +426,10 @@ async def get_admin_analytics(admin_id: Optional[str] = None, period: str = "30d
             .select("reimbursement_id, status, amount_claimed, amount_approved, user_id, category_id, department_id, created_at") \
             .gte("created_at", start_date.isoformat())
         
-        if company_id:
-            query = query.eq("company_id", company_id)
+        if not company_id:
+            return {"success": True, "data": _get_empty_analytics_data()}
+        
+        query = query.eq("company_id", company_id)
         
         resp = query.execute()
         current_data = resp.data or []
@@ -415,11 +440,12 @@ async def get_admin_analytics(admin_id: Optional[str] = None, period: str = "30d
             .gte("created_at", prev_start.isoformat()) \
             .lt("created_at", start_date.isoformat())
         
-        if company_id:
+        if not company_id:
+            prev_data = []
+        else:
             prev_query = prev_query.eq("company_id", company_id)
-        
-        prev_resp = prev_query.execute()
-        prev_data = prev_resp.data or []
+            prev_resp = prev_query.execute()
+            prev_data = prev_resp.data or []
         
         # 3. Calculate metrics
         total_claims = len(current_data)
@@ -506,3 +532,32 @@ async def get_admin_analytics(admin_id: Optional[str] = None, period: str = "30d
     except Exception as e:
         logger.error(f"Error fetching admin analytics: {e}")
         raise HTTPException(status_code=500, detail=str(e))
+
+
+def _get_empty_analytics_data() -> Dict[str, Any]:
+    """Helper to return empty analytics structure."""
+    return {
+        "period": "N/A",
+        "totalClaims": 0,
+        "totalAmount": 0,
+        "averageClaim": 0,
+        "approvedClaims": 0,
+        "pendingClaims": 0,
+        "rejectedClaims": 0,
+        "topCategory": "N/A",
+        "topDepartment": "N/A",
+        "monthlyTrend": 0,
+        "weeklyTrend": 0,
+        "activeUsers": 0
+    }
+
+
+def _get_empty_stats_data(company_name: str = "New Account") -> Dict[str, Any]:
+    """Helper to return empty structure for new or unauthenticated accounts."""
+    return {
+        "company_name": company_name,
+        "total_claims": {"value": 0, "change": "0%", "description": "This month"},
+        "pending_approvals": {"value": 0, "change": "No new", "description": "Require attention"},
+        "budget_utilization": {"value": 0, "change": "0%", "description": "New account"},
+        "policy_violations": {"value": 0, "change": "0 resolved", "description": "This week"}
+    }
