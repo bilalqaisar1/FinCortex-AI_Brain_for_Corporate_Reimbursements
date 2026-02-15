@@ -72,18 +72,18 @@ export default function FeaturesPage() {
 
 
   return (
-    <section id="features" className="py-20 bg-dark text-primary">
+    <section id="features" className="py-20 bg-[var(--background-dark)] text-[var(--text-primary)]">
       <div className="max-w-6xl mx-auto px-4">
             {/* Header */}
             <div className="text-center mb-12">
-              <Badge className="bg-card/20 text-accent border-accent/30 mb-4 backdrop-blur-sm hover:shadow-md hover:shadow-blue-500/20 hover:border-blue-400/40 transition-all duration-300">
+              <Badge className="bg-[var(--card-dark)]/20 text-accent border-accent/30 mb-4 backdrop-blur-sm hover:shadow-md hover:shadow-blue-500/20 hover:border-blue-400/40 transition-all duration-300">
                 ✨ AI Features
               </Badge>
-              <h2 className="text-3xl lg:text-4xl font-bold text-primary mb-4">
+              <h2 className="text-3xl lg:text-4xl font-bold text-[var(--text-primary)] mb-4">
                 AI-Powered
                 <span className="bg-gradient-to-r from-blue-500 to-purple-600 bg-clip-text text-transparent"> Reimbursement</span>
               </h2>
-              <p className="text-lg text-muted max-w-2xl mx-auto">
+              <p className="text-lg text-[var(--text-secondary)] max-w-2xl mx-auto">
                 Automate your entire reimbursement workflow with AI. From receipt processing 
                 to instant approvals, we handle it all.
               </p>
@@ -94,7 +94,7 @@ export default function FeaturesPage() {
               {mainFeatures.map((feature, index) => (
                 <Card 
                   key={index}
-                  className="p-6 hover:shadow-lg hover:shadow-blue-500/25 transition-all duration-400 hover:-translate-y-2 hover:scale-105 border border-subtle bg-gradient-to-br from-white/10 to-white/5 backdrop-blur-25 group hover:border-blue-400/50 relative overflow-hidden"
+                  className="p-6 hover:shadow-lg hover:shadow-blue-500/25 transition-all duration-400 hover:-translate-y-2 hover:scale-105 border border-[var(--border-subtle)] bg-[var(--card-dark)] backdrop-blur-xl group hover:border-blue-400/50 relative overflow-hidden"
                 >
                   {/* Shimmer Effect */}
                   <div className="absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity duration-600 pointer-events-none">
@@ -105,8 +105,8 @@ export default function FeaturesPage() {
                     <div className={`w-12 h-12 rounded-full bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center group-hover:scale-110 transition-transform duration-300 shadow-lg`}>
                       <feature.icon className="w-6 h-6 text-white" />
                     </div>
-                    <h3 className="text-lg font-semibold text-primary">{feature.title}</h3>
-                    <p className="text-sm text-muted leading-relaxed">{feature.description}</p>
+                    <h3 className="text-lg font-semibold text-[var(--text-primary)]">{feature.title}</h3>
+                    <p className="text-sm text-[var(--text-secondary)] leading-relaxed">{feature.description}</p>
                   </div>
                 </Card>
               ))}

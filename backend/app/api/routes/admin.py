@@ -510,6 +510,80 @@ async def get_admin_analytics(admin_id: Optional[str] = None, period: str = "30d
             weekly_trend = round(((total_amount - prev_total_amount) / prev_total_amount) * 100, 1)
         elif total_amount > 0:
             weekly_trend = 100
+
+        # 7. Fetch Active Users & Managers Lists
+        active_managers_count = 0
+        active_users_list = []
+        active_managers_list = []
+        
+        try:
+            # Fetch all users with department info
+            # Note: joining definitions might vary, assuming departments(department_name) is accessible via join if setup,
+            # but simpler to fetch departments separately and map if foreign keys aren't perfect in Supabase ORM.
+            # Let's try direct select with map.
+            
+            u_query = supabase.table("users").select("user_id, full_name, email, role, department_id, is_active")
+            if company_id:
+                u_query = u_query.eq("company_id", company_id)
+            
+            users_resp = u_query.execute()
+            all_users = users_resp.data or []
+            
+            # Fetch departments for mapping
+            d_query = supabase.table("departments").select("department_id, department_name")
+            if company_id:
+                d_query = d_query.eq("company_id", company_id)
+            dept_resp = d_query.execute()
+            dept_map = {d["department_id"]: d["department_name"] for d in (dept_resp.data or [])}
+            
+            # Identify Managers per Department (for "Assigned Manager" field)
+            dept_managers = {}
+            for u in all_users:
+                if u.get("role") == "manager" and u.get("is_active", True):
+                    dept_id = u.get("department_id")
+                    if dept_id:
+                        dept_managers[dept_id] = u.get("full_name")
+
+            # Process Lists
+            for u in all_users:
+                is_active = u.get("is_active", True)
+                role = u.get("role", "employee")
+                dept_id = u.get("department_id")
+                dept_name = dept_map.get(dept_id, "Unknown")
+                
+                user_obj = {
+                    "id": u.get("user_id"),
+                    "name": u.get("full_name", "Unknown"),
+                    "email": u.get("email"),
+                    "department": dept_name,
+                    "status": "Active" if is_active else "Inactive",
+                    "role": role
+                }
+                
+                if is_active:
+                    if role == "manager":
+                        active_managers_list.append(user_obj)
+                    else:
+                        # For regular users, add assigned manager
+                        user_obj["assigned_manager"] = dept_managers.get(dept_id, "Unassigned")
+                        active_users_list.append(user_obj)
+
+            active_managers_count = len(active_managers_list)
+            # update active_users count to reflect total active users (managers + employees) or just employees?
+            # "Active Users" card usually implies total active platform users. 
+            # But the request separates them. "List ALL active users... Assigned Manager". 
+            # Usually implies employees. Let's keep existing active_users count as specific count logic or update it?
+            # Existing logic: active_users = len(set(r.get("user_id") for r in current_data...)) -> distinct users who CLAIMED.
+            # Request says "Display total count of active users". 
+            # I should use the `all_users` count (managers + employees) or just employees?
+            # "Active Users" card usually means everyone.
+            # Let's stick to the list I just generated for the modal.
+            
+            # Override active_users count with actual DB count, not just claimers
+            active_users = len([u for u in all_users if u.get("is_active", True)])
+
+        except Exception as user_err:
+            logger.error(f"Error fetching users for analytics: {user_err}")
         
         return {
             "success": True,
@@ -525,7 +599,10 @@ async def get_admin_analytics(admin_id: Optional[str] = None, period: str = "30d
                 "topDepartment": top_department,
                 "monthlyTrend": monthly_trend,
                 "weeklyTrend": weekly_trend,
-                "activeUsers": active_users
+                "activeUsers": active_users,
+                "activeManagers": active_managers_count,
+                "managersList": active_managers_list,
+                "usersList": active_users_list
             }
         }
         

@@ -9,11 +9,53 @@ class OpenAIService:
         self.client = openai.OpenAI(api_key=settings.OPENAI_API_KEY)
         self.model = settings.OPENAI_MODEL
     
-    def extract_receipt_fields(self, extracted_text: str) -> Dict[str, Any]:
+    def extract_receipt_fields(self, extracted_text: str, categories: List[Dict[str, Any]] = None) -> Dict[str, Any]:
         """
-        Use OpenAI to extract structured data from receipt text
+        Use OpenAI to extract structured data from receipt text.
+        When admin-defined categories are provided, uses strict allow-list logic
+        for reimbursability decisions.
         """
         try:
+            has_admin_categories = bool(categories)
+            categories_str = "No specific categories provided. Infer standard business categories."
+            if categories:
+                cat_list = []
+                for cat in categories:
+                    subs = cat.get('subcategories', [])
+                    sub_entries = []
+                    for sub in subs:
+                        sub_name = sub.get('subcategory_name', '')
+                        sub_id = sub.get('subcategory_id', '')
+                        sub_entries.append(f"{sub_name} (SubID: {sub_id})")
+                    cat_info = f"- {cat.get('category_name')} (ID: {cat.get('category_id')})"
+                    if sub_entries:
+                        cat_info += f" [Subcategories: {', '.join(sub_entries)}]"
+                    cat_list.append(cat_info)
+                categories_str = "\n".join(cat_list)
+
+            # Build the reimbursability rules based on whether admin categories exist
+            if has_admin_categories:
+                reimbursability_rules = """
+            STRICT REIMBURSABILITY RULES (COMPANY POLICY — THESE ARE ABSOLUTE):
+            - The ALLOWED CATEGORIES list below is the ONLY way an item can be reimbursable.
+            - An item is reimbursable (is_reimbursable: true) ONLY IF its category or subcategory
+              EXACTLY matches one of the ALLOWED CATEGORIES.
+            - IF AN ITEM DOES NOT FIT ANY ALLOWED CATEGORY, IT MUST BE MARKED is_reimbursable: false.
+            - DO NOT invent categories. DO NOT use "Uncategorized" as a way to make an item reimbursable.
+            - If "MEDICAL" is the only category provided, and an item is "FOOD", it is NOT reimbursable.
+            - You MUST provide a clear 'rejection_reason' for every non-reimbursable item
+              (e.g., "Category 'Groceries' is not in the company's allowed reimbursement categories").
+            - For reimbursable items, set rejection_reason to null.
+            """
+            else:
+                reimbursability_rules = """
+            REIMBURSABILITY RULES (DEFAULT — NO COMPANY CATEGORIES DEFINED):
+            - Mark is_reimbursable: false for alcohol, tobacco, personal entertainment,
+              or obvious non-business items.
+            - All other items default to is_reimbursable: true.
+            - Set rejection_reason to a short explanation for non-reimbursable items, null otherwise.
+            """
+
             prompt = f"""
             Analyze this receipt text and extract ALL relevant information with high precision.
 
@@ -21,14 +63,19 @@ class OpenAIService:
             1. vendor_name: Complete shop or business name
             2. date: Transaction date in YYYY-MM-DD format
             3. time: Transaction time in HH:MM format (or null if missing)
-            4. category: Main category of the purchase (e.g., food, grocery, electronics, etc.)
-            5. sub_category: More specific category if identifiable
+            4. category: Main category of the purchase (choose ONLY from ALLOWED CATEGORIES if provided, else infer)
+            5. sub_category: More specific category if identifiable (choose ONLY from ALLOWED CATEGORIES if provided)
             6. items: List of purchased items. For EACH item return:
                 - item_name: Full description
                 - quantity: Default 1 if not shown
                 - price: Total price for this item
+                - category: Assign from ALLOWED CATEGORIES if possible, else item's natural category
+                - subcategory: Assign from ALLOWED CATEGORIES subcategories if possible, else null
+                - is_reimbursable: Boolean — see STRICT REIMBURSABILITY RULES below
+                - rejection_reason: String explanation if not reimbursable, null if reimbursable
             7. total_bill: Final total amount of the receipt
             8. tax: Full tax amount applied
+            {reimbursability_rules}
 
             EXTRACTION RULES:
             - Capture ALL items exactly as they appear.
@@ -39,6 +86,9 @@ class OpenAIService:
             - Currency should be inferred where possible.
             - Output must follow the exact JSON structure.
 
+            ALLOWED CATEGORIES:
+            {categories_str}
+
             Receipt Text:
             {extracted_text}
 
@@ -47,19 +97,24 @@ class OpenAIService:
                 "vendor_name": "string",
                 "date": "YYYY-MM-DD",
                 "time": "HH:MM or null",
-                "category": "string",
-                "sub_category": "string or null",
+                "category": "string (Must be one of the allowed categories or 'Uncategorized')",
+                "sub_category": "string (Must be one of the allowed subcategories or null)",
+                "category_id": number (ID of the matched category or null),
+                "subcategory_id": number (ID of the matched subcategory or null),
                 "items": [
                     {{
                         "item_name": "string",
                         "quantity": number,
-                        "price": number
+                        "price": number,
+                        "category": "string (Item-level category)",
+                        "subcategory": "string or null",
+                        "is_reimbursable": boolean,
+                        "rejection_reason": "string or null"
                     }}
                 ],
                 "total_bill": number,
                 "tax": number
-            }}
-            """
+            }}"""
             
             response = self.client.chat.completions.create(
                 model=self.model,
@@ -155,6 +210,51 @@ class OpenAIService:
             return {
                 "success": False,
                 "error": f"OpenAI processing error: {str(e)}"
+            }
+    
+    def extract_text_with_vision(self, image_content: str) -> Dict[str, Any]:
+        """
+        Use OpenAI's vision capability (GPT-4o-mini) as a fallback OCR.
+        
+        Args:
+            image_content: Base64 encoded image content
+            
+        Returns:
+            Extracted raw text from the image
+        """
+        try:
+            response = self.client.chat.completions.create(
+                model="gpt-4o-mini",
+                messages=[
+                    {
+                        "role": "user",
+                        "content": [
+                            {"type": "text", "text": "This is a receipt image. Please perform OCR and extract all readable text content exactly as it appears. If it's not a receipt, just extract all text you see regardless."},
+                            {
+                                "type": "image_url",
+                                "image_url": {
+                                    "url": f"data:image/jpeg;base64,{image_content}"
+                                },
+                            },
+                        ],
+                    }
+                ],
+                max_tokens=2000,
+            )
+            
+            extracted_text = response.choices[0].message.content.strip()
+            
+            return {
+                "success": True,
+                "full_text": extracted_text,
+                "raw_response": "OpenAI Vision processing successful"
+            }
+
+        except Exception as e:
+            logger.error(f"❌ OpenAI Vision (OCR Fallback) failed: {str(e)}")
+            return {
+                "success": False,
+                "error": f"OpenAI Vision OCR failed: {str(e)}"
             }
     
     def generate_sql_query(self, natural_language: str, schema_info: str) -> Dict[str, Any]:

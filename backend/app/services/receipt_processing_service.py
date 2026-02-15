@@ -1,20 +1,34 @@
 """
-Receipt processing orchestrator.
-Coordinates Vision OCR and GPT structuring services.
+Receipt processing orchestrator via MCP Server.
+Backend acts as a thin client to the Agentic MCP Server.
 """
 import logging
+import json
+import base64
+import requests
+import os
 from typing import Dict, Any, List, Optional
-
-from app.services.vision_service import extract_text_from_image, VisionServiceError
-from app.services.gpt_service import structure_text_with_openai, extract_text_with_openai_vision, GPTServiceError
+from app.config.settings import settings
 
 logger = logging.getLogger(__name__)
 
+# MCP Server Configuration (should ideally move to settings)
+MCP_SERVER_URL = "http://localhost:8001/api/v1"
 
 class ReceiptProcessingError(Exception):
     """Custom exception for receipt processing errors."""
     pass
 
+def _call_mcp_tool(endpoint: str, payload: Dict[str, Any]) -> Dict[str, Any]:
+    """Helper to call MCP Server tools"""
+    url = f"{MCP_SERVER_URL}{endpoint}"
+    try:
+        response = requests.post(url, json=payload, timeout=60)
+        response.raise_for_status()
+        return response.json()
+    except Exception as e:
+        logger.error(f"MCP Tool call failed ({endpoint}): {str(e)}")
+        raise ReceiptProcessingError(f"MCP Tool call failed: {str(e)}")
 
 def process_receipt(
     image_path: str,
@@ -23,55 +37,41 @@ def process_receipt(
     categories_data: Optional[List[Dict[str, Any]]] = None,
 ) -> Dict[str, Any]:
     """
-    Full pipeline: Extract OCR text from image, then structure it with GPT.
-    
-    Args:
-        image_path: Path to the receipt image file
-        admin_uuid: Optional admin UUID to scope allowed categories/subcategories
-        categories_data: Optional pre-fetched categories/subcategories to avoid extra RPC
-    
-    Returns:
-        Dictionary with keys:
-            - "raw_text": Extracted OCR text
-            - "structured": Structured JSON from GPT
-    
-    Raises:
-        ReceiptProcessingError: If any step fails
+    Agentic Pipeline via MCP Server:
+    The backend now acts as a thin client to the MCP Server which orchestrates the AI logic.
     """
-    # Step 1: Extract text using Azure Document Intelligence
     try:
-        try:
-            from app.services.azure_document_intelligence_service import extract_text_with_azure, AzureDocumentIntelligenceError
-            raw_text = extract_text_with_azure(image_path)
-            logger.info("✅ OCR extraction: Azure Document Intelligence successful")
-        except (AzureDocumentIntelligenceError, ImportError) as e:
-            logger.warning("⚠️ Azure OCR failed: %s. Falling back to OpenAI OCR.", str(e))
-            # Fallback to OpenAI Vision OCR
-            raw_text = extract_text_with_openai_vision(image_path)
-            logger.info("✅ OCR extraction: OpenAI Fallback successful")
+        # Load and encode image
+        with open(image_path, "rb") as image_file:
+            image_content = base64.b64encode(image_file.read()).decode('utf-8')
         
-        if not raw_text:
-            raise ReceiptProcessingError("No text extracted from image. Please ensure the image contains readable text.")
-        
-        # Step 2: Structure text using GPT
-        structured_data = structure_text_with_openai(
-            raw_text,
-            admin_uuid=admin_uuid,
-            categories_data=categories_data,
-        )
-        
-        return {
-            "raw_text": raw_text,
-            "structured": structured_data,
+        # Call the end-to-end agentic tool on MCP
+        payload = {
+            "user_id": admin_uuid or "unknown_user",
+            "file_name": os.path.basename(image_path),
+            "file_content": image_content,
+            "categories": categories_data
         }
         
-    except VisionServiceError as e:
-        raise ReceiptProcessingError(f"OCR extraction failed: {str(e)}")
-    except GPTServiceError as e:
-        raise ReceiptProcessingError(f"Text structuring failed: {str(e)}")
-    except ReceiptProcessingError:
-        raise
+        logger.info("🤖 Calling MCP Agentic Orchestrator")
+        mcp_response = _call_mcp_tool("/ocr/process-receipt-end-to-end", payload)
+        
+        if not mcp_response.get("success"):
+            error = mcp_response.get("error", "Unknown MCP error")
+            logger.error(f"❌ MCP Processing failed: {error}")
+            raise ReceiptProcessingError(error)
+        
+        data = mcp_response.get("data", {})
+        
+        return {
+            "raw_text": data.get("extracted_text", ""),
+            "structured": data.get("structured_data", {}),
+            "ocr_source": data.get("ocr_source", "unknown")
+        }
+        
     except Exception as e:
+        if isinstance(e, ReceiptProcessingError):
+            raise
         error_msg = f"Unexpected error during receipt processing: {str(e)}"
         logger.error("❌ Receipt processing: Unexpected error - %s", error_msg)
         raise ReceiptProcessingError(error_msg)

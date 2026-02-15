@@ -1,8 +1,4 @@
-/**
- * Policy Rules API client for managing reimbursement policies.
- */
-
-const BACKEND_URL = process.env.NEXT_PUBLIC_BACKEND_URL || 'http://localhost:8000';
+import { BACKEND_URL } from '@/lib/config';
 
 export interface PolicyRule {
     rule_id: string;

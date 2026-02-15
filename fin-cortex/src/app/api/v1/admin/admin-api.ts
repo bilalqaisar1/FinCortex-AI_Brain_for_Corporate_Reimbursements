@@ -1,8 +1,4 @@
-/**
- * Admin API client for fetching dashboard stats, pending approvals, and recent activity.
- */
-
-const BACKEND_URL = process.env.NEXT_PUBLIC_BACKEND_URL || 'http://localhost:8000';
+import { BACKEND_URL } from '@/lib/config';
 
 export interface AdminStats {
     company_name?: string;

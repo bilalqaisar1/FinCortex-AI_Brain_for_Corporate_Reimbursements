@@ -11,6 +11,7 @@ class Settings(BaseSettings):
     SUPABASE_URL: str
     SUPABASE_KEY: str  # Using service role key for backend
     SUPABASE_ANON_KEY: Optional[str] = None
+    SUPABASE_JWT_SECRET: str = ""  # JWT secret for token verification
     
     # Google Vision API Configuration
     GOOGLE_VISION_API_KEY: Optional[str] = None
@@ -23,9 +24,13 @@ class Settings(BaseSettings):
     # Database
     DATABASE_URL: str = "sqlite:///./reimbursement.db"
     
+    # Azure Document Intelligence Configuration
+    AZURE_ENDPOINT: Optional[str] = None
+    AZURE_KEY: Optional[str] = None
+    
     # MCP Server
     MCP_SERVER_HOST: str = "0.0.0.0"
-    MCP_SERVER_PORT: int = 8000
+    MCP_SERVER_PORT: int = 8001
     
     # Storage (from your existing settings)
     RECEIPTS_BUCKET: str = "receipts-bucket"

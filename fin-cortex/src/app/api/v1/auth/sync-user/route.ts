@@ -132,14 +132,12 @@ export async function POST(request: Request) {
     let adminId: string | null = null
     if (userTable === 'users') {
       // For users, admin_id comes from their manager (via syncUserProfile or fresh fetch)
-      // syncUserProfile (utils) already tries to inject 'admin_id'
-      // managerInfo (fresh fetch) has 'manager_admin_id'
       adminId = managerInfo?.manager_admin_id || (profile as any).admin_id || null
     } else if (userTable === 'managers') {
       // For managers, admin_id is in their profile as 'manager_admin_id'
-      adminId = (profile as any).manager_admin_id || null
+      adminId = (profile as any).manager_admin_id || (profile as any).admin_id || null
     } else if (userTable === 'admins') {
-      // For admins, their admin_id is their own ID
+      // For admins, their admin_id is their own ID (primary key is admin_id)
       adminId = (profile as any).admin_id || null
     }
 

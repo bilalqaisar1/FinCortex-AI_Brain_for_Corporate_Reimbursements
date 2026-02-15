@@ -2,8 +2,6 @@
 
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
-import { DashboardLayout } from "@/components/dashboard/DashboardLayout";
-import { RouteProtection } from "@/components/auth/RouteProtection";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -145,27 +143,27 @@ export default function CreateManagerPage() {
                 <Button
                     variant="ghost"
                     onClick={() => router.back()}
-                    className="mb-4 hover:bg-slate-100 dark:hover:bg-slate-800"
+                    className="mb-4 hover:bg-[var(--card-hover)] text-[var(--text-muted)] hover:text-[var(--text-primary)]"
                 >
                     <ArrowLeft className="w-4 h-4 mr-2" />
                     Back
                 </Button>
-                <h1 className="text-3xl font-bold text-slate-900 dark:text-slate-100 mb-2">
+                <h1 className="text-3xl font-bold text-[var(--text-primary)] mb-2">
                     Create New Manager
                 </h1>
-                <p className="text-slate-600 dark:text-slate-400">
+                <p className="text-[var(--text-muted)]">
                     Add a new department manager to the system
                 </p>
             </div>
 
             {/* Form Card */}
-            <Card className="bg-white/80 dark:bg-slate-900/80 backdrop-blur-sm border-slate-200 dark:border-slate-700 shadow-lg">
+            <Card className="bg-[var(--card-dark)] border-[var(--border-subtle)] shadow-lg backdrop-blur-sm">
                 <CardHeader>
-                    <CardTitle className="flex items-center">
+                    <CardTitle className="flex items-center text-[var(--text-primary)]">
                         <UserPlus className="w-5 h-5 mr-2 text-blue-600" />
                         Manager Information
                     </CardTitle>
-                    <CardDescription>
+                    <CardDescription className="text-[var(--text-muted)]">
                         Fill in the details to create a new manager account
                     </CardDescription>
                 </CardHeader>
@@ -174,12 +172,12 @@ export default function CreateManagerPage() {
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                             {/* Full Name */}
                             <div className="space-y-2">
-                                <Label htmlFor="full_name" className="text-sm font-medium">
+                                <Label htmlFor="full_name" className="text-sm font-medium text-[var(--text-primary)]">
                                     Full Name <span className="text-red-500">*</span>
                                 </Label>
                                 <div className="relative">
                                     <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                                        <User className="h-5 w-5 text-slate-400" />
+                                        <User className="h-5 w-5 text-[var(--text-muted)]" />
                                     </div>
                                     <Input
                                         id="full_name"
@@ -187,7 +185,7 @@ export default function CreateManagerPage() {
                                         type="text"
                                         value={formData.full_name}
                                         onChange={handleChange}
-                                        className="pl-10 h-12 bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700 text-slate-900 dark:text-slate-100 rounded-xl"
+                                        className="pl-10 h-12 bg-[var(--background-tertiary)] border-[var(--border-medium)] text-[var(--text-primary)] placeholder:text-[var(--text-muted)] rounded-xl focus:border-blue-500/50"
                                         placeholder="Enter full name"
                                         required
                                     />
@@ -196,12 +194,12 @@ export default function CreateManagerPage() {
 
                             {/* Email */}
                             <div className="space-y-2">
-                                <Label htmlFor="email" className="text-sm font-medium">
+                                <Label htmlFor="email" className="text-sm font-medium text-[var(--text-primary)]">
                                     Email Address <span className="text-red-500">*</span>
                                 </Label>
                                 <div className="relative">
                                     <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                                        <Mail className="h-5 w-5 text-slate-400" />
+                                        <Mail className="h-5 w-5 text-[var(--text-muted)]" />
                                     </div>
                                     <Input
                                         id="email"
@@ -209,7 +207,7 @@ export default function CreateManagerPage() {
                                         type="email"
                                         value={formData.email}
                                         onChange={handleChange}
-                                        className="pl-10 h-12 bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700 text-slate-900 dark:text-slate-100 rounded-xl"
+                                        className="pl-10 h-12 bg-[var(--background-tertiary)] border-[var(--border-medium)] text-[var(--text-primary)] placeholder:text-[var(--text-muted)] rounded-xl focus:border-blue-500/50"
                                         placeholder="Enter email address"
                                         required
                                     />
@@ -218,12 +216,12 @@ export default function CreateManagerPage() {
 
                             {/* Employee Code */}
                             <div className="space-y-2">
-                                <Label htmlFor="employee_code" className="text-sm font-medium">
+                                <Label htmlFor="employee_code" className="text-sm font-medium text-[var(--text-primary)]">
                                     Employee Code <span className="text-red-500">*</span>
                                 </Label>
                                 <div className="relative">
                                     <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                                        <Building2 className="h-5 w-5 text-slate-400" />
+                                        <Building2 className="h-5 w-5 text-[var(--text-muted)]" />
                                     </div>
                                     <Input
                                         id="employee_code"
@@ -231,7 +229,7 @@ export default function CreateManagerPage() {
                                         type="text"
                                         value={formData.employee_code}
                                         onChange={handleChange}
-                                        className="pl-10 h-12 bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700 text-slate-900 dark:text-slate-100 rounded-xl"
+                                        className="pl-10 h-12 bg-[var(--background-tertiary)] border-[var(--border-medium)] text-[var(--text-primary)] placeholder:text-[var(--text-muted)] rounded-xl focus:border-blue-500/50"
                                         placeholder="Enter employee code"
                                         required
                                     />
@@ -240,12 +238,12 @@ export default function CreateManagerPage() {
 
                             {/* Phone Number */}
                             <div className="space-y-2">
-                                <Label htmlFor="phone_number" className="text-sm font-medium">
+                                <Label htmlFor="phone_number" className="text-sm font-medium text-[var(--text-primary)]">
                                     Phone Number
                                 </Label>
                                 <div className="relative">
                                     <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                                        <Phone className="h-5 w-5 text-slate-400" />
+                                        <Phone className="h-5 w-5 text-[var(--text-muted)]" />
                                     </div>
                                     <Input
                                         id="phone_number"
@@ -253,7 +251,7 @@ export default function CreateManagerPage() {
                                         type="tel"
                                         value={formData.phone_number}
                                         onChange={handleChange}
-                                        className="pl-10 h-12 bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700 text-slate-900 dark:text-slate-100 rounded-xl"
+                                        className="pl-10 h-12 bg-[var(--background-tertiary)] border-[var(--border-medium)] text-[var(--text-primary)] placeholder:text-[var(--text-muted)] rounded-xl focus:border-blue-500/50"
                                         placeholder="Enter phone number"
                                     />
                                 </div>
@@ -261,19 +259,23 @@ export default function CreateManagerPage() {
 
                             {/* Department */}
                             <div className="space-y-2">
-                                <Label htmlFor="department_id" className="text-sm font-medium">
+                                <Label htmlFor="department_id" className="text-sm font-medium text-[var(--text-primary)]">
                                     Department
                                 </Label>
                                 <Select
                                     onValueChange={(value) => handleSelectChange('department_id', value)}
                                     value={formData.department_id}
                                 >
-                                    <SelectTrigger className="h-12 bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700 rounded-xl">
+                                    <SelectTrigger className="h-12 bg-[var(--background-tertiary)] border-[var(--border-medium)] text-[var(--text-primary)] rounded-xl">
                                         <SelectValue placeholder="Select a department" />
                                     </SelectTrigger>
-                                    <SelectContent>
+                                    <SelectContent className="bg-[var(--card-dark)] border-[var(--border-medium)] text-[var(--text-primary)]">
                                         {departments.map((dept) => (
-                                            <SelectItem key={dept.department_id} value={dept.department_id.toString()}>
+                                            <SelectItem
+                                                key={dept.department_id}
+                                                value={dept.department_id.toString()}
+                                                className="focus:bg-[var(--card-hover)] focus:text-[var(--text-primary)]"
+                                            >
                                                 {dept.department_name}
                                             </SelectItem>
                                         ))}
@@ -283,12 +285,12 @@ export default function CreateManagerPage() {
 
                             {/* Password */}
                             <div className="space-y-2">
-                                <Label htmlFor="password" className="text-sm font-medium">
+                                <Label htmlFor="password" className="text-sm font-medium text-[var(--text-primary)]">
                                     Password <span className="text-red-500">*</span>
                                 </Label>
                                 <div className="relative">
                                     <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                                        <Lock className="h-5 w-5 text-slate-400" />
+                                        <Lock className="h-5 w-5 text-[var(--text-muted)]" />
                                     </div>
                                     <Input
                                         id="password"
@@ -296,32 +298,33 @@ export default function CreateManagerPage() {
                                         type="password"
                                         value={formData.password}
                                         onChange={handleChange}
-                                        className="pl-10 h-12 bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700 text-slate-900 dark:text-slate-100 rounded-xl"
+                                        className="pl-10 h-12 bg-[var(--background-tertiary)] border-[var(--border-medium)] text-[var(--text-primary)] placeholder:text-[var(--text-muted)] rounded-xl focus:border-blue-500/50"
                                         placeholder="Enter password"
                                         required
                                         minLength={8}
                                     />
                                 </div>
-                                <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
+                                <p className="text-xs text-[var(--text-muted)] mt-1">
                                     Must be at least 8 characters long and contain both letters and numbers
                                 </p>
                             </div>
                         </div>
 
                         {/* Form Actions */}
-                        <div className="flex items-center justify-end space-x-4 pt-4 border-t border-slate-200 dark:border-slate-700">
+                        <div className="flex items-center justify-end space-x-4 pt-4 border-t border-[var(--border-subtle)]">
                             <Button
                                 type="button"
                                 variant="outline"
                                 onClick={() => router.back()}
                                 disabled={isLoading}
+                                className="border-[var(--border-medium)] text-[var(--text-primary)] hover:bg-[var(--card-hover)] hover:text-[var(--text-primary)]"
                             >
                                 Cancel
                             </Button>
                             <Button
                                 type="submit"
                                 disabled={isLoading}
-                                className="bg-gradient-to-r from-blue-500 to-purple-600 hover:from-blue-600 hover:to-purple-700 text-white"
+                                className="bg-gradient-to-r from-blue-500 to-purple-600 hover:from-blue-600 hover:to-purple-700 text-white shadow-lg shadow-blue-500/20"
                             >
                                 {isLoading ? "Creating..." : "Create Manager"}
                             </Button>

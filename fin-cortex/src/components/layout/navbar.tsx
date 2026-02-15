@@ -4,142 +4,147 @@ import Link from "next/link";
 import { useState, useEffect } from "react";
 import { useTheme } from "@/hooks/useTheme";
 import { useAuth } from "@/context/AuthContext";
+import { FinCortexLogo } from "@/components/ui/FinCortexLogo";
+import { cn } from "@/lib/utils";
+import { useRef } from "react";
 
 export default function Navbar() {
   const [isScrolled, setIsScrolled] = useState(false);
-  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+  const [activeSection, setActiveSection] = useState("home");
+  const [hoveredSection, setHoveredSection] = useState<string | null>(null);
   const { toggleTheme, themeIcon } = useTheme();
-  const { user, userProfile, signOut } = useAuth();
+  const { user } = useAuth();
 
-  const displayName =
-    userProfile?.full_name ||
-    user?.user_metadata?.full_name ||
-    user?.email?.split("@")[0] ||
-    "Guest";
+  const navContainerRef = useRef<HTMLDivElement>(null);
+  const itemRefs = useRef<{ [key: string]: HTMLAnchorElement | null }>({});
 
-  const userRole = userProfile?.userRole || (userProfile?.employee_code !== undefined ? 'user' : null);
-
-  const getRoleBadge = () => {
-    if (!userRole) return null;
-    const roleColors = {
-      admin: "bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400",
-      manager: "bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-400",
-      user: "bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400",
-    };
-    return (
-      <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${roleColors[userRole as keyof typeof roleColors] || ''}`}>
-        {userRole.charAt(0).toUpperCase() + userRole.slice(1)}
-      </span>
-    );
-  };
+  const navItems = [
+    { label: "HOME", href: "#home" },
+    { label: "JOURNEY", href: "#features" },
+    { label: "PORTFOLIO", href: "#works" },
+    { label: "SERVICES", href: "#solutions" },
+    { label: "ABOUT", href: "#about" },
+    { label: "CONTACT", href: "#contact" },
+  ];
 
   useEffect(() => {
     const handleScroll = () => {
-      setIsScrolled(window.scrollY > 50);
+      setIsScrolled(window.scrollY > 20);
     };
+
+    // Intersection Observer for active section tracking
+    const observerOptions = {
+      root: null,
+      rootMargin: '-20% 0px -70% 0px', // Adjust trigger point
+      threshold: 0
+    };
+
+    const handleIntersect = (entries: IntersectionObserverEntry[]) => {
+      entries.forEach(entry => {
+        if (entry.isIntersecting) {
+          setActiveSection(entry.target.id);
+        }
+      });
+    };
+
+    const observer = new IntersectionObserver(handleIntersect, observerOptions);
+    const sections = ['home', 'features', 'works', 'solutions', 'about', 'reviews', 'contact'];
+    sections.forEach(id => {
+      const el = document.getElementById(id);
+      if (el) observer.observe(el);
+    });
 
     window.addEventListener('scroll', handleScroll);
-    return () => window.removeEventListener('scroll', handleScroll);
-  }, []);
-
-  useEffect(() => {
-    const handleClickOutside = (e: MouseEvent) => {
-      const target = e.target as Element;
-      const mobileToggle = document.getElementById('mobileToggle');
-      const navLinks = document.getElementById('navLinks');
-
-      if (mobileToggle && navLinks && !mobileToggle.contains(target) && !navLinks.contains(target)) {
-        setIsMobileMenuOpen(false);
-      }
+    return () => {
+      window.removeEventListener('scroll', handleScroll);
+      observer.disconnect();
     };
-
-    document.addEventListener('click', handleClickOutside);
-    return () => document.removeEventListener('click', handleClickOutside);
   }, []);
 
-  const handleLinkClick = (e: React.MouseEvent<HTMLAnchorElement>) => {
-    const href = e.currentTarget.getAttribute('href');
-    if (href?.startsWith('#')) {
-      e.preventDefault();
-      const target = document.querySelector(href);
-      if (target) {
-        target.scrollIntoView({
-          behavior: 'smooth',
-          block: 'start'
-        });
-      }
+  const getPillStyles = () => {
+    let targetId = hoveredSection || activeSection;
+    if (!targetId) return { opacity: 0, visibility: "hidden" as const };
+
+    // Map 'reviews' to 'about' since reviews section falls under the ABOUT nav item
+    if (targetId === 'reviews') targetId = 'about';
+    const targetRef = itemRefs.current[targetId];
+    const containerRef = navContainerRef.current;
+
+    if (targetRef && containerRef) {
+      const targetRect = targetRef.getBoundingClientRect();
+      const containerRect = containerRef.getBoundingClientRect();
+
+      return {
+        left: `${targetRect.left - containerRect.left}px`,
+        width: `${targetRect.width}px`,
+        opacity: 1,
+        visibility: "visible" as const,
+      };
     }
-    setIsMobileMenuOpen(false);
+    return { opacity: 0, visibility: "hidden" as const };
   };
 
   return (
-    <nav className={`navbar ${isScrolled ? 'scrolled' : ''}`} id="navbar">
-      <div className="nav-container">
-        <Link href="/" className="logo">
-          Fincortex
+    <nav className={cn(
+      "fixed top-0 right-0 left-0 z-40 transition-all duration-500 px-6 py-4",
+      isScrolled
+        ? "bg-[var(--background-dark)]/80 backdrop-blur-xl border-b border-[var(--border-subtle)] shadow-lg py-3"
+        : "bg-transparent py-6"
+    )}>
+      <div className="max-w-[1600px] mx-auto flex items-center justify-between">
+        {/* Left: Logo */}
+        <Link href="/" className="flex items-center group transition-transform hover:scale-105">
+          <FinCortexLogo size="lg" showText />
         </Link>
 
-        <ul className={`nav-links ${isMobileMenuOpen ? 'active' : ''}`} id="navLinks">
-          <li><a href="#home" onClick={handleLinkClick}>Home</a></li>
-          <li><a href="#features" onClick={handleLinkClick}>Features</a></li>
-          <li><a href="#works" onClick={handleLinkClick}>How It Works</a></li>
-          <li><a href="#solutions" onClick={handleLinkClick}>Solutions</a></li>
-          <li><a href="#about" onClick={handleLinkClick}>About</a></li>
-          <li><a href="#contact" onClick={handleLinkClick}>Contact</a></li>
-        </ul>
+        {/* Center: Nav Links */}
+        <div
+          ref={navContainerRef}
+          className="hidden lg:flex items-center gap-1 bg-[var(--card-dark)] backdrop-blur-md border border-[var(--border-subtle)] rounded-full px-2 py-1 relative"
+          onMouseLeave={() => setHoveredSection(null)}
+        >
+          {/* Active Pill 배경 */}
+          <div
+            className="absolute h-[80%] bg-[var(--text-primary)] rounded-full transition-all duration-300 ease-in-out shadow-[0_0_20px_rgba(165,180,252,0.3)] z-0 top-1/2 -translate-y-1/2"
+            style={getPillStyles()}
+          />
+          {navItems.map((item) => {
+            const sectionId = item.href.replace("#", "");
+            const isActive = sectionId === activeSection || (sectionId === 'about' && activeSection === 'reviews');
+            const isHovered = sectionId === hoveredSection;
 
-        {/* Mobile: Guest centered or User info centered */}
-        {!user || !userProfile ? (
-          <div className="md:hidden absolute left-1/2 -translate-x-1/2 text-sm font-medium text-primary">
-            Guest
-          </div>
-        ) : (
-          <div className="md:hidden absolute left-1/2 -translate-x-1/2 text-center">
-            <div className="text-sm font-medium text-primary">{displayName}</div>
-            {userRole && (
-              <div className="mt-0.5 flex justify-center">{getRoleBadge()}</div>
-            )}
-          </div>
-        )}
-
-        <div className="nav-cta">
-          {user && userProfile ? (
-            <>
-              {/* Desktop: User info (full name + role) */}
-              <div className="hidden md:flex items-center gap-3">
-                <div className="text-right">
-                  <div className="text-sm font-medium text-primary">{displayName}</div>
-                  {userRole && (
-                    <div className="mt-0.5">{getRoleBadge()}</div>
-                  )}
-                </div>
-              </div>
-
-              {/* Mobile: User info (full name + role) */}
-              <div className="md:hidden flex items-center">
-                {/* Already shown in centered position above */}
-              </div>
-            </>
-          ) : (
-            /* Anonymous user: Show "Guest" on desktop right side */
-            <div className="hidden md:block text-sm font-medium text-primary">
-              Guest
-            </div>
-          )}
-          <button className="theme-toggle p-1.5 w-8 h-8 flex items-center justify-center" onClick={toggleTheme}>
-            <div className="theme-icon text-sm">{themeIcon}</div>
-          </button>
+            return (
+              <Link
+                key={item.label}
+                href={item.href}
+                ref={(el) => { itemRefs.current[sectionId] = el; }}
+                onMouseEnter={() => setHoveredSection(sectionId)}
+                className={cn(
+                  "px-6 py-2 text-[10px] font-black transition-all uppercase tracking-[0.2em] rounded-full relative z-10",
+                  (isActive && !hoveredSection) || isHovered ? "text-[var(--background-dark)]" : "text-[var(--text-secondary)] hover:text-[var(--text-primary)]"
+                )}
+              >
+                {item.label}
+              </Link>
+            );
+          })}
         </div>
 
-        <button
-          className={`mobile-toggle ${isMobileMenuOpen ? 'active' : ''}`}
-          id="mobileToggle"
-          onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
-        >
-          <span></span>
-          <span></span>
-          <span></span>
-        </button>
+        {/* Right: Actions */}
+        <div className="flex items-center gap-6">
+          <button
+            onClick={toggleTheme}
+            className="w-10 h-10 rounded-full bg-[var(--card-dark)] border border-[var(--border-subtle)] flex items-center justify-center text-[var(--text-secondary)] hover:text-[var(--text-primary)] transition-colors"
+          >
+            {themeIcon}
+          </button>
+
+          <Link href={user ? "/dashboard" : "/login"}>
+            <button className="group relative px-6 py-2.5 bg-gradient-to-r from-indigo-500 via-purple-500 to-pink-500 rounded-xl font-black text-[10px] uppercase tracking-[0.2em] text-white shadow-[0_0_20px_rgba(168,85,247,0.3)] hover:shadow-[0_0_30px_rgba(168,85,247,0.5)] transition-all duration-300">
+              <span className="relative z-10">{user ? "Dashboard" : "Sign In"}</span>
+            </button>
+          </Link>
+        </div>
       </div>
     </nav>
   );

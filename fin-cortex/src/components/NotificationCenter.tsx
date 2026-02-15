@@ -48,12 +48,8 @@ export function NotificationCenter() {
             setNotifications(data || []);
             setUnreadCount(data?.filter((n: Notification) => !n.is_read).length || 0);
         } catch (error: any) {
-            // Log with more context to help debug transient failures
-            console.error("🚨 Notification fetch failed:", {
-                message: error.message || error,
-                userId: user.id,
-                time: new Date().toISOString()
-            });
+            // Silently handle fetch failures — notifications are non-critical
+            console.warn("Notification fetch skipped:", error.message || "Unknown error");
         } finally {
             setIsLoading(false);
         }

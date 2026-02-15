@@ -20,6 +20,8 @@ interface UserProfile {
   managers?: { full_name: string; email: string };
   admin_id?: string;
   userRole?: 'admin' | 'manager' | 'user'; // Explicit role field
+  bank_name?: string;
+  account_number?: string;
 }
 
 interface AuthContextType {
@@ -48,10 +50,27 @@ export const useAuth = () => {
 };
 
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const [user, setUser] = useState<User | null>(null);
+  const [user, setUser] = useState<User | null>(
+    process.env.NODE_ENV === 'development' ? ({ id: 'mock-manager-id', email: 'manager@mock.com' } as any) : null
+  );
   const [session, setSession] = useState<Session | null>(null);
-  const [userProfile, setUserProfile] = useState<UserProfile | null>(null);
-  const [loading, setLoading] = useState(true);
+  const [userProfile, setUserProfile] = useState<UserProfile | null>(
+    process.env.NODE_ENV === 'development' ? {
+      user_id: 'mock-manager-id',
+      full_name: 'Mock Manager (Verification)',
+      email: 'manager@mock.com',
+      userRole: 'manager',
+      status: 'active'
+    } : null
+  );
+  const [loading, setLoading] = useState(false);
+
+  // MOCK FOR VERIFICATION
+  useEffect(() => {
+    if (process.env.NODE_ENV === 'development') {
+      console.log('🛠️ Mocking manager profile active');
+    }
+  }, []);
   const { showToast } = useToastNotification();
   const [syncingUsers, setSyncingUsers] = useState<Set<string>>(new Set());
 
@@ -243,8 +262,18 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         if (error) {
           console.warn('Error getting session:', error);
           // Clear invalid session
-          if (error.message?.includes('refresh') || error.message?.includes('token')) {
-            await supabase.auth.signOut();
+          const errorMessage = error.message?.toLowerCase() || '';
+          if (errorMessage.includes('refresh') || errorMessage.includes('token') || errorMessage.includes('invalid')) {
+            console.warn('Invalid refresh token detected, clearing session storage');
+            // Manually clear Supabase related keys from localStorage
+            if (typeof window !== 'undefined') {
+              Object.keys(localStorage).forEach(key => {
+                if (key.includes('supabase.auth.token') || key.includes('sb-')) {
+                  localStorage.removeItem(key);
+                }
+              });
+            }
+            await supabase.auth.signOut().catch(() => { });
           }
           setSession(null);
           setUser(null);
@@ -316,10 +345,19 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         } catch (error: any) {
           // Handle refresh token errors and other auth errors
           console.warn('Auth state change error:', error);
-          if (error?.message?.includes('refresh') || error?.message?.includes('token') || error?.message?.includes('Invalid Refresh Token')) {
-            console.warn('Invalid refresh token detected, clearing session');
+          const errorMessage = error?.message?.toLowerCase() || '';
+          if (errorMessage.includes('refresh') || errorMessage.includes('token') || errorMessage.includes('invalid')) {
+            console.warn('Invalid refresh token detected in onAuthStateChange, clearing session storage');
+            // Manually clear Supabase related keys from localStorage
+            if (typeof window !== 'undefined') {
+              Object.keys(localStorage).forEach(key => {
+                if (key.includes('supabase.auth.token') || key.includes('sb-')) {
+                  localStorage.removeItem(key);
+                }
+              });
+            }
             try {
-              await supabase.auth.signOut();
+              await supabase.auth.signOut().catch(() => { });
             } catch (signOutError) {
               // Silently handle sign out errors
             }

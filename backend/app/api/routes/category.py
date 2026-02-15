@@ -230,3 +230,120 @@ async def create_subcategory(request: CreateSubcategoryRequest) -> Dict[str, Any
         logger.error("📤 POST /subcategories - Error response: status_code=500, detail='%s'", error_msg)
         raise HTTPException(status_code=500, detail=error_msg) from exc
 
+
+@router.get("/categories")
+async def get_categories(company_id: Optional[int] = None) -> Dict[str, Any]:
+    """
+    Fetch all categories and their subcategories.
+    Optionally filter by company_id.
+    """
+    try:
+        supabase = get_supabase_client()
+        
+        query = supabase.table("expense_categories").select("*, subcategories:expense_subcategories(*)")
+        
+        if company_id:
+            query = query.eq("company_id", company_id)
+            
+        result = query.execute()
+        
+        return {
+            "success": True,
+            "data": result.data
+        }
+    except Exception as e:
+        logger.error(f"Failed to fetch categories: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.delete("/categories/{category_id}")
+async def delete_category(category_id: int) -> Dict[str, Any]:
+    """
+    Delete a category by ID.
+    Cleans up all referencing tables before deleting.
+    """
+    try:
+        supabase = get_supabase_client()
+        
+        # 1. Nullify subcategory_id in reimbursements for all subcategories of this category
+        # First get subcategory IDs
+        subcats = supabase.table("expense_subcategories").select("subcategory_id").eq("category_id", category_id).execute()
+        if subcats.data:
+            subcat_ids = [s['subcategory_id'] for s in subcats.data]
+            supabase.table("reimbursements").update({"subcategory_id": None}).in_("subcategory_id", subcat_ids).execute()
+            
+            # Also delete rules for these subcategories
+            supabase.table("reimbursement_rules").delete().in_("subcategory_id", subcat_ids).execute()
+
+        # 2. Nullify category_id in reimbursements
+        supabase.table("reimbursements").update({"category_id": None}).eq("category_id", category_id).execute()
+
+        # 3. Delete rules for this category
+        supabase.table("reimbursement_rules").delete().eq("category_id", category_id).execute()
+
+        # 4. Nullify category_id in company_budgets (FK: company_budgets_category_id_fkey)
+        try:
+            supabase.table("company_budgets").update({"category_id": None}).eq("category_id", category_id).execute()
+        except Exception as budget_err:
+            logger.warning(f"Could not nullify company_budgets.category_id: {budget_err}")
+            # Try deleting budget rows referencing this category as a fallback
+            try:
+                supabase.table("company_budgets").delete().eq("category_id", category_id).execute()
+            except Exception as budget_del_err:
+                logger.warning(f"Could not delete company_budgets rows: {budget_del_err}")
+
+        # 5. Delete subcategories
+        supabase.table("expense_subcategories").delete().eq("category_id", category_id).execute()
+        
+        # 6. Delete the category
+        result = supabase.table("expense_categories").delete().eq("category_id", category_id).execute()
+        
+        if not result.data:
+             return {
+                "success": False,
+                "message": "Category not found or already deleted"
+            }
+
+        return {
+            "success": True,
+            "message": "Category deleted successfully"
+        }
+    except Exception as e:
+        error_str = str(e)
+        logger.error(f"Failed to delete category: {e}")
+        # Detect foreign key violations and return a friendlier message
+        if "foreign key" in error_str.lower() or "23503" in error_str:
+            raise HTTPException(
+                status_code=409,
+                detail="This category cannot be deleted because it is still referenced by other records (e.g., budgets or claims). Please remove those references first."
+            )
+        raise HTTPException(status_code=500, detail=error_str)
+
+
+@router.delete("/subcategories/{subcategory_id}")
+async def delete_subcategory(subcategory_id: int) -> Dict[str, Any]:
+    """
+    Delete a subcategory by ID.
+    """
+    try:
+        supabase = get_supabase_client()
+
+        # 1. Nullify subcategory_id in reimbursements
+        supabase.table("reimbursements").update({"subcategory_id": None}).eq("subcategory_id", subcategory_id).execute()
+
+        # 2. Delete rules for this subcategory
+        supabase.table("reimbursement_rules").delete().eq("subcategory_id", subcategory_id).execute()
+
+        # 3. Delete subcategory
+        result = supabase.table("expense_subcategories").delete().eq("subcategory_id", subcategory_id).execute()
+        
+        if not result.data:
+             raise HTTPException(status_code=404, detail="Subcategory not found")
+
+        return {
+            "success": True,
+            "message": "Subcategory deleted successfully"
+        }
+    except Exception as e:
+        logger.error(f"Failed to delete subcategory: {e}")
+        raise HTTPException(status_code=500, detail=str(e))

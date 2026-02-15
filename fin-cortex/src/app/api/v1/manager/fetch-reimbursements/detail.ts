@@ -3,8 +3,7 @@
  */
 
 import { ReimbursementDetailResponse } from '@/types/reimbursement-detail';
-
-const BACKEND_URL = process.env.NEXT_PUBLIC_BACKEND_URL || 'http://localhost:8000';
+import { BACKEND_URL } from '@/lib/config';
 
 /**
  * Fetch full details of a specific reimbursement

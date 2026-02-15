@@ -46,22 +46,22 @@ export function PageHeader({
   className,
 }: PageHeaderProps) {
   return (
-    <div className={cn("mb-8", className)}>
+    <div className={cn("mb-12", className)}>
       {/* Breadcrumbs */}
       {breadcrumbs.length > 0 && (
-        <div className="flex items-center space-x-2 text-sm text-slate-600 dark:text-slate-400 mb-4">
+        <div className="flex items-center space-x-3 text-[10px] font-black uppercase tracking-[0.2em] text-[var(--text-muted)] mb-6">
           {breadcrumbs.map((item, index) => (
-            <div key={index} className="flex items-center space-x-2">
-              {index > 0 && <ChevronRight className="w-4 h-4 text-slate-600 dark:text-slate-400" />}
+            <div key={index} className="flex items-center space-x-3">
+              {index > 0 && <span className="text-[var(--text-muted)] opacity-30">/</span>}
               {item.href ? (
-                <Link 
-                  href={item.href} 
-                  className="hover:text-blue-600 dark:hover:text-blue-400 transition-colors"
+                <Link
+                  href={item.href}
+                  className="hover:text-[var(--text-primary)] transition-colors"
                 >
                   {item.label}
                 </Link>
               ) : (
-                <span className="text-slate-900 dark:text-slate-100 font-medium">{item.label}</span>
+                <span className="text-purple-400">{item.label}</span>
               )}
             </div>
           ))}
@@ -69,50 +69,49 @@ export function PageHeader({
       )}
 
       {/* Header Content */}
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between">
-        <div className="flex items-center space-x-3 mb-4 sm:mb-0">
+      <div className="flex flex-col sm:flex-row sm:items-end sm:justify-between gap-6">
+        <div className="flex items-center space-x-6">
           {showBackButton && (
-            <Link href={backButtonHref} className="mr-4">
-              <Button 
-                variant="outline" 
-                size="sm" 
-                className="hover:bg-blue-50 hover:border-blue-200 transition-colors"
+            <Link href={backButtonHref} className="mr-2">
+              <Button
+                variant="outline"
+                size="icon"
+                className="rounded-full bg-[var(--card-dark)] border-[var(--border-subtle)] hover:bg-[var(--card-hover)]"
               >
-                <ArrowLeft className="w-4 h-4 mr-2" />
-                {backButtonLabel}
+                <ArrowLeft className="w-4 h-4" />
               </Button>
             </Link>
           )}
-          
+
           {Icon && (
             <div className={cn(
-              "w-12 h-12 rounded-xl flex items-center justify-center shadow-lg",
-              iconBgColor
+              "w-16 h-16 rounded-2xl flex items-center justify-center shadow-2xl shadow-purple-500/20 bg-gradient-to-br from-[#6366f1] via-[#a855f7] to-[#ec4899] relative overflow-hidden group"
             )}>
-              <Icon className={cn("w-6 h-6", iconColor)} />
+              <div className="absolute inset-0 bg-white/10 opacity-0 group-hover:opacity-100 transition-opacity" />
+              <Icon className="w-8 h-8 text-white relative z-10" />
             </div>
           )}
-          
+
           <div className="flex-1 min-w-0">
-            <div className="flex items-center space-x-3 flex-wrap">
-              <h1 className="text-2xl sm:text-3xl font-bold text-slate-900 dark:text-slate-100 truncate">{title}</h1>
+            <div className="flex items-center gap-4 flex-wrap mb-1">
+              <h1 className="text-4xl font-black text-[var(--text-primary)] uppercase tracking-tighter leading-none">{title}</h1>
               {badge && (
-                <Badge 
+                <Badge
                   variant={badge.variant || "secondary"}
-                  className={cn("text-xs sm:text-sm", badge.className)}
+                  className={cn("bg-[var(--card-dark)] text-purple-400 border-[var(--border-subtle)] text-[10px] uppercase font-black tracking-widest px-3 py-1", badge.className)}
                 >
                   {badge.text}
                 </Badge>
               )}
             </div>
             {description && (
-              <p className="text-sm sm:text-base text-slate-600 dark:text-slate-400 mt-1 line-clamp-2">{description}</p>
+              <p className="text-sm font-medium text-[var(--text-muted)] uppercase tracking-widest">{description}</p>
             )}
           </div>
         </div>
-        
+
         {actions && (
-          <div className="flex items-center space-x-3">
+          <div className="flex items-center gap-4">
             {actions}
           </div>
         )}

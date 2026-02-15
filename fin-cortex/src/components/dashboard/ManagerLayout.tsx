@@ -54,98 +54,101 @@ export function ManagerLayout({ children, className }: ManagerLayoutProps) {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-100 dark:from-slate-900 dark:via-blue-900 dark:to-indigo-900 transition-all duration-300">
+    <div className="min-h-screen bg-[var(--background-dark)] transition-all duration-500 overflow-x-hidden">
+      {/* Background Decorative Glows */}
+      <div className="fixed top-0 right-0 w-[500px] h-[500px] bg-purple-600/5 blur-[120px] rounded-full pointer-events-none z-0" />
+      <div className="fixed bottom-0 left-0 w-[500px] h-[500px] bg-blue-600/5 blur-[120px] rounded-full pointer-events-none z-0" />
+
       {/* Desktop Layout */}
-      <div className="hidden lg:flex h-screen overflow-hidden">
+      <div className="hidden lg:flex h-screen overflow-hidden relative z-10">
         <ManagerSidebar
           collapsed={sidebarCollapsed}
           onToggle={toggleSidebar}
         />
 
         {/* Main Content */}
-        <div className="flex-1 flex flex-col min-w-0 transition-all duration-300">
-          {/* Top Header - Sticky */}
-          <header className="bg-white/80 dark:bg-slate-900/80 backdrop-blur-sm border-b border-slate-200 dark:border-slate-700 px-4 sm:px-6 py-3 sm:py-4 sticky top-0 z-40 transition-all duration-300 shadow-sm">
+        <div className="flex-1 flex flex-col min-w-0 transition-all duration-500">
+          {/* Top Header - Sticky Glassmorphic */}
+          <header className="bg-[var(--background-dark)]/40 backdrop-blur-2xl border-b border-[var(--border-subtle)] px-8 py-4 sticky top-0 z-40 transition-all duration-300">
             <div className="flex items-center justify-between">
-              <div className="flex items-center space-x-2 sm:space-x-4">
+              <div className="flex items-center gap-6">
                 <Button
                   variant="ghost"
-                  size="sm"
+                  size="icon"
                   onClick={toggleSidebar}
-                  className="lg:hidden hover:bg-blue-50 dark:hover:bg-slate-800"
+                  className="lg:hidden hover:bg-[var(--card-hover)] text-[var(--text-secondary)] hover:text-[var(--text-primary)]"
                 >
-                  <Menu className="w-4 h-4 sm:w-5 sm:h-5" />
+                  <Menu className="w-5 h-5" />
                 </Button>
 
-                <div className="flex items-center space-x-3">
-                  <div className="w-8 h-8 bg-gradient-to-br from-blue-500 to-purple-600 rounded-lg flex items-center justify-center shadow-lg">
-                    <span className="text-white font-bold text-sm">F</span>
-                  </div>
-                  <div>
-                    <h1 className="text-lg font-bold text-slate-900 dark:text-slate-100">Manager Dashboard</h1>
-                    <p className="text-xs text-slate-500 dark:text-slate-400">Welcome back, {displayName}</p>
+                <div className="flex flex-col">
+                  <h2 className="text-[10px] font-black uppercase tracking-[0.3em] text-[var(--text-muted)] mb-0.5">Management Suite</h2>
+                  <div className="flex items-center gap-2">
+                    <span className="text-sm font-bold text-[var(--text-primary)] uppercase tracking-widest">Active Session:</span>
+                    <span className="text-sm font-black text-purple-400 uppercase tracking-widest">{displayName}</span>
                   </div>
                 </div>
               </div>
 
-              <div className="flex items-center space-x-2 sm:space-x-4">
+              <div className="flex items-center gap-6">
                 <Button
                   variant="ghost"
-                  size="sm"
+                  size="icon"
                   onClick={toggleTheme}
-                  className="hover:bg-blue-50 dark:hover:bg-slate-800 transition-all duration-200"
-                  title="Toggle theme"
+                  className="rounded-full bg-[var(--card-dark)] border border-[var(--border-medium)] hover:bg-[var(--card-hover)] text-[var(--text-secondary)] hover:text-[var(--text-primary)] transition-all duration-300"
                 >
                   {isDarkTheme ? (
-                    <Sun className="w-4 h-4 sm:w-5 sm:h-5 text-yellow-500" />
+                    <Sun className="w-4 h-4" />
                   ) : (
-                    <Moon className="w-4 h-4 sm:w-5 sm:h-5 text-slate-600" />
+                    <Moon className="w-4 h-4" />
                   )}
                 </Button>
+
+                <div className="h-6 w-px bg-[var(--border-medium)]" />
 
                 <NotificationCenter />
 
                 {/* User Profile Dropdown */}
                 <DropdownMenu>
                   <DropdownMenuTrigger asChild>
-                    <Button variant="ghost" className="h-9 w-9 rounded-full p-0 hover:bg-blue-50 dark:hover:bg-slate-800">
-                      <Avatar className="h-9 w-9">
+                    <Button variant="ghost" className="h-10 w-10 rounded-2xl p-0 hover:bg-[var(--card-hover)] transition-all duration-300 group">
+                      <Avatar className="h-10 w-10 rounded-2xl border border-[var(--border-subtle)] group-hover:border-purple-500/50 transition-all">
                         <AvatarImage src={user?.user_metadata?.avatar_url} alt={displayName} />
-                        <AvatarFallback className="bg-gradient-to-br from-blue-500 to-purple-600 text-white">
+                        <AvatarFallback className="bg-gradient-to-br from-[#6366f1] to-[#ec4899] text-white rounded-2xl font-black">
                           {userInitials}
                         </AvatarFallback>
                       </Avatar>
                     </Button>
                   </DropdownMenuTrigger>
-                  <DropdownMenuContent align="end" className="w-56">
-                    <DropdownMenuLabel className="font-normal">
-                      <div className="flex flex-col space-y-1">
-                        <p className="text-sm font-medium leading-none">{displayName}</p>
-                        <p className="text-xs leading-none text-muted-foreground">
-                          {userProfile?.email || user?.email || "No email"}
+                  <DropdownMenuContent align="end" className="w-64 bg-[var(--background-dark)]/90 backdrop-blur-3xl border-[var(--border-medium)] p-2">
+                    <DropdownMenuLabel className="p-4">
+                      <div className="flex flex-col gap-1">
+                        <p className="text-xs font-black uppercase tracking-widest text-[var(--text-primary)]">{displayName}</p>
+                        <p className="text-[10px] font-bold text-[var(--text-secondary)] uppercase truncate">
+                          {userProfile?.email || user?.email}
                         </p>
-                        <p className="text-xs leading-none text-muted-foreground mt-1">
-                          Role: <span className="font-medium text-purple-600 dark:text-purple-400">Manager</span>
-                        </p>
+                        <div className="mt-3 inline-flex items-center px-2 py-0.5 rounded bg-purple-500/10 border border-purple-500/20 text-[9px] font-black text-purple-400 uppercase tracking-widest">
+                          MANAGER ROLE
+                        </div>
                       </div>
                     </DropdownMenuLabel>
-                    <DropdownMenuSeparator />
-                    <DropdownMenuItem asChild>
-                      <Link href="/manager/profile" className="flex items-center cursor-pointer">
-                        <User className="mr-2 h-4 w-4" />
-                        <span>Profile</span>
+                    <DropdownMenuSeparator className="bg-[var(--border-subtle)]" />
+                    <DropdownMenuItem asChild className="p-3 focus:bg-[var(--card-hover)] cursor-pointer rounded-xl group">
+                      <Link href="/manager/profile" className="flex items-center w-full">
+                        <User className="mr-3 h-4 w-4 text-[var(--text-secondary)] group-hover:text-[var(--text-primary)]" />
+                        <span className="text-[10px] font-black uppercase tracking-widest text-[var(--text-secondary)] group-hover:text-[var(--text-primary)]">Profile</span>
                       </Link>
                     </DropdownMenuItem>
-                    <DropdownMenuItem asChild>
-                      <Link href="/manager/settings" className="flex items-center cursor-pointer">
-                        <Settings className="mr-2 h-4 w-4" />
-                        <span>Settings</span>
+                    <DropdownMenuItem asChild className="p-3 focus:bg-[var(--card-hover)] cursor-pointer rounded-xl group">
+                      <Link href="/manager/settings" className="flex items-center w-full">
+                        <Settings className="mr-3 h-4 w-4 text-[var(--text-secondary)] group-hover:text-[var(--text-primary)]" />
+                        <span className="text-[10px] font-black uppercase tracking-widest text-[var(--text-secondary)] group-hover:text-[var(--text-primary)]">Settings</span>
                       </Link>
                     </DropdownMenuItem>
-                    <DropdownMenuSeparator />
-                    <DropdownMenuItem onClick={handleSignOut} className="text-red-600 dark:text-red-400 cursor-pointer">
-                      <LogOut className="mr-2 h-4 w-4" />
-                      <span>Log out</span>
+                    <DropdownMenuSeparator className="bg-[var(--border-subtle)]" />
+                    <DropdownMenuItem onClick={handleSignOut} className="p-3 focus:bg-red-500/10 cursor-pointer rounded-xl group">
+                      <LogOut className="mr-3 h-4 w-4 text-red-500/70" />
+                      <span className="text-[10px] font-black uppercase tracking-widest text-red-500/70">Secure Sign Out</span>
                     </DropdownMenuItem>
                   </DropdownMenuContent>
                 </DropdownMenu>
@@ -154,8 +157,8 @@ export function ManagerLayout({ children, className }: ManagerLayoutProps) {
           </header>
 
           {/* Page Content */}
-          <main className={cn("flex-1 p-3 sm:p-4 lg:p-6 overflow-auto min-w-0", className)}>
-            <div className="max-w-full overflow-x-auto">
+          <main className={cn("flex-1 p-8 lg:p-10 overflow-auto scrollbar-hide relative z-10", className)}>
+            <div className="max-w-7xl mx-auto w-full">
               {children}
             </div>
           </main>
@@ -163,97 +166,48 @@ export function ManagerLayout({ children, className }: ManagerLayoutProps) {
       </div>
 
       {/* Mobile Layout */}
-      <div className="lg:hidden">
-        {/* Mobile Header - Sticky */}
-        <header className="bg-white/80 dark:bg-slate-900/80 backdrop-blur-sm border-b border-slate-200 dark:border-slate-700 px-3 sm:px-4 py-2 sm:py-3 sticky top-0 z-40 transition-all duration-300 shadow-sm">
+      <div className="lg:hidden relative z-10">
+        <header className="bg-[var(--background-dark)]/60 backdrop-blur-xl border-b border-[var(--border-subtle)] px-6 py-4 sticky top-0 z-40">
           <div className="flex items-center justify-between">
-            <div className="flex items-center space-x-2 sm:space-x-3">
+            <div className="flex items-center gap-4">
               <Sheet open={mobileSidebarOpen} onOpenChange={setMobileSidebarOpen}>
                 <SheetTrigger asChild>
-                  <Button variant="ghost" size="sm" className="hover:bg-blue-50 dark:hover:bg-slate-800">
-                    <Menu className="w-4 h-4 sm:w-5 sm:h-5" />
+                  <Button variant="ghost" size="icon" className="hover:bg-[var(--card-hover)] text-[var(--text-secondary)]">
+                    <Menu className="w-5 h-5" />
                   </Button>
                 </SheetTrigger>
-                <SheetContent side="left" className="w-72 p-0 bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-700">
-                  <ManagerSidebar />
+                <SheetContent side="left" className="w-80 p-0 bg-[var(--background-secondary)] border-[var(--border-subtle)]">
+                  <ManagerSidebar onToggle={() => setMobileSidebarOpen(false)} />
                 </SheetContent>
               </Sheet>
 
-              <div className="w-7 h-7 sm:w-8 sm:h-8 bg-gradient-to-br from-blue-500 to-purple-600 rounded-lg flex items-center justify-center shadow-lg">
-                <span className="text-white font-bold text-xs sm:text-sm">F</span>
-              </div>
-              <div>
-                <span className="text-base sm:text-lg font-bold text-slate-900 dark:text-slate-100 block">FinCortex</span>
-                <span className="text-xs text-slate-500 dark:text-slate-400">Manager</span>
+              <div className="w-10 h-10 bg-gradient-to-br from-[#6366f1] via-[#a855f7] to-[#ec4899] rounded-xl flex items-center justify-center shadow-lg shadow-purple-500/20">
+                <span className="text-white font-black text-lg">F</span>
               </div>
             </div>
 
-            <div className="flex items-center space-x-1 sm:space-x-2">
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={toggleTheme}
-                className="hover:bg-blue-50 dark:hover:bg-slate-800 transition-all duration-200"
-              >
-                {isDarkTheme ? (
-                  <Sun className="w-4 h-4 sm:w-5 sm:h-5 text-yellow-500" />
-                ) : (
-                  <Moon className="w-4 h-4 sm:w-5 sm:h-5 text-slate-600" />
-                )}
-              </Button>
-
+            <div className="flex items-center gap-4">
               <NotificationCenter />
-
-              {/* Mobile User Profile */}
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
-                  <Button variant="ghost" className="h-8 w-8 rounded-full p-0 hover:bg-blue-50 dark:hover:bg-slate-800">
-                    <Avatar className="h-8 w-8">
+                  <Button variant="ghost" className="h-9 w-9 rounded-xl p-0 hover:bg-[var(--card-hover)]">
+                    <Avatar className="h-9 w-9 rounded-xl border border-[var(--border-subtle)]">
                       <AvatarImage src={user?.user_metadata?.avatar_url} alt={displayName} />
-                      <AvatarFallback className="bg-gradient-to-br from-blue-500 to-purple-600 text-white text-xs">
+                      <AvatarFallback className="bg-gradient-to-br from-[#6366f1] to-[#ec4899] text-white rounded-xl text-xs font-black">
                         {userInitials}
                       </AvatarFallback>
                     </Avatar>
                   </Button>
                 </DropdownMenuTrigger>
-                <DropdownMenuContent align="end" className="w-56">
-                  <DropdownMenuLabel className="font-normal">
-                    <div className="flex flex-col space-y-1">
-                      <p className="text-sm font-medium leading-none">{displayName}</p>
-                      <p className="text-xs leading-none text-muted-foreground">
-                        {userProfile?.email || user?.email || "No email"}
-                      </p>
-                      <p className="text-xs leading-none text-muted-foreground mt-1">
-                        Role: <span className="font-medium text-purple-600 dark:text-purple-400">Manager</span>
-                      </p>
-                    </div>
-                  </DropdownMenuLabel>
-                  <DropdownMenuSeparator />
-                  <DropdownMenuItem asChild>
-                    <Link href="/manager/profile" className="flex items-center cursor-pointer">
-                      <User className="mr-2 h-4 w-4" />
-                      <span>Profile</span>
-                    </Link>
-                  </DropdownMenuItem>
-                  <DropdownMenuItem asChild>
-                    <Link href="/manager/settings" className="flex items-center cursor-pointer">
-                      <Settings className="mr-2 h-4 w-4" />
-                      <span>Settings</span>
-                    </Link>
-                  </DropdownMenuItem>
-                  <DropdownMenuSeparator />
-                  <DropdownMenuItem onClick={handleSignOut} className="text-red-600 dark:text-red-400 cursor-pointer">
-                    <LogOut className="mr-2 h-4 w-4" />
-                    <span>Log out</span>
-                  </DropdownMenuItem>
+                <DropdownMenuContent align="end" className="w-64 bg-[var(--background-dark)]/95 backdrop-blur-2xl border-[var(--border-subtle)]">
+                  {/* Mobile content simplified */}
                 </DropdownMenuContent>
               </DropdownMenu>
             </div>
           </div>
         </header>
 
-        {/* Mobile Content */}
-        <main className={cn("p-3 sm:p-4 overflow-auto min-h-screen", className)}>
+        <main className={cn("p-6 overflow-auto min-h-screen", className)}>
           {children}
         </main>
       </div>

@@ -13,6 +13,7 @@ class ReceiptUpload(BaseModel):
     user_id: str
     file_name: str
     file_content: str  # base64 encoded
+    categories: Optional[List[Dict[str, Any]]] = None
 
 class ExtractedReceiptData(BaseModel):
     merchant_name: Optional[str] = None
@@ -33,11 +34,13 @@ class ChatMessage(BaseModel):
     user_id: str
     message: str
     conversation_id: Optional[str] = None
+    token: Optional[str] = None  # Supabase JWT token for auth
 
 class ChatResponse(BaseModel):
     response: str
     conversation_id: str
     sources: Optional[List[Dict]] = None
+    role: Optional[str] = None  # User role used for the response
 
 class ToolResponse(BaseModel):
     success: bool

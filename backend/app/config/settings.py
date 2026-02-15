@@ -15,6 +15,9 @@ class Settings(BaseSettings):
     supabase_service_role_key: str
     supabase_anon_key: str
     
+    # Database (Alchemy)
+    database_url: Optional[str] = None
+    
     # Google Vision API Configuration
     google_vision_api_key: Optional[str] = None
     vision_api_url: Optional[str] = None

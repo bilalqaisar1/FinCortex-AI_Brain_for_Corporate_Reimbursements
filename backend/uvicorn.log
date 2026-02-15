@@ -1,0 +1,22 @@
+nohup: ignoring input
+INFO:     Will watch for changes in these directories: ['/home/ubuntu/Desktop/FinCortex-AI_Brain_for_Corporate_Reimbursements/backend']
+INFO:     Uvicorn running on http://0.0.0.0:8000 (Press CTRL+C to quit)
+INFO:     Started reloader process [25242] using WatchFiles
+Email service disabled: RESEND_API_KEY not configured
+INFO:     Started server process [25244]
+INFO:     Waiting for application startup.
+INFO:     Application startup complete.
+WARNING:  WatchFiles detected changes in 'app/api/routes/admin.py', 'test_analytics.py'. Reloading...
+INFO:     Shutting down
+INFO:     Waiting for application shutdown.
+INFO:     Application shutdown complete.
+INFO:     Finished server process [25244]
+WARNING:  WatchFiles detected changes in 'app/api/routes/admin.py'. Reloading...
+Email service disabled: RESEND_API_KEY not configured
+INFO:     Started server process [25316]
+INFO:     Waiting for application startup.
+INFO:     Application startup complete.
+Email service disabled: RESEND_API_KEY not configured
+INFO:     Started server process [25354]
+INFO:     Waiting for application startup.
+INFO:     Application startup complete.

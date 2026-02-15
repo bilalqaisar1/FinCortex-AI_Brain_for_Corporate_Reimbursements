@@ -2,11 +2,13 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { 
+import {
   BudgetOverview,
-  PageHeader
+  PageHeader,
+  CategoriesManager
 } from "@/components/dashboard";
-import { DollarSign } from "lucide-react";
+import { DollarSign, Tag, Calculator } from "lucide-react";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
 export default function BudgetPage() {
   const router = useRouter();
@@ -26,14 +28,12 @@ export default function BudgetPage() {
   return (
     <div className="w-full max-w-full overflow-hidden">
       <PageHeader
-        title="Budget Management"
-        description="Monitor budget utilization and manage financial allocations across companies"
+        title="BUDGET MANAGEMENT"
+        description="Manage company budgets and department allocations"
         icon={DollarSign}
-        iconColor="text-green-600"
-        iconBgColor="bg-green-100"
         actions={
           <div className="flex items-center space-x-2">
-            <button 
+            <button
               onClick={() => router.back()}
               className="px-3 py-2 text-sm text-slate-600 hover:text-slate-900 dark:text-slate-400 dark:hover:text-slate-100"
             >
@@ -43,10 +43,35 @@ export default function BudgetPage() {
         }
       />
 
-      <BudgetOverview
-        onViewDetails={handleViewDetails}
-        onAddBudget={handleAddBudget}
-      />
+      <Tabs defaultValue="budget" className="w-full">
+        <TabsList className="bg-white/[0.02] border border-white/5 p-1 mb-8">
+          <TabsTrigger
+            value="budget"
+            className="data-[state=active]:bg-purple-500 data-[state=active]:text-white text-[10px] font-black uppercase tracking-widest px-6"
+          >
+            <Calculator className="w-3.5 h-3.5 mr-2" />
+            Budget Allocation
+          </TabsTrigger>
+          <TabsTrigger
+            value="categories"
+            className="data-[state=active]:bg-blue-500 data-[state=active]:text-white text-[10px] font-black uppercase tracking-widest px-6"
+          >
+            <Tag className="w-3.5 h-3.5 mr-2" />
+            Expense Categories
+          </TabsTrigger>
+        </TabsList>
+
+        <TabsContent value="budget" className="mt-0 outline-none animate-in fade-in duration-500">
+          <BudgetOverview
+            onViewDetails={handleViewDetails}
+            onAddBudget={handleAddBudget}
+          />
+        </TabsContent>
+
+        <TabsContent value="categories" className="mt-0 outline-none animate-in fade-in duration-500">
+          <CategoriesManager />
+        </TabsContent>
+      </Tabs>
     </div>
   );
 }

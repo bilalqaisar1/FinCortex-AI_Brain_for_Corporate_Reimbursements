@@ -24,15 +24,10 @@ import {
 } from "@/components/ui/select";
 import { useToastNotification } from "@/hooks/useToastNotification";
 import { useAuth } from "@/context/AuthContext";
+import { BACKEND_URL, getApiUrl } from "@/lib/config";
 
-const BACKEND_BASE_URL = process.env.NEXT_PUBLIC_BACKEND_URL
-  ? process.env.NEXT_PUBLIC_BACKEND_URL.replace(/\/$/, "")
-  : typeof window !== "undefined"
-    ? `${window.location.protocol}//${window.location.hostname}:8000`
-    : null;
-
-const RECEIPT_UPLOAD_ENDPOINT = BACKEND_BASE_URL ? `${BACKEND_BASE_URL}/api/v1/receipt/upload` : null;
-const RECEIPT_CODE_ENDPOINT = BACKEND_BASE_URL ? `${BACKEND_BASE_URL}/api/v1/receipt-code/generate` : null;
+const RECEIPT_UPLOAD_ENDPOINT = getApiUrl('/api/v1/receipt/upload');
+const RECEIPT_CODE_ENDPOINT = getApiUrl('/api/v1/receipt-code/generate');
 
 interface ExpenseFormProps {
   isDarkTheme: boolean;
@@ -47,7 +42,7 @@ interface FormData {
   address: string;
   totalAmount: string;
   invoiceNumber: string;
-  items: Array<{ item: string; price: string; quantity: string; category?: string; subcategory?: string; reimbursable?: boolean }>;
+  items: Array<{ item: string; price: string; quantity: string; category?: string; subcategory?: string; reimbursable?: boolean; rejection_reason?: string | null }>;
   receiptType: string;
   vendorType: string;
   description: string;
@@ -67,7 +62,7 @@ interface OCRData {
   Date?: string;
   Categories?: string | string[];
   Subcategories?: string | string[];
-  items?: Array<{ item: string; price: string; quantity?: string; category?: string; subcategory?: string; category_id?: number | null; subcategory_id?: number | null; reimbursable?: boolean }>;
+  items?: Array<{ item: string; price: string; quantity?: string; category?: string; subcategory?: string; category_id?: number | null; subcategory_id?: number | null; reimbursable?: boolean; rejection_reason?: string | null }>;
   Address?: string;
   "Total Amount"?: string;
   "Invoice Number"?: string;
@@ -88,7 +83,7 @@ const ExpenseForm: React.FC<ExpenseFormProps> = ({ isDarkTheme }) => {
     address: "",
     totalAmount: "",
     invoiceNumber: "",
-    items: [{ item: "", price: "", quantity: "", category: "", subcategory: "", reimbursable: true }],
+    items: [{ item: "", price: "", quantity: "", category: "", subcategory: "", reimbursable: true, rejection_reason: null }],
     receiptType: "",
     vendorType: "",
     description: "",
@@ -107,14 +102,18 @@ const ExpenseForm: React.FC<ExpenseFormProps> = ({ isDarkTheme }) => {
   // Derived read-only category/subcategory from GPT/OCR; shown on form (read-only)
   const detectedCategory = React.useMemo(() => {
     if (!ocrStructured) return "";
-    const cat = (ocrStructured as any)?.Categories;
+    const data = ocrStructured as any;
+    // Check both CamelCase/PascalCase (old) and snake_case (new)
+    const cat = data?.Categories || data?.category;
     if (Array.isArray(cat)) return cat.filter(Boolean).join(", ");
     return cat ? String(cat) : "";
   }, [ocrStructured]);
 
   const detectedSubcategory = React.useMemo(() => {
     if (!ocrStructured) return "";
-    const sub = (ocrStructured as any)?.Subcategories;
+    const data = ocrStructured as any;
+    // Check both CamelCase/PascalCase (old) and snake_case (new)
+    const sub = data?.Subcategories || data?.sub_category || data?.subcategory;
     if (Array.isArray(sub)) return sub.filter(Boolean).join(", ");
     return sub ? String(sub) : "";
   }, [ocrStructured]);
@@ -230,48 +229,52 @@ const ExpenseForm: React.FC<ExpenseFormProps> = ({ isDarkTheme }) => {
       // First, update non-async fields
       setFormData((prev) => {
         const updated = { ...prev };
+        const data = ocrData as any; // Cast to any to handle flexible key access
 
-        // Vendor Name
-        if (ocrData["Vendor Name"]) {
-          updated.vendorName = String(ocrData["Vendor Name"]).trim();
+        // Vendor Name - check both Title Case and snake_case
+        if (data["Vendor Name"] || data.vendor_name) {
+          updated.vendorName = String(data["Vendor Name"] || data.vendor_name).trim();
         }
 
         // Date - improved parsing
-        if (ocrData.Date) {
-          const parsedDate = parseDate(String(ocrData.Date));
+        if (data.Date || data.date) {
+          const parsedDate = parseDate(String(data.Date || data.date));
           if (parsedDate) {
             updated.date = parsedDate;
           }
         }
 
         // Address
-        if (ocrData.Address) {
-          updated.address = String(ocrData.Address).trim();
+        if (data.Address || data.address) {
+          updated.address = String(data.Address || data.address).trim();
         }
 
         // Total Amount - improved parsing
-        if (ocrData["Total Amount"]) {
-          const parsedAmount = parseAmount(String(ocrData["Total Amount"]));
+        // Check "Total Amount" (old) or "total_bill" (new) or "total_amount"
+        if (data["Total Amount"] || data.total_bill || data.total_amount) {
+          const amountVal = data["Total Amount"] || data.total_bill || data.total_amount;
+          const parsedAmount = parseAmount(String(amountVal));
           if (parsedAmount) {
             updated.totalAmount = parsedAmount;
           }
         }
 
         // Invoice Number
-        if (ocrData["Invoice Number"]) {
-          updated.invoiceNumber = String(ocrData["Invoice Number"]).trim();
+        if (data["Invoice Number"] || data.invoice_number) {
+          updated.invoiceNumber = String(data["Invoice Number"] || data.invoice_number).trim();
         }
 
         // Items - improved parsing with per-item category
-        if (ocrData.items && Array.isArray(ocrData.items) && ocrData.items.length > 0) {
-          updated.items = ocrData.items.map((item: any) => ({
-            item: String(item.item || "").trim(),
+        if (data.items && Array.isArray(data.items) && data.items.length > 0) {
+          updated.items = data.items.map((item: any) => ({
+            item: String(item.item || item.item_name || "").trim(),
             price: parseAmount(String(item.price || "")),
             quantity: item.quantity ? String(item.quantity).trim() : "1",
             category: String(item.category || "").trim(),
             subcategory: String(item.subcategory || "").trim(),
-            reimbursable: item.reimbursable !== false,
-          })).filter((item) => item.item || item.price); // Remove empty items
+            reimbursable: item.is_reimbursable !== undefined ? item.is_reimbursable : (item.reimbursable !== false),
+            rejection_reason: item.rejection_reason || null,
+          })).filter((item: any) => item.item || item.price); // Remove empty items
         }
 
         return updated;
@@ -383,7 +386,7 @@ const ExpenseForm: React.FC<ExpenseFormProps> = ({ isDarkTheme }) => {
   const addItemRow = () => {
     setFormData((prev) => ({
       ...prev,
-      items: [...prev.items, { item: "", price: "", quantity: "", category: "", subcategory: "", reimbursable: true }],
+      items: [...prev.items, { item: "", price: "", quantity: "", category: "", subcategory: "", reimbursable: true, rejection_reason: null }],
     }));
   };
 
@@ -432,7 +435,7 @@ const ExpenseForm: React.FC<ExpenseFormProps> = ({ isDarkTheme }) => {
       return;
     }
 
-    if (!BACKEND_BASE_URL) {
+    if (!BACKEND_URL) {
       showToast("error", "Configuration Error", "Backend URL not configured");
       return;
     }
@@ -485,7 +488,7 @@ const ExpenseForm: React.FC<ExpenseFormProps> = ({ isDarkTheme }) => {
         formPayload.append("ocr_structured", JSON.stringify(ocrStructured));
       }
 
-      const response = await fetch(`${BACKEND_BASE_URL}/api/v1/reimbursements`, {
+      const response = await fetch(`${BACKEND_URL}/api/v1/reimbursements`, {
         method: "POST",
         body: formPayload,
       });
@@ -812,16 +815,17 @@ const ExpenseForm: React.FC<ExpenseFormProps> = ({ isDarkTheme }) => {
                 <LayoutGrid className="size-4 text-primary/70" />
                 <Label className="text-sm font-bold text-primary">Itemized Breakdown</Label>
               </div>
-              <Button
-                type="button"
-                variant="outline"
-                size="sm"
-                onClick={addItemRow}
-                className="h-8 gap-1.5 border-primary/20 hover:bg-primary/5 text-primary"
-              >
-                <Plus className="size-3.5" />
-                Add Item
-              </Button>
+              <div className="flex items-center gap-1 text-[10px] text-[var(--text-muted)] font-black uppercase tracking-widest">
+                <span className="opacity-50">Missing an item?</span>
+                <button
+                  type="button"
+                  onClick={addItemRow}
+                  className="text-primary hover:text-white transition-colors flex items-center gap-1"
+                >
+                  <Plus className="size-2.5" />
+                  <span>Manually Insert Item</span>
+                </button>
+              </div>
             </div>
 
             {/* Reimbursable Items */}
@@ -968,7 +972,7 @@ const ExpenseForm: React.FC<ExpenseFormProps> = ({ isDarkTheme }) => {
                       <div className="flex items-center gap-2 flex-wrap">
                         <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-medium bg-red-500/10 text-red-400 border border-red-500/20">
                           <Ban className="size-2.5" />
-                          {item.category || "Not categorized"} — Not Allowed
+                          {item.rejection_reason || `${item.category || "Not categorized"} — Not Allowed`}
                         </span>
                       </div>
                     </div>

@@ -1,4 +1,4 @@
-# 🧠 FinCortex - AI Brain for Corporate Reimbursements
+# 🧠 FinCortex — AI Brain for Corporate Reimbursements
 
 <div align="center">
 
@@ -8,10 +8,11 @@
 ![Supabase](https://img.shields.io/badge/Supabase-Database-3ECF8E?style=for-the-badge&logo=supabase)
 ![TypeScript](https://img.shields.io/badge/TypeScript-5.x-3178C6?style=for-the-badge&logo=typescript)
 ![Python](https://img.shields.io/badge/Python-3.11+-3776AB?style=for-the-badge&logo=python&logoColor=white)
+![Azure](https://img.shields.io/badge/Azure-Document%20AI-0078D4?style=for-the-badge&logo=microsoftazure)
 
 **An intelligent, AI-powered corporate reimbursement management system that streamlines expense claims, automates policy enforcement, and provides real-time analytics for modern enterprises.**
 
-[Problem Statement](#-problem-statement) • [Solution](#-our-solution) • [Features](#-features) • [User Roles](#-user-roles--workflows) • [Architecture](#-architecture) • [Getting Started](#-getting-started) • [API Documentation](#-api-documentation)
+[Problem Statement](#-problem-statement) • [Solution](#-our-solution) • [Features](#-key-features) • [User Roles](#-user-roles--workflows) • [Architecture](#-system-architecture) • [Getting Started](#-getting-started) • [Deployment](#-server-deployment) • [API Docs](#-api-documentation)
 
 </div>
 
@@ -27,9 +28,9 @@
 - [Database Schema](#-database-schema)
 - [Tech Stack](#-tech-stack)
 - [Getting Started](#-getting-started)
+- [Server Deployment](#-server-deployment)
 - [API Documentation](#-api-documentation)
 - [Security Features](#-security-features)
-- [Deployment](#-deployment)
 - [Contributing](#-contributing)
 
 ---
@@ -38,49 +39,65 @@
 
 Corporate expense reimbursement is a critical business process that often suffers from:
 
-- **Manual Processing**: Paper-based receipts and manual data entry lead to errors and delays
-- **Policy Violations**: Employees unknowingly submit claims that violate company policies
-- **Approval Bottlenecks**: Managers struggle to review and approve claims efficiently
-- **Lack of Visibility**: Finance teams have no real-time view of expense patterns and budget utilization
-- **Fraud Risk**: Traditional systems fail to detect duplicate or fraudulent claims
-- **Poor User Experience**: Employees face complex, time-consuming submission processes
+- **Manual Processing** — Paper-based receipts and manual data entry lead to errors and delays
+- **Policy Violations** — Employees unknowingly submit claims that violate company policies
+- **Approval Bottlenecks** — Managers struggle to review and approve claims efficiently
+- **Lack of Visibility** — Finance teams have no real-time view of expense patterns and budget utilization
+- **Fraud Risk** — Traditional systems fail to detect duplicate or fraudulent claims
+- **Poor User Experience** — Employees face complex, time-consuming submission processes
 
 ---
 
 ## 💡 Our Solution
 
-**FinCortex** is an end-to-end AI-powered reimbursement management platform that transforms how organizations handle expense claims:
+**FinCortex** is an end-to-end AI-powered reimbursement management platform that transforms how organizations handle expense claims.
 
 ### 🤖 Intelligent Automation
-- **OCR Receipt Processing**: Upload a receipt photo, and our AI automatically extracts vendor, amount, date, and category
-- **Smart Policy Engine**: Claims are automatically validated against configurable company policies before submission
-- **Fraud Detection**: Machine learning algorithms flag suspicious patterns like duplicate receipts or unusual amounts
+- **Dual OCR Engine** — Azure Document Intelligence (primary) with OpenAI Vision fallback for reliable receipt processing
+- **GPT-Powered Structuring** — Extracts vendor, amount, date, individual items with per-item categorization, and identifies non-reimbursable items (alcohol, tobacco, etc.)
+- **Smart Policy Engine** — Claims are automatically validated against configurable company policies before submission
+- **Fraud Detection** — Algorithms flag suspicious patterns like duplicate receipts, unusual amounts, or velocity checks
 
 ### 🚀 Streamlined Workflows
-- **One-Click Approvals**: Managers can approve or reject claims directly from their dashboard
-- **Real-time Notifications**: All stakeholders receive instant updates on claim status changes
-- **Mobile-Friendly**: Submit and manage claims from any device
+- **One-Click Approvals** — Managers approve/reject claims directly from their dashboard
+- **Real-time Notifications** — All stakeholders receive instant in-app alerts on claim status changes
+- **Itemized Breakdown** — Items are auto-grouped into reimbursable vs. non-reimbursable with per-item category badges
+- **Invoice Generation** — Post-submission invoice page with PDF download for record-keeping
 
 ### 📊 Actionable Insights
-- **Dynamic Dashboards**: Role-specific views with real-time KPIs and analytics
-- **Budget Tracking**: Monitor spending against allocated budgets in real-time
-- **Trend Analysis**: Identify spending patterns across departments, categories, and time periods
+- **Dynamic Dashboards** — Role-specific views with real-time KPIs and analytics
+- **Budget Tracking** — Monitor spending against allocated budgets by company, department, and category
+- **Trend Analysis** — Period-based analytics (7d, 30d, 90d, 1y) with spending patterns across departments and categories
+- **Data Export** — Download reports in CSV/Excel for external reporting
 
 ---
 
 ## 🌟 Key Features
 
-### 1. Claim Management
+### 1. AI-Powered Receipt Processing
 
 | Feature | Description |
 |---------|-------------|
-| **Quick Submission** | Submit claims in under 30 seconds with receipt upload |
-| **OCR Processing** | Automatic extraction of receipt data (amount, vendor, date) |
-| **Category Assignment** | AI-suggested expense categories with manual override |
-| **Status Tracking** | Real-time tracking from submission to reimbursement |
-| **Claim History** | Complete historical view with search and filters |
+| **Azure Document Intelligence** | Primary OCR engine using Microsoft's `prebuilt-layout` model for high-accuracy text extraction |
+| **OpenAI Vision Fallback** | Automatic fallback to GPT-4o Vision if Azure fails or is unconfigured |
+| **GPT Text Structuring** | Converts raw OCR text into structured JSON — vendor, date, items, amounts, categories |
+| **Per-Item Categorization** | Each item gets its own expense category, subcategory, and reimbursable flag |
+| **Non-Reimbursable Detection** | AI flags items like alcohol, tobacco, personal entertainment as non-reimbursable |
+| **Smart Price Correction** | Detects and fixes OCR errors like missing decimals or extra zeros |
 
-### 2. Policy Engine
+### 2. Expense Claim Management
+
+| Feature | Description |
+|---------|-------------|
+| **Quick Submission** | Upload receipt → AI auto-fills everything → review → submit in under 30 seconds |
+| **Itemized Breakdown** | Visual grouping of reimbursable (green) and non-reimbursable (red, strikethrough) items |
+| **Reimbursable Total** | Calculated total excluding non-reimbursable items (displayed in PKR) |
+| **Category Badges** | Per-item category and subcategory badges for clear cost tracking |
+| **Invoice Page** | Post-submission invoice with full employee, organization, and expense details |
+| **PDF Download** | Print-optimized invoice for downloading as PDF |
+| **Claim History** | Searchable, filterable history with status tracking |
+
+### 3. Policy Engine
 
 | Feature | Description |
 |---------|-------------|
@@ -88,37 +105,38 @@ Corporate expense reimbursement is a critical business process that often suffer
 | **Daily Claim Limits** | Restrict number of claims per user per day |
 | **Monthly Budgets** | Enforce monthly spending limits by department |
 | **Restricted Keywords** | Flag claims with specific keywords for review |
-| **Auto-Enforcement** | Policies checked automatically before submission |
+| **Auto-Enforcement** | Policies checked automatically before submission with violation flags |
 
-### 3. Budget Management
-
-| Feature | Description |
-|---------|-------------|
-| **Company Budgets** | Allocate budgets at company level |
-| **Real-time Utilization** | Track spending against budget in real-time |
-| **Dynamic Calculations** | Used amounts calculated from approved claims |
-| **Add Funds** | Admins can add funds to existing budgets |
-| **Visual Progress** | Progress bars show budget utilization percentage |
-
-### 4. Analytics & Reporting
+### 4. Budget Management
 
 | Feature | Description |
 |---------|-------------|
-| **Period Filtering** | View analytics for 7 days, 30 days, 90 days, or 1 year |
+| **Company-Level Budgets** | Allocate budgets at company, department, and category levels |
+| **Real-time Utilization** | Track spending against budget with dynamic progress bars |
+| **Add Funds / Top-Up** | Admins can add funds to existing budgets |
+| **Category Budgets** | Per-category budget allocation and tracking |
+| **Department Scoping** | Optional department-specific budget constraints |
+
+### 5. Analytics & Reporting
+
+| Feature | Description |
+|---------|-------------|
+| **Period Filtering** | Analytics for 7 days, 30 days, 90 days, or 1 year |
 | **Status Breakdown** | Pie charts showing approved/pending/rejected ratios |
-| **Category Analysis** | Identify top expense categories |
-| **Department Insights** | Track spending by department |
-| **Trend Comparisons** | Compare current period with previous periods |
-| **Export Reports** | Download analytics data for external reporting |
+| **Category Analysis** | Top expense categories with amount breakdowns |
+| **Department Insights** | Spending distribution by department |
+| **Trend Comparisons** | Monthly and weekly trend percentages |
+| **Data Export** | CSV/Excel export for external reporting |
 
-### 5. Notifications
+### 6. Notifications & Alerts
 
 | Feature | Description |
 |---------|-------------|
-| **In-App Alerts** | Real-time notifications within the application |
-| **Status Updates** | Notified when claims are approved/rejected |
+| **In-App Notifications** | Real-time notification center with unread count badge |
+| **Status Updates** | Instant alerts when claims are approved/rejected |
 | **Action Required** | Managers notified of pending approvals |
-| **Read/Unread Tracking** | Mark notifications as read |
+| **Email Notifications** | Automated email alerts for critical actions |
+| **Read/Unread Tracking** | Mark as read with visual indicators |
 
 ---
 
@@ -128,18 +146,20 @@ Corporate expense reimbursement is a critical business process that often suffer
 
 **Primary Functions:**
 - Submit new reimbursement claims
-- Upload receipt images for OCR processing
+- Upload receipt images for AI-powered OCR processing
+- Review auto-filled itemized breakdown with category assignments
 - Track claim status and history
-- View personal spending analytics
+- Download post-submission invoices as PDF
 
 **Workflow:**
 ```
 1. Login → User Dashboard
-2. Click "New Claim" → Fill expense details
-3. Upload receipt → AI extracts data
-4. Review & Submit → Claim sent to manager
-5. Receive notification → Claim approved/rejected
-6. View reimbursement status in history
+2. Click "New Claim" → Select receipt/vendor type
+3. Upload receipt → AI extracts and categorizes all items
+4. Review items → Reimbursable vs Non-Reimbursable grouped
+5. Verify details & Submit → Redirected to Invoice page
+6. Download/Print Invoice → Back to dashboard
+7. Receive notification → Claim approved/rejected
 ```
 
 **Dashboard Features:**
@@ -154,18 +174,18 @@ Corporate expense reimbursement is a critical business process that often suffer
 ### 👔 Manager
 
 **Primary Functions:**
-- Review and approve/reject team claims
+- Review and approve/reject team claims with one click
+- View claim details with receipt images
 - Monitor team spending and patterns
 - View team analytics and performance
-- Manage team member claims
 
 **Workflow:**
 ```
 1. Login → Manager Dashboard
-2. View Pending Claims section
-3. Click claim → View details with receipt
+2. View "Pending Claims" section
+3. Click claim → View full details with receipt
 4. Approve/Reject with optional comments
-5. Employee receives notification
+5. Employee receives instant notification
 6. View team analytics for insights
 ```
 
@@ -175,7 +195,8 @@ Corporate expense reimbursement is a critical business process that often suffer
 - Total Amount processed
 - Team Performance metrics
 - Monthly Trend analysis
-- Top Categories/Spenders
+- Top Categories / Spenders
+- Team Budget overview
 
 ---
 
@@ -185,17 +206,17 @@ Corporate expense reimbursement is a critical business process that often suffer
 - Manage company settings and budgets
 - Create and configure policy rules
 - Monitor organization-wide analytics
-- Manage manager accounts
-- Handle policy violations
+- Manage manager accounts and departments
+- Handle policy violations and flagged claims
 
 **Workflow:**
 ```
 1. Login → Admin Dashboard
 2. View organization-wide KPIs
-3. Manage Budgets → Add/Edit company budgets
+3. Manage Budgets → Add/Edit company and category budgets
 4. Configure Policy Rules → Set limits and restrictions
 5. Review Violations → Handle flagged claims
-6. Analyze → Comprehensive reporting
+6. Analyze → Comprehensive reporting with export
 ```
 
 **Dashboard Features:**
@@ -205,59 +226,72 @@ Corporate expense reimbursement is a critical business process that often suffer
 - Policy Violations count
 - Quick Analytics with period selection
 - Claims Status Breakdown
-- Top Category/Department insights
+- Top Category / Department insights
 
 ---
 
 ## 🏗 System Architecture
 
 ```
-┌─────────────────────────────────────────────────────────────────┐
-│                        CLIENT LAYER                              │
-│  ┌─────────────────────────────────────────────────────────┐    │
-│  │              Next.js 15 Frontend (React 19)              │    │
-│  │  ┌─────────┐  ┌─────────┐  ┌─────────┐  ┌─────────┐    │    │
-│  │  │  User   │  │ Manager │  │  Admin  │  │  Auth   │    │    │
-│  │  │Dashboard│  │Dashboard│  │Dashboard│  │ Context │    │    │
-│  │  └─────────┘  └─────────┘  └─────────┘  └─────────┘    │    │
-│  └─────────────────────────────────────────────────────────┘    │
-└─────────────────────────────────────────────────────────────────┘
-                              │
-                              ▼
-┌─────────────────────────────────────────────────────────────────┐
-│                        API LAYER                                 │
-│  ┌─────────────────────────────────────────────────────────┐    │
-│  │                 FastAPI Backend (Python)                 │    │
-│  │  ┌──────────┐  ┌──────────┐  ┌──────────┐  ┌─────────┐ │    │
-│  │  │Reimburse-│  │  Admin   │  │  Policy  │  │ Notifi- │ │    │
-│  │  │  ments   │  │  Routes  │  │  Rules   │  │ cations │ │    │
-│  │  └──────────┘  └──────────┘  └──────────┘  └─────────┘ │    │
-│  │  ┌──────────┐  ┌──────────┐  ┌──────────┐  ┌─────────┐ │    │
-│  │  │  Budget  │  │  Export  │  │  OCR     │  │  Fraud  │ │    │
-│  │  │ Service  │  │ Service  │  │ Service  │  │Detection│ │    │
-│  │  └──────────┘  └──────────┘  └──────────┘  └─────────┘ │    │
-│  └─────────────────────────────────────────────────────────┘    │
-└─────────────────────────────────────────────────────────────────┘
-                              │
-                              ▼
-┌─────────────────────────────────────────────────────────────────┐
-│                      DATA LAYER                                  │
-│  ┌─────────────────────────────────────────────────────────┐    │
-│  │                 Supabase (PostgreSQL)                    │    │
-│  │  ┌──────────┐  ┌──────────┐  ┌──────────┐  ┌─────────┐ │    │
-│  │  │  users   │  │ managers │  │companies │  │ budgets │ │    │
-│  │  └──────────┘  └──────────┘  └──────────┘  └─────────┘ │    │
-│  │  ┌──────────┐  ┌──────────┐  ┌──────────┐  ┌─────────┐ │    │
-│  │  │reimburse-│  │ policy_  │  │ notifi-  │  │categories│ │    │
-│  │  │  ments   │  │  rules   │  │ cations  │  │         │ │    │
-│  │  └──────────┘  └──────────┘  └──────────┘  └─────────┘ │    │
-│  │                                                         │    │
-│  │  ┌─────────────────────────────────────────────────┐   │    │
-│  │  │              Supabase Storage                    │   │    │
-│  │  │         (Receipt Images & Documents)             │   │    │
-│  │  └─────────────────────────────────────────────────┘   │    │
-│  └─────────────────────────────────────────────────────────┘    │
-└─────────────────────────────────────────────────────────────────┘
+┌───────────────────────────────────────────────────────────────────────┐
+│                          CLIENT LAYER                                 │
+│  ┌───────────────────────────────────────────────────────────────┐   │
+│  │                Next.js 15 Frontend (React 19)                 │   │
+│  │  ┌──────────┐  ┌──────────┐  ┌──────────┐  ┌──────────────┐  │   │
+│  │  │   User   │  │ Manager  │  │  Admin   │  │   Auth       │  │   │
+│  │  │Dashboard │  │Dashboard │  │Dashboard │  │  Context     │  │   │
+│  │  └──────────┘  └──────────┘  └──────────┘  └──────────────┘  │   │
+│  │  ┌──────────┐  ┌──────────┐  ┌──────────┐  ┌──────────────┐  │   │
+│  │  │ Expense  │  │ Invoice  │  │ Notifi-  │  │  Budget /    │  │   │
+│  │  │  Form    │  │  Page    │  │ cations  │  │  Analytics   │  │   │
+│  │  └──────────┘  └──────────┘  └──────────┘  └──────────────┘  │   │
+│  └───────────────────────────────────────────────────────────────┘   │
+└───────────────────────────────────────────────────────────────────────┘
+                                │
+                                ▼
+┌───────────────────────────────────────────────────────────────────────┐
+│                           API LAYER                                   │
+│  ┌───────────────────────────────────────────────────────────────┐   │
+│  │                  FastAPI Backend (Python)                      │   │
+│  │  ┌──────────┐  ┌──────────┐  ┌──────────┐  ┌──────────────┐  │   │
+│  │  │Reimburse │  │  Admin   │  │  Budget  │  │   Policy     │  │   │
+│  │  │  ments   │  │  Routes  │  │  Routes  │  │   Rules      │  │   │
+│  │  └──────────┘  └──────────┘  └──────────┘  └──────────────┘  │   │
+│  │  ┌──────────┐  ┌──────────┐  ┌──────────┐  ┌──────────────┐  │   │
+│  │  │ Receipt  │  │   GPT    │  │  Fraud   │  │   Email      │  │   │
+│  │  │Processing│  │ Service  │  │Detection │  │  Service     │  │   │
+│  │  └──────────┘  └──────────┘  └──────────┘  └──────────────┘  │   │
+│  └───────────────────────────────────────────────────────────────┘   │
+└───────────────────────────────────────────────────────────────────────┘
+                                │
+                                ▼
+┌───────────────────────────────────────────────────────────────────────┐
+│                       AI / OCR LAYER                                  │
+│  ┌────────────────────────┐  ┌────────────────────────────────────┐  │
+│  │  Azure Document        │  │   OpenAI GPT-4o                   │  │
+│  │  Intelligence (Primary)│  │   Text Structuring + Vision       │  │
+│  │  prebuilt-layout model │  │   Fallback OCR                    │  │
+│  └────────────────────────┘  └────────────────────────────────────┘  │
+└───────────────────────────────────────────────────────────────────────┘
+                                │
+                                ▼
+┌───────────────────────────────────────────────────────────────────────┐
+│                         DATA LAYER                                    │
+│  ┌───────────────────────────────────────────────────────────────┐   │
+│  │                  Supabase (PostgreSQL)                         │   │
+│  │  ┌──────────┐  ┌──────────┐  ┌──────────┐  ┌──────────────┐  │   │
+│  │  │  users   │  │companies │  │reimburse │  │   budgets    │  │   │
+│  │  └──────────┘  └──────────┘  │  ments   │  └──────────────┘  │   │
+│  │  ┌──────────┐  ┌──────────┐  └──────────┘  ┌──────────────┐  │   │
+│  │  │ managers │  │policy_   │  ┌──────────┐  │  categories  │  │   │
+│  │  │          │  │  rules   │  │notifica- │  │  departments │  │   │
+│  │  └──────────┘  └──────────┘  │  tions   │  └──────────────┘  │   │
+│  │                              └──────────┘                     │   │
+│  │  ┌─────────────────────────────────────────────────────────┐  │   │
+│  │  │           Supabase Storage (Receipt Images)              │  │   │
+│  │  └─────────────────────────────────────────────────────────┘  │   │
+│  └───────────────────────────────────────────────────────────────┘   │
+└───────────────────────────────────────────────────────────────────────┘
 ```
 
 ### Project Structure
@@ -265,81 +299,103 @@ Corporate expense reimbursement is a critical business process that often suffer
 ```
 FinCortex-AI_Brain_for_Corporate_Reimbursements/
 │
-├── 📁 fin-cortex/                    # Frontend Application
+├── 📁 fin-cortex/                         # Frontend (Next.js 15)
 │   ├── 📁 src/
-│   │   ├── 📁 app/                   # Next.js App Router
-│   │   │   ├── 📁 admin/             # Admin pages
-│   │   │   │   ├── page.tsx          # Admin dashboard
-│   │   │   │   ├── layout.tsx        # Admin layout wrapper
-│   │   │   │   ├── 📁 analytics/     # Analytics page
-│   │   │   │   ├── 📁 budget/        # Budget management
-│   │   │   │   ├── 📁 policy-rules/  # Policy configuration
-│   │   │   │   ├── 📁 users/         # Manager management
-│   │   │   │   └── 📁 violations/    # Policy violations
+│   │   ├── 📁 app/
+│   │   │   ├── 📁 admin/                 # Admin dashboard & pages
+│   │   │   │   ├── page.tsx              # Dashboard with KPIs
+│   │   │   │   ├── 📁 analytics/         # Organization analytics
+│   │   │   │   ├── 📁 budget/            # Budget management
+│   │   │   │   ├── 📁 policy-rules/      # Policy configuration
+│   │   │   │   ├── 📁 users/             # Manager management
+│   │   │   │   └── 📁 violations/        # Policy violations
 │   │   │   │
-│   │   │   ├── 📁 manager/           # Manager pages
-│   │   │   │   ├── page.tsx          # Manager dashboard
-│   │   │   │   ├── 📁 analytics/     # Team analytics
-│   │   │   │   └── 📁 reimbursements/# Claim details
+│   │   │   ├── 📁 manager/               # Manager dashboard & pages
+│   │   │   │   ├── page.tsx              # Dashboard with team claims
+│   │   │   │   ├── 📁 analytics/         # Team analytics
+│   │   │   │   ├── 📁 approvals/         # Approval management
+│   │   │   │   ├── 📁 budget/            # Team budget view
+│   │   │   │   ├── 📁 reimbursements/    # Claim details & view
+│   │   │   │   └── 📁 users/             # Team member management
 │   │   │   │
-│   │   │   ├── 📁 user/              # Employee pages
-│   │   │   │   ├── 📁 dashboard/     # User dashboard
-│   │   │   │   ├── 📁 claims/        # Claim submission & history
-│   │   │   │   └── 📁 profile/       # User profile
+│   │   │   ├── 📁 user/                  # Employee pages
+│   │   │   │   ├── 📁 dashboard/         # User dashboard
+│   │   │   │   ├── 📁 claims/
+│   │   │   │   │   ├── 📁 new/           # Submit new claim (ExpenseForm)
+│   │   │   │   │   ├── 📁 history/       # Claim history
+│   │   │   │   │   └── 📁 invoice/[id]/  # Post-submission invoice
+│   │   │   │   └── 📁 profile/           # User profile
 │   │   │   │
-│   │   │   └── 📁 api/v1/            # API client functions
-│   │   │       └── 📁 admin/         # Admin API clients
+│   │   │   ├── 📁 api/v1/               # Next.js API route handlers
+│   │   │   ├── 📁 components/forms/      # ExpenseForm component
+│   │   │   ├── 📁 login/                # Login page
+│   │   │   ├── 📁 signup/               # Registration page
+│   │   │   └── 📁 forgot-password/      # Password reset flow
 │   │   │
-│   │   ├── 📁 components/            # Reusable Components
-│   │   │   ├── 📁 dashboard/         # Dashboard components
+│   │   ├── 📁 components/               # Shared components
+│   │   │   ├── 📁 dashboard/            # 19 dashboard components
 │   │   │   │   ├── AdminSidebar.tsx
-│   │   │   │   ├── ManagerSidebar.tsx
+│   │   │   │   ├── ManagerSidebar.tsx / ManagerLayout.tsx
 │   │   │   │   ├── UserNavbar.tsx
 │   │   │   │   ├── BudgetOverview.tsx
-│   │   │   │   └── QuickAnalytics.tsx
-│   │   │   └── 📁 ui/                # shadcn/ui components
+│   │   │   │   ├── QuickAnalytics.tsx
+│   │   │   │   ├── PolicyViolations.tsx
+│   │   │   │   ├── PendingApprovals.tsx
+│   │   │   │   ├── UserManagement.tsx
+│   │   │   │   ├── Charts.tsx / DataTable.tsx
+│   │   │   │   └── StatsCard.tsx / FilterPanel.tsx
+│   │   │   ├── 📁 ui/                   # 25 shadcn/ui components
+│   │   │   ├── NotificationCenter.tsx
+│   │   │   └── LogoLoop.tsx / TypeWriter.tsx
 │   │   │
-│   │   ├── 📁 context/               # React Context
-│   │   │   └── AuthContext.tsx       # Authentication state
-│   │   │
-│   │   └── 📁 lib/                   # Utilities
-│   │       ├── supabase/             # Supabase client
-│   │       └── utils.ts              # Helper functions
+│   │   ├── 📁 context/
+│   │   │   └── AuthContext.tsx           # Auth state & user profile
+│   │   ├── 📁 hooks/
+│   │   │   └── useTheme.ts              # Dark/light theme toggle
+│   │   └── 📁 lib/
+│   │       └── supabase/                 # Supabase client setup
 │   │
 │   ├── package.json
 │   └── next.config.ts
 │
-├── 📁 backend/                        # Backend Application
+├── 📁 backend/                            # Backend (FastAPI + Python)
 │   ├── 📁 app/
-│   │   ├── main.py                   # FastAPI entry point
+│   │   ├── main.py                       # FastAPI entry point
 │   │   │
-│   │   ├── 📁 api/
-│   │   │   ├── 📁 routes/            # API Route Handlers
-│   │   │   │   ├── reimbursement.py  # Claim CRUD & stats
-│   │   │   │   ├── admin.py          # Admin stats & analytics
-│   │   │   │   ├── budget.py         # Budget management
-│   │   │   │   ├── policy_rules.py   # Policy CRUD
-│   │   │   │   ├── notification.py   # Notifications
-│   │   │   │   └── export.py         # Report exports
-│   │   │   └── 📁 v1/
-│   │   │       └── router.py         # Route aggregation
+│   │   ├── 📁 api/routes/                # 12 API Route Handlers
+│   │   │   ├── reimbursement.py          # Claim CRUD, stats, history
+│   │   │   ├── admin.py                  # Admin stats & analytics
+│   │   │   ├── budget.py                 # Budget CRUD & top-up
+│   │   │   ├── policy_rules.py           # Policy rule CRUD
+│   │   │   ├── receipt.py                # Receipt upload & OCR
+│   │   │   ├── category.py              # Expense categories
+│   │   │   ├── notification.py          # In-app notifications
+│   │   │   ├── export.py                # CSV/Excel report export
+│   │   │   ├── receipt_code.py          # Receipt code generation
+│   │   │   ├── remote_receipt.py        # Remote receipt handling
+│   │   │   └── rpc.py                   # Supabase RPC endpoints
 │   │   │
-│   │   ├── 📁 services/              # Business Logic
-│   │   │   ├── reimbursement_service.py
-│   │   │   ├── policy_service.py
-│   │   │   ├── fraud_detection_service.py
-│   │   │   ├── ocr_service.py
-│   │   │   ├── notification_service.py
-│   │   │   └── supabase_service.py
+│   │   ├── 📁 services/                  # 16 Business Logic Services
+│   │   │   ├── receipt_processing_service.py  # OCR orchestration (Azure → OpenAI fallback)
+│   │   │   ├── azure_document_intelligence_service.py  # Azure OCR
+│   │   │   ├── vision_service.py              # OpenAI Vision OCR
+│   │   │   ├── gpt_service.py                 # GPT text structuring with per-item categories
+│   │   │   ├── reimbursement_service.py       # Claim business logic
+│   │   │   ├── policy_service.py              # Policy enforcement
+│   │   │   ├── fraud_detection_service.py     # Fraud detection algorithms
+│   │   │   ├── email_service.py               # Email notifications
+│   │   │   ├── image_compression_service.py   # Image optimization
+│   │   │   ├── storage_service.py             # File storage
+│   │   │   ├── supabase_service.py            # Database client
+│   │   │   └── supabase_rpc_service.py        # RPC function calls
 │   │   │
-│   │   └── 📁 models/                # Pydantic Models
+│   │   ├── 📁 models/                    # Pydantic data models
+│   │   └── 📁 config/                    # Settings & database config
 │   │
-│   ├── 📁 scripts/                   # Utility Scripts
-│   ├── 📁 tests/                     # Test Suites
 │   ├── requirements.txt
 │   └── .env
 │
-└── README.md                          # This file
+└── README.md
 ```
 
 ---
@@ -350,25 +406,31 @@ FinCortex-AI_Brain_for_Corporate_Reimbursements/
 
 | Table | Description | Key Fields |
 |-------|-------------|------------|
-| `users` | Employee accounts | user_id, full_name, email, role, manager_id, admin_id |
+| `users` | Employee accounts | user_id, full_name, email, role, manager_id, company_id, employee_code |
 | `managers` | Manager accounts | manager_id, full_name, email, admin_id |
-| `companies` | Company information | company_id, company_name, admin_id |
-| `reimbursements` | Expense claims | reimbursement_id, user_id, amount_claimed, status, category_id |
-| `company_budgets` | Budget allocations | budget_id, company_id, total_balance, last_updated |
-| `reimbursement_rules` | Policy rules | rule_id, category_id, max_amount, monthly_limit |
+| `companies` | Company information | company_id, company_name, admin_id, account_balance |
+| `departments` | Company departments | department_id, department_name, company_id |
+| `reimbursements` | Expense claims | reimbursement_id, user_id, amount_claimed, status, category_id, flags (JSONB) |
+| `company_budgets` | Budget allocations | budget_id, company_id, total_balance, department_id, category_id |
+| `reimbursement_rules` | Policy rules | rule_id, company_id, category_id, max_amount, monthly_limit |
 | `notifications` | User notifications | notification_id, user_id, message, read_status |
-| `expense_categories` | Expense categories | category_id, category_name |
-| `departments` | Company departments | department_id, department_name |
+| `expense_categories` | Expense categories | category_id, category_name, company_id |
+| `expense_subcategories` | Sub-categories | subcategory_id, subcategory_name, category_id |
 
 ### Entity Relationships
 
 ```
 companies (1) ──────< (n) managers
+companies (1) ──────< (n) departments
 companies (1) ──────< (n) company_budgets
-managers (1) ─────<── (n) users
-users (1) ──────────< (n) reimbursements
+companies (1) ──────< (n) expense_categories
+companies (1) ──────< (n) reimbursement_rules
+managers  (1) ──────< (n) users
+users     (1) ──────< (n) reimbursements
+users     (1) ──────< (n) notifications
 reimbursements (n) ──> (1) expense_categories
 reimbursements (n) ──> (1) departments
+expense_categories (1) ──< (n) expense_subcategories
 ```
 
 ---
@@ -379,13 +441,13 @@ reimbursements (n) ──> (1) departments
 
 | Technology | Version | Purpose |
 |------------|---------|---------|
-| **Next.js** | 15.5 | React framework with App Router |
+| **Next.js** | 15.5 | React framework with App Router & Turbopack |
 | **React** | 19.1 | UI library |
 | **TypeScript** | 5.x | Type-safe JavaScript |
 | **Tailwind CSS** | 4.x | Utility-first CSS |
-| **Radix UI** | Latest | Accessible UI primitives |
-| **Lucide React** | Latest | Icon library |
-| **Supabase JS** | 2.58 | Database & auth client |
+| **Radix UI** | Latest | Accessible UI primitives (Dialog, Select, Tabs, etc.) |
+| **Lucide React** | 0.544+ | Modern icon library |
+| **Supabase JS** | 2.58+ | Database & auth client |
 
 ### Backend
 
@@ -393,19 +455,20 @@ reimbursements (n) ──> (1) departments
 |------------|---------|---------|
 | **FastAPI** | 0.115+ | Modern Python web framework |
 | **Uvicorn** | 0.30+ | ASGI server |
-| **Pydantic** | 2.9+ | Data validation |
-| **Supabase** | 2.5+ | Database client |
-| **OpenAI** | 1.51+ | AI/ML services |
-| **Pillow** | 10.4+ | Image processing |
+| **Pydantic** | 2.9+ | Data validation & settings |
+| **Supabase Python** | 2.5+ | Database client |
+| **OpenAI** | 1.51+ | GPT text structuring & Vision OCR |
+| **Azure Document Intelligence** | 1.0+ | Primary OCR engine |
+| **Pillow** | 10.4+ | Image processing & compression |
 | **HTTPX** | 0.27+ | Async HTTP client |
 
 ### Infrastructure
 
 | Service | Purpose |
 |---------|---------|
-| **Supabase** | PostgreSQL database, authentication, storage |
-| **Vercel** (recommended) | Frontend deployment |
-| **Railway/Render** (recommended) | Backend deployment |
+| **Supabase** | PostgreSQL database, authentication, row-level security, file storage |
+| **Azure AI** | Document Intelligence for OCR text extraction |
+| **OpenAI** | GPT-4o for text structuring and Vision-based OCR fallback |
 
 ---
 
@@ -413,13 +476,13 @@ reimbursements (n) ──> (1) departments
 
 ### Prerequisites
 
-Before you begin, ensure you have:
-
 - **Node.js** 18.x or higher ([Download](https://nodejs.org/))
 - **Python** 3.11 or higher ([Download](https://python.org/))
-- **npm** (comes with Node.js) or **yarn**
+- **npm** (comes with Node.js)
 - **Git** ([Download](https://git-scm.com/))
 - **Supabase** account ([Sign up](https://supabase.com/))
+- **OpenAI** API key ([Get key](https://platform.openai.com/))
+- **Azure AI** Document Intelligence resource (optional, for primary OCR)
 
 ### Step 1: Clone the Repository
 
@@ -444,32 +507,33 @@ cd FinCortex-AI_Brain_for_Corporate_Reimbursements
 cd backend
 
 # Create Python virtual environment
-python -m venv venv
+python3 -m venv venv
 
 # Activate virtual environment
-# On macOS/Linux:
-source venv/bin/activate
-# On Windows:
-venv\Scripts\activate
+source venv/bin/activate        # macOS / Linux
+# venv\Scripts\activate          # Windows
 
-# Install Python dependencies
+# Install dependencies
 pip install -r requirements.txt
-
-# Create environment file
-cp env_template.txt .env
 ```
 
-Edit `backend/.env`:
+Create `backend/.env`:
+
 ```env
-# Supabase Configuration
+# Supabase
 SUPABASE_URL=https://your-project.supabase.co
 SUPABASE_KEY=your-anon-key
 SUPABASE_SERVICE_ROLE_KEY=your-service-role-key
 
-# OpenAI (for OCR and AI features)
+# OpenAI (required for GPT text structuring)
 OPENAI_API_KEY=sk-your-openai-key
+OPENAI_MODEL=gpt-4o
 
-# Server Configuration
+# Azure Document Intelligence (optional — falls back to OpenAI Vision if not set)
+AZURE_ENDPOINT=https://your-resource.cognitiveservices.azure.com/
+AZURE_KEY=your-azure-key
+
+# Server
 HOST=0.0.0.0
 PORT=8000
 DEBUG=true
@@ -478,19 +542,17 @@ DEBUG=true
 ### Step 4: Frontend Setup
 
 ```bash
-# Navigate to frontend directory (from project root)
+# Navigate to frontend (from project root)
 cd fin-cortex
 
-# Install Node.js dependencies
+# Install dependencies
 npm install
-
-# Create environment file
-touch .env.local
 ```
 
-Edit `fin-cortex/.env.local`:
+Create `fin-cortex/.env.local`:
+
 ```env
-# Supabase Configuration
+# Supabase
 NEXT_PUBLIC_SUPABASE_URL=https://your-project.supabase.co
 NEXT_PUBLIC_SUPABASE_ANON_KEY=your-anon-key
 
@@ -498,176 +560,163 @@ NEXT_PUBLIC_SUPABASE_ANON_KEY=your-anon-key
 NEXT_PUBLIC_BACKEND_URL=http://localhost:8000
 ```
 
-### Step 5: Initialize Database
+### Step 5: Run Locally
 
-Run the database schema setup in your Supabase SQL editor. The schema includes tables for users, managers, companies, reimbursements, budgets, policy rules, and more.
-
-### Step 6: Run the Application
-
-**Terminal 1 - Start Backend:**
+**Terminal 1 — Backend:**
 ```bash
 cd backend
-source venv/bin/activate  # or venv\Scripts\activate on Windows
+source venv/bin/activate
 uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
 ```
 
-**Terminal 2 - Start Frontend:**
+**Terminal 2 — Frontend:**
 ```bash
 cd fin-cortex
 npm run dev
 ```
 
-### Step 7: Access the Application
+### Step 6: Access the Application
 
 | Service | URL |
 |---------|-----|
 | **Frontend** | [http://localhost:3000](http://localhost:3000) |
 | **Backend API** | [http://localhost:8000](http://localhost:8000) |
-| **API Documentation** | [http://localhost:8000/docs](http://localhost:8000/docs) |
-| **ReDoc** | [http://localhost:8000/redoc](http://localhost:8000/redoc) |
+| **API Docs (Swagger)** | [http://localhost:8000/docs](http://localhost:8000/docs) |
+| **API Docs (ReDoc)** | [http://localhost:8000/redoc](http://localhost:8000/redoc) |
+
+---
+
+## 🖥 Server Deployment
+
+### Step 1: Push Code to GitHub
+
+```bash
+cd FinCortex-AI_Brain_for_Corporate_Reimbursements
+git add -A
+git commit -m "deploy: latest changes"
+git push origin main
+```
+
+### Step 2: Clone on Server
+
+```bash
+git clone https://github.com/bilalqaisar1/FinCortex-AI_Brain_for_Corporate_Reimbursements.git
+cd FinCortex-AI_Brain_for_Corporate_Reimbursements
+```
+
+### Step 3: Setup & Run Backend
+
+```bash
+cd backend
+python3 -m venv venv
+source venv/bin/activate
+pip install -r requirements.txt
+
+# Create .env file with your credentials
+nano .env
+
+# Run (accessible from any IP)
+uvicorn app.main:app --host 0.0.0.0 --port 8000
+
+# Run in background (persists after SSH disconnect)
+nohup uvicorn app.main:app --host 0.0.0.0 --port 8000 > backend.log 2>&1 &
+```
+
+### Step 4: Setup & Run Frontend
+
+```bash
+cd ../fin-cortex
+npm install
+
+# Create .env.local — point NEXT_PUBLIC_BACKEND_URL to your server IP
+nano .env.local
+
+# Build for production
+npm run build
+
+# Run on 0.0.0.0 (accessible from any IP)
+npm run start -- -H 0.0.0.0 -p 3000
+
+# Run in background
+nohup npm run start -- -H 0.0.0.0 -p 3000 > frontend.log 2>&1 &
+```
+
+### Step 5: Open Firewall Ports
+
+```bash
+# Ubuntu/Debian
+sudo ufw allow 3000
+sudo ufw allow 8000
+
+# For cloud servers (AWS/GCP/Azure): open ports 3000 & 8000 in Security Group / Firewall Rules
+```
+
+### Step 6: Access
+
+- **Frontend:** `http://YOUR_SERVER_IP:3000`
+- **Backend API:** `http://YOUR_SERVER_IP:8000/docs`
 
 ---
 
 ## 📚 API Documentation
 
-### Authentication
+### Reimbursements
 
-All API requests should include the user context. The frontend handles this through Supabase Auth.
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| `POST` | `/api/v1/reimbursements/submit` | Submit a new claim |
+| `GET` | `/api/v1/reimbursements/user/{user_id}` | Get user's claims |
+| `GET` | `/api/v1/reimbursements/manager/{manager_id}` | Get manager's team claims |
+| `PUT` | `/api/v1/reimbursements/{id}/status` | Approve/reject a claim |
 
-### Reimbursements API
+### Admin
 
-#### Submit a New Claim
-```http
-POST /api/v1/reimbursements/submit
-Content-Type: multipart/form-data
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| `GET` | `/api/v1/admin/stats?admin_id={id}` | Dashboard KPIs |
+| `GET` | `/api/v1/admin/analytics?admin_id={id}&period=30d` | Organization analytics |
+| `GET` | `/api/v1/admin/violations?admin_id={id}` | Policy violations |
 
-{
-  "user_id": "uuid",
-  "category_id": "uuid",
-  "amount": 5000,
-  "description": "Client meeting lunch",
-  "receipt_image": <file>
-}
-```
+### Budgets
 
-#### Get User Claims
-```http
-GET /api/v1/reimbursements/user/{user_id}
-```
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| `GET` | `/api/v1/admin/budgets` | List all budgets |
+| `POST` | `/api/v1/admin/budgets` | Create a budget |
+| `PUT` | `/api/v1/admin/budgets/{id}` | Update a budget |
+| `POST` | `/api/v1/admin/budgets/{id}/add-funds` | Top up a budget |
 
-#### Get Manager's Team Claims
-```http
-GET /api/v1/reimbursements/manager/{manager_id}
-```
+### Policy Rules
 
-#### Update Claim Status
-```http
-PUT /api/v1/reimbursements/{reimbursement_id}/status
-Content-Type: application/json
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| `GET` | `/api/v1/policy-rules?company_id={id}` | List rules |
+| `POST` | `/api/v1/policy-rules` | Create a rule |
+| `PUT` | `/api/v1/policy-rules/{id}` | Update a rule |
+| `DELETE` | `/api/v1/policy-rules/{id}` | Delete a rule |
 
-{
-  "status": "approved",
-  "manager_comments": "Approved for client meeting"
-}
-```
+### Receipt Processing
 
-### Admin API
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| `POST` | `/api/v1/receipts/upload` | Upload & OCR a receipt |
+| `POST` | `/api/v1/receipts/process` | Process receipt text with GPT |
 
-#### Get Dashboard Stats
-```http
-GET /api/v1/admin/stats?admin_id={admin_id}
-```
+### Categories & Notifications
 
-**Response:**
-```json
-{
-  "success": true,
-  "company_name": "Your Company",
-  "data": {
-    "total_claims": { "value": 150, "change": "+12%" },
-    "pending_approvals": { "value": 23, "change": "5 new" },
-    "budget_utilization": { "value": 67, "change": "+5%" },
-    "policy_violations": { "value": 3, "change": "1 resolved" }
-  }
-}
-```
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| `GET` | `/api/v1/categories?company_id={id}` | List categories & subcategories |
+| `GET` | `/api/v1/notifications/{user_id}` | Get user notifications |
+| `PUT` | `/api/v1/notifications/{id}/read` | Mark as read |
 
-#### Get Analytics
-```http
-GET /api/v1/admin/analytics?admin_id={admin_id}&period=30d
-```
+### Export
 
-**Response:**
-```json
-{
-  "success": true,
-  "data": {
-    "period": "Last 30 days",
-    "totalClaims": 245,
-    "totalAmount": 1250000,
-    "averageClaim": 5102.04,
-    "approvedClaims": 180,
-    "pendingClaims": 45,
-    "rejectedClaims": 20,
-    "topCategory": "Travel",
-    "topDepartment": "Engineering",
-    "monthlyTrend": 15.5,
-    "weeklyTrend": -2.3,
-    "activeUsers": 67
-  }
-}
-```
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| `GET` | `/api/v1/export/claims?admin_id={id}&format=csv` | Export claims data |
 
-### Budget API
-
-#### Get All Budgets
-```http
-GET /api/v1/admin/budgets
-```
-
-#### Create Budget
-```http
-POST /api/v1/admin/budgets
-Content-Type: application/json
-
-{
-  "company_id": "uuid",
-  "company_name": "Tech Corp",
-  "total_amount": 5000000
-}
-```
-
-#### Add Funds
-```http
-POST /api/v1/admin/budgets/{budget_id}/add-funds
-Content-Type: application/json
-
-{
-  "amount": 500000,
-  "notes": "Q2 budget increase"
-}
-```
-
-### Policy Rules API
-
-#### Get Policy Rules
-```http
-GET /api/v1/policy-rules?company_id={company_id}
-```
-
-#### Create Policy Rule
-```http
-POST /api/v1/policy-rules
-Content-Type: application/json
-
-{
-  "company_id": "uuid",
-  "rule_type": "max_amount",
-  "rule_value": 50000,
-  "category_id": "uuid",
-  "description": "Max travel expense per claim"
-}
-```
+> 📖 Full interactive API documentation available at `/docs` (Swagger UI) when the backend is running.
 
 ---
 
@@ -676,31 +725,14 @@ Content-Type: application/json
 | Feature | Implementation |
 |---------|----------------|
 | **Authentication** | Supabase Auth with JWT tokens |
-| **Authorization** | Role-based access control (User/Manager/Admin) |
+| **Authorization** | Role-based access control (User / Manager / Admin) |
 | **Row Level Security** | Supabase RLS policies on all tables |
 | **API Protection** | Service role keys for backend operations |
 | **Input Validation** | Pydantic models for all API inputs |
-| **CORS** | Configured for specific origins only |
-
----
-
-## 🚢 Deployment
-
-### Frontend (Vercel)
-
-1. Push your code to GitHub
-2. Import project in [Vercel Dashboard](https://vercel.com/)
-3. Set environment variables
-4. Deploy
-
-### Backend (Railway/Render)
-
-1. Create new web service
-2. Connect GitHub repository
-3. Set build command: `pip install -r requirements.txt`
-4. Set start command: `uvicorn app.main:app --host 0.0.0.0 --port $PORT`
-5. Add environment variables
-6. Deploy
+| **CORS** | Configured for specific allowed origins |
+| **Middleware Protection** | Next.js middleware for route guarding |
+| **Policy Enforcement** | Automated pre-submission policy checks |
+| **Fraud Detection** | Duplicate receipt detection, velocity checks, amount anomalies |
 
 ---
 
@@ -725,14 +757,14 @@ We welcome contributions! Please follow these steps:
 
 ### Code Style
 
-- **Frontend**: ESLint + Prettier
-- **Backend**: PEP 8 + Black formatter
+- **Frontend:** ESLint + Prettier
+- **Backend:** PEP 8 + Black formatter
 
 ---
 
 ## 📄 License
 
-This project is licensed under the **MIT License** - see the [LICENSE](LICENSE) file for details.
+This project is licensed under the **MIT License** — see the [LICENSE](LICENSE) file for details.
 
 ---
 
@@ -747,11 +779,14 @@ This project is licensed under the **MIT License** - see the [LICENSE](LICENSE) 
 
 ## 🙏 Acknowledgments
 
-- [Next.js](https://nextjs.org/) for the amazing React framework
-- [FastAPI](https://fastapi.tiangolo.com/) for the high-performance Python framework
-- [Supabase](https://supabase.com/) for the backend-as-a-service platform
-- [Radix UI](https://radix-ui.com/) for accessible UI components
-- [Tailwind CSS](https://tailwindcss.com/) for utility-first styling
+- [Next.js](https://nextjs.org/) — React framework with App Router
+- [FastAPI](https://fastapi.tiangolo.com/) — High-performance Python framework
+- [Supabase](https://supabase.com/) — Backend-as-a-service platform
+- [Azure AI Document Intelligence](https://azure.microsoft.com/en-us/products/ai-services/ai-document-intelligence) — Enterprise OCR
+- [OpenAI](https://openai.com/) — GPT-4o for text structuring
+- [Radix UI](https://radix-ui.com/) — Accessible UI components
+- [Tailwind CSS](https://tailwindcss.com/) — Utility-first CSS
+- [Lucide](https://lucide.dev/) — Beautiful icon library
 
 ---
 

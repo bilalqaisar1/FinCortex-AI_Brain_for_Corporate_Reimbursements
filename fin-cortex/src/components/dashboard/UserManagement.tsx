@@ -148,19 +148,21 @@ export function UserManagement({
   return (
     <div className={cn("space-y-6", className)}>
       {/* Header with Search and Filters */}
-      <Card className="bg-white/80 dark:bg-slate-900/80 backdrop-blur-sm border-slate-200 dark:border-slate-700 shadow-lg">
+      <Card className="bg-[var(--card-dark)] backdrop-blur-3xl border-[var(--border-subtle)] shadow-2xl">
         <CardHeader className="pb-4">
           <div className="flex flex-col sm:flex-row sm:items-center justify-between space-y-4 sm:space-y-0">
-            <CardTitle className="text-xl font-semibold text-slate-900 dark:text-slate-100 flex items-center">
-              <Users className="w-6 h-6 mr-2 text-blue-500" />
-              Manager Management
+            <CardTitle className="text-xl font-black text-[var(--text-primary)] flex items-center tracking-tight">
+              <div className="w-10 h-10 rounded-xl bg-blue-500/10 flex items-center justify-center mr-3">
+                <Users className="w-5 h-5 text-blue-400" />
+              </div>
+              MANAGER MANAGEMENT
             </CardTitle>
             <Button
               onClick={onAddUser}
-              className="bg-gradient-to-r from-blue-500 to-purple-600 hover:from-blue-600 hover:to-purple-700 text-white"
+              className="bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-500 hover:to-purple-500 text-white border-0 shadow-lg shadow-blue-500/20"
             >
               <Plus className="w-4 h-4 mr-2" />
-              Add Manager
+              ADD MANAGER
             </Button>
           </div>
         </CardHeader>
@@ -168,13 +170,13 @@ export function UserManagement({
         <CardContent className="space-y-4">
           {/* Search and Filters */}
           <div className="flex flex-col sm:flex-row space-y-4 sm:space-y-0 sm:space-x-4">
-            <div className="relative flex-1">
-              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-slate-400" />
+            <div className="relative flex-1 group">
+              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-[var(--text-muted)] group-focus-within:text-blue-400 transition-colors" />
               <Input
-                placeholder="Search managers..."
+                placeholder="SEARCH MANAGERS..."
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
-                className="pl-10"
+                className="pl-10 bg-[var(--card-dark)] border-[var(--border-medium)] text-[var(--text-primary)] placeholder:text-[var(--text-muted)] focus:border-blue-500/40 focus:ring-blue-500/20 rounded-xl text-xs font-bold tracking-wider"
               />
             </div>
 
@@ -182,23 +184,23 @@ export function UserManagement({
               <select
                 value={roleFilter}
                 onChange={(e) => setRoleFilter(e.target.value as any)}
-                className="px-3 py-2 border border-slate-200 dark:border-slate-700 rounded-lg bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100 text-sm"
+                className="px-4 py-2 border border-[var(--border-medium)] rounded-xl bg-[var(--card-dark)] text-[var(--text-secondary)] text-xs font-bold tracking-wider focus:outline-none focus:border-blue-500/40"
               >
-                <option value="all">All Roles</option>
-                <option value="admin">Admin</option>
-                <option value="manager">Manager</option>
-                <option value="user">User</option>
+                <option value="all" className="bg-slate-900">ALL ROLES</option>
+                <option value="admin" className="bg-slate-900">ADMIN</option>
+                <option value="manager" className="bg-slate-900">MANAGER</option>
+                <option value="user" className="bg-slate-900">USER</option>
               </select>
 
               <select
                 value={statusFilter}
                 onChange={(e) => setStatusFilter(e.target.value as any)}
-                className="px-3 py-2 border border-slate-200 dark:border-slate-700 rounded-lg bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100 text-sm"
+                className="px-4 py-2 border border-[var(--border-medium)] rounded-xl bg-[var(--card-dark)] text-[var(--text-secondary)] text-xs font-bold tracking-wider focus:outline-none focus:border-blue-500/40"
               >
-                <option value="all">All Status</option>
-                <option value="active">Active</option>
-                <option value="inactive">Inactive</option>
-                <option value="pending">Pending</option>
+                <option value="all" className="bg-slate-900">ALL STATUS</option>
+                <option value="active" className="bg-slate-900">ACTIVE</option>
+                <option value="inactive" className="bg-slate-900">INACTIVE</option>
+                <option value="pending" className="bg-slate-900">PENDING</option>
               </select>
             </div>
           </div>
@@ -206,122 +208,112 @@ export function UserManagement({
       </Card>
 
       {/* Users List */}
-      <Card className="bg-white/80 dark:bg-slate-900/80 backdrop-blur-sm border-slate-200 dark:border-slate-700 shadow-lg">
+      <Card className="bg-[var(--card-dark)] backdrop-blur-3xl border-[var(--border-subtle)] shadow-2xl overflow-hidden">
         <CardContent className="p-0">
-          <div className="space-y-0">
-            {filteredUsers.map((user, index) => (
+          <div className="divide-y divide-[var(--border-subtle)]">
+            {filteredUsers.map((user) => (
               <div
                 key={user.id}
-                className={cn(
-                  "p-4 border-b border-slate-200 dark:border-slate-700 last:border-b-0 hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors",
-                  index === 0 && "rounded-t-lg"
-                )}
+                className="p-5 hover:bg-[var(--card-hover)] transition-colors group"
               >
                 <div className="flex items-center justify-between">
-                  <div className="flex items-center space-x-4 flex-1 min-w-0">
+                  <div className="flex items-center space-x-5 flex-1 min-w-0">
                     {/* Avatar */}
-                    <div className="w-10 h-10 bg-gradient-to-br from-blue-500 to-purple-600 rounded-full flex items-center justify-center text-white font-semibold text-sm">
-                      {user.name.split(' ').map(n => n[0]).join('')}
+                    <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-slate-800 to-slate-900 border border-[var(--border-medium)] flex items-center justify-center text-white font-black text-sm shadow-inner relative overflow-hidden">
+                      <div className="absolute inset-0 bg-blue-500/10 opacity-0 group-hover:opacity-100 transition-opacity" />
+                      {user.name.split(' ').map(n => n[0]).join('').substring(0, 2)}
                     </div>
 
                     {/* User Info */}
                     <div className="flex-1 min-w-0">
-                      <div className="flex items-center space-x-2 mb-1">
-                        <h3 className="font-semibold text-slate-900 dark:text-slate-100 truncate">
+                      <div className="flex items-center gap-3 mb-1.5">
+                        <h3 className="font-bold text-[var(--text-primary)] text-sm tracking-wide truncate">
                           {user.name}
                         </h3>
                         <Badge
                           variant="outline"
-                          className={cn("text-xs flex items-center space-x-1", getRoleColor(user.role))}
+                          className={cn("text-[9px] font-black uppercase tracking-wider px-2 py-0.5 border-0",
+                            user.role === 'admin' ? "bg-red-500/10 text-red-400" :
+                              user.role === 'manager' ? "bg-blue-500/10 text-blue-400" :
+                                "bg-green-500/10 text-green-400"
+                          )}
                         >
-                          {getRoleIcon(user.role)}
-                          <span className="capitalize">{user.role}</span>
+                          {user.role}
                         </Badge>
                         <Badge
                           variant="outline"
-                          className={cn("text-xs", getStatusColor(user.status))}
+                          className={cn("text-[9px] font-black uppercase tracking-wider px-2 py-0.5 border-0",
+                            user.status === 'active' ? "bg-emerald-500/10 text-emerald-400" :
+                              user.status === 'inactive' ? "bg-slate-500/10 text-slate-400" :
+                                "bg-yellow-500/10 text-yellow-400"
+                          )}
                         >
                           {user.status}
                         </Badge>
                       </div>
 
-                      <div className="space-y-1">
-                        <div className="flex items-center space-x-2 text-sm text-slate-600 dark:text-slate-400">
-                          <Mail className="w-3 h-3" />
-                          <span className="truncate">{user.email}</span>
+                      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 text-xs">
+                        <div className="flex items-center space-x-2 text-[var(--text-secondary)]">
+                          <Mail className="w-3.5 h-3.5 text-[var(--text-muted)]" />
+                          <span className="truncate hover:text-[var(--text-primary)] transition-colors cursor-default">{user.email}</span>
                         </div>
 
-                        <div className="flex items-center space-x-4 text-sm text-slate-500 dark:text-slate-500">
-                          <div className="flex items-center space-x-1">
-                            <Building2 className="w-3 h-3" />
-                            <span>{user.department}</span>
-                          </div>
-                          <div className="flex items-center space-x-1">
-                            <span>#{user.employeeCode}</span>
-                          </div>
-                          <div className="flex items-center space-x-1">
-                            <Calendar className="w-3 h-3" />
-                            <span>Joined {new Date(user.createdAt).toLocaleDateString()}</span>
-                          </div>
+                        <div className="flex items-center space-x-2 text-[var(--text-secondary)]">
+                          <Building2 className="w-3.5 h-3.5 text-[var(--text-muted)]" />
+                          <span>{user.department}</span>
                         </div>
 
-                        {user.phone && (
-                          <div className="flex items-center space-x-2 text-sm text-slate-500 dark:text-slate-500">
-                            <Phone className="w-3 h-3" />
-                            <span>{user.phone}</span>
-                          </div>
-                        )}
+                        <div className="flex items-center space-x-2 text-[var(--text-secondary)]">
+                          <code className="bg-[var(--card-dark)] px-1.5 py-0.5 rounded text-[10px] text-[var(--text-secondary)] font-mono border border-[var(--border-subtle)]">
+                            {user.employeeCode}
+                          </code>
+                        </div>
 
-                        <div className="text-xs text-slate-500 dark:text-slate-500">
-                          Last active: {user.lastActive}
+                        <div className="flex items-center space-x-2 text-[var(--text-muted)]">
+                          <span className="text-[10px] font-medium uppercase tracking-wider">
+                            Active: {user.lastActive}
+                          </span>
                         </div>
                       </div>
                     </div>
                   </div>
 
                   {/* Actions */}
-                  <div className="flex items-center space-x-2">
+                  <div className="flex items-center gap-2 pl-4">
                     <Button
                       size="sm"
-                      variant="outline"
+                      variant="ghost"
                       onClick={() => onToggleStatus?.(user.id)}
                       className={cn(
-                        "h-8 px-3",
+                        "h-8 w-8 p-0 rounded-lg transition-all",
                         user.status === "active"
-                          ? "text-red-600 hover:text-red-700 hover:bg-red-50"
-                          : "text-green-600 hover:text-green-700 hover:bg-green-50"
+                          ? "hover:bg-red-500/10 text-[var(--text-muted)] hover:text-red-400"
+                          : "hover:bg-green-500/10 text-[var(--text-muted)] hover:text-green-400"
                       )}
                     >
                       {user.status === "active" ? (
-                        <>
-                          <UserX className="w-3 h-3 mr-1" />
-                          Deactivate
-                        </>
+                        <UserX className="w-4 h-4" />
                       ) : (
-                        <>
-                          <UserCheck className="w-3 h-3 mr-1" />
-                          Activate
-                        </>
+                        <UserCheck className="w-4 h-4" />
                       )}
                     </Button>
 
                     <Button
                       size="sm"
-                      variant="outline"
+                      variant="ghost"
                       onClick={() => onEditUser?.(user.id)}
-                      className="h-8 px-3"
+                      className="h-8 w-8 p-0 rounded-lg hover:bg-[var(--card-hover)] text-[var(--text-muted)] hover:text-[var(--text-primary)] transition-all"
                     >
-                      <Edit className="w-3 h-3 mr-1" />
-                      Edit
+                      <Edit className="w-4 h-4" />
                     </Button>
 
                     <Button
                       size="sm"
-                      variant="outline"
+                      variant="ghost"
                       onClick={() => onDeleteUser?.(user.id)}
-                      className="h-8 px-3 text-red-600 hover:text-red-700 hover:bg-red-50"
+                      className="h-8 w-8 p-0 rounded-lg hover:bg-red-500/10 text-[var(--text-muted)] hover:text-red-400 transition-all"
                     >
-                      <Trash2 className="w-3 h-3" />
+                      <Trash2 className="w-4 h-4" />
                     </Button>
                   </div>
                 </div>
@@ -329,11 +321,13 @@ export function UserManagement({
             ))}
 
             {filteredUsers.length === 0 && (
-              <div className="text-center py-12">
-                <Users className="w-12 h-12 text-slate-400 mx-auto mb-4" />
-                <p className="text-slate-500 dark:text-slate-400">No managers found</p>
-                <p className="text-sm text-slate-400 dark:text-slate-500">
-                  Try adjusting your search or filters
+              <div className="text-center py-20">
+                <div className="w-16 h-16 bg-[var(--card-dark)] rounded-full flex items-center justify-center mx-auto mb-4 border border-[var(--border-medium)]">
+                  <Users className="w-8 h-8 text-[var(--text-muted)]" />
+                </div>
+                <p className="text-[var(--text-secondary)] font-medium">No managers found</p>
+                <p className="text-xs text-[var(--text-muted)] mt-1 uppercase tracking-wider">
+                  Try adjusting your search filters
                 </p>
               </div>
             )}

@@ -131,26 +131,26 @@ export default function UsersPage() {
           />
 
           {/* Search Bar */}
-          <Card className="mb-6 bg-white/80 dark:bg-slate-900/80 backdrop-blur-sm border-slate-200 dark:border-slate-700 shadow-lg">
+          <Card className="mb-6 bg-[var(--card-dark)] border-[var(--border-subtle)] shadow-sm">
             <CardContent className="pt-6">
               <div className="relative">
-                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-slate-400" />
+                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-[var(--text-secondary)]" />
                 <Input
                   type="text"
                   placeholder="Search by name, email, or employee code..."
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
-                  className="pl-10 h-12 bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700 text-slate-900 dark:text-slate-100 placeholder-slate-400 focus:border-purple-300 dark:focus:border-purple-600 focus:ring-purple-200 dark:focus:ring-purple-800 rounded-xl"
+                  className="pl-10 h-12 bg-[var(--surface-elevated)] border-[var(--border-subtle)] text-[var(--text-primary)] placeholder-[var(--text-muted)] focus:border-purple-500/50 focus:ring-purple-500/20 rounded-xl"
                 />
               </div>
             </CardContent>
           </Card>
 
           {/* Users List */}
-          <Card className="bg-white/80 dark:bg-slate-900/80 backdrop-blur-sm border-slate-200 dark:border-slate-700 shadow-lg">
+          <Card className="bg-[var(--card-dark)] border-[var(--border-subtle)] shadow-sm">
             <CardHeader>
               <CardTitle className="flex items-center justify-between">
-                <span className="flex items-center">
+                <span className="flex items-center text-[var(--text-primary)]">
                   <Users className="w-5 h-5 mr-2 text-purple-600" />
                   All Users ({filteredUsers.length})
                 </span>
@@ -160,7 +160,7 @@ export default function UsersPage() {
               {loading ? (
                 <div className="flex items-center justify-center py-12">
                   <Loader2 className="w-8 h-8 animate-spin text-purple-500" />
-                  <span className="ml-3 text-lg text-slate-600 dark:text-slate-400">Loading team members...</span>
+                  <span className="ml-3 text-lg text-[var(--text-secondary)]">Loading team members...</span>
                 </div>
               ) : error ? (
                 <div className="flex flex-col items-center justify-center py-12 text-red-500">
@@ -172,8 +172,8 @@ export default function UsersPage() {
                 </div>
               ) : filteredUsers.length === 0 ? (
                 <div className="text-center py-12">
-                  <Users className="w-16 h-16 mx-auto text-slate-400 mb-4" />
-                  <p className="text-slate-600 dark:text-slate-400 mb-4">
+                  <Users className="w-16 h-16 mx-auto text-[var(--text-muted)] mb-4" />
+                  <p className="text-[var(--text-secondary)] mb-4">
                     {searchQuery ? "No users found matching your search." : "No users found."}
                   </p>
                   {!searchQuery && (
@@ -191,7 +191,7 @@ export default function UsersPage() {
                   {filteredUsers.map((user) => (
                     <div
                       key={user.user_id}
-                      className="flex items-center justify-between p-4 bg-slate-50 dark:bg-slate-800 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors"
+                      className="flex items-center justify-between p-4 bg-[var(--surface-elevated)] border border-[var(--border-subtle)] rounded-lg hover:bg-[var(--card-hover)] transition-colors"
                     >
                       <div className="flex items-center space-x-4 flex-1 overflow-hidden">
                         <div className="w-12 h-12 bg-gradient-to-br from-blue-500 to-purple-600 rounded-full flex-shrink-0 flex items-center justify-center text-white font-bold text-lg">
@@ -199,7 +199,7 @@ export default function UsersPage() {
                         </div>
                         <div className="flex-1 min-w-0">
                           <div className="flex items-center space-x-2 mb-1">
-                            <h3 className="font-semibold text-slate-900 dark:text-slate-100 truncate">
+                            <h3 className="font-semibold text-[var(--text-primary)] truncate">
                               {user.full_name}
                             </h3>
                             <Badge
@@ -209,7 +209,7 @@ export default function UsersPage() {
                               {user.status || 'Unknown'}
                             </Badge>
                           </div>
-                          <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-sm text-slate-600 dark:text-slate-400">
+                          <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-sm text-[var(--text-secondary)]">
                             <div className="flex items-center space-x-1 min-w-0">
                               <Mail className="w-3.5 h-3.5 flex-shrink-0" />
                               <span className="truncate">{user.email}</span>
@@ -228,7 +228,7 @@ export default function UsersPage() {
                             )}
                           </div>
                           {user.department?.department_name && (
-                            <p className="text-xs text-slate-500 dark:text-slate-400 mt-1 truncate">
+                            <p className="text-xs text-[var(--text-muted)] mt-1 truncate">
                               Department: {user.department.department_name}
                             </p>
                           )}
@@ -240,7 +240,7 @@ export default function UsersPage() {
                             <Button
                               variant="outline"
                               size="sm"
-                              className="whitespace-nowrap"
+                              className="whitespace-nowrap border-[var(--border-subtle)] text-[var(--text-secondary)] bg-transparent hover:bg-[var(--card-hover)] hover:text-[var(--text-primary)]"
                               disabled={updatingId === user.user_id}
                             >
                               {updatingId === user.user_id ? (
@@ -251,18 +251,18 @@ export default function UsersPage() {
                               Change Status
                             </Button>
                           </DropdownMenuTrigger>
-                          <DropdownMenuContent align="end">
-                            <DropdownMenuLabel>Set Status</DropdownMenuLabel>
-                            <DropdownMenuSeparator />
-                            <DropdownMenuItem onClick={() => handleStatusUpdate(user.user_id, 'active')}>
+                          <DropdownMenuContent align="end" className="bg-[var(--card-dark)] border-[var(--border-subtle)]">
+                            <DropdownMenuLabel className="text-[var(--text-primary)]">Set Status</DropdownMenuLabel>
+                            <DropdownMenuSeparator className="bg-[var(--border-subtle)]" />
+                            <DropdownMenuItem onClick={() => handleStatusUpdate(user.user_id, 'active')} className="text-[var(--text-primary)] focus:bg-[var(--card-hover)]">
                               <CheckCircle className="w-4 h-4 mr-2 text-green-500" />
                               Active
                             </DropdownMenuItem>
-                            <DropdownMenuItem onClick={() => handleStatusUpdate(user.user_id, 'inactive')}>
+                            <DropdownMenuItem onClick={() => handleStatusUpdate(user.user_id, 'inactive')} className="text-[var(--text-primary)] focus:bg-[var(--card-hover)]">
                               <XCircle className="w-4 h-4 mr-2 text-yellow-500" />
                               Inactive
                             </DropdownMenuItem>
-                            <DropdownMenuItem onClick={() => handleStatusUpdate(user.user_id, 'suspended')}>
+                            <DropdownMenuItem onClick={() => handleStatusUpdate(user.user_id, 'suspended')} className="text-[var(--text-primary)] focus:bg-[var(--card-hover)]">
                               <Ban className="w-4 h-4 mr-2 text-red-500" />
                               Suspended
                             </DropdownMenuItem>
@@ -273,7 +273,7 @@ export default function UsersPage() {
                           variant="outline"
                           size="sm"
                           onClick={() => router.push(`/manager/users/${user.user_id}`)}
-                          className="hover:bg-purple-50 dark:hover:bg-slate-700 whitespace-nowrap"
+                          className="whitespace-nowrap border-[var(--border-subtle)] text-[var(--text-secondary)] bg-transparent hover:bg-[var(--card-hover)] hover:text-[var(--text-primary)]"
                         >
                           View Details
                         </Button>

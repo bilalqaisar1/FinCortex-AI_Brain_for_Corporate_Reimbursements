@@ -59,8 +59,11 @@ export async function syncUserProfile(
     .maybeSingle();
 
   if (!managerError && managerProfile) {
-    // Manager profile found - it already has admin_id in the table
-    return managerProfile;
+    // Manager profile found - map manager_admin_id to admin_id for frontend consistency
+    return {
+      ...managerProfile,
+      admin_id: managerProfile.manager_admin_id || null
+    };
   }
 
   // Try admins table
@@ -95,7 +98,7 @@ export async function syncUserProfile(
           // Add admin_id to user profile from manager
           return {
             ...userProfile,
-            admin_id: managerData.manager_admin_id || null,
+            admin_id: managerData.manager_admin_id || null, // property matches the select
           };
         }
       } catch (err) {

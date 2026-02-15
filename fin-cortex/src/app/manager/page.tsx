@@ -18,8 +18,19 @@ import {
   UserPlus,
   Calendar,
   FileText,
-  Loader2
+  Loader2,
+  TrendingUp,
+  TrendingDown,
+  Filter,
+  Download
 } from "lucide-react";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -36,9 +47,36 @@ import {
   StatsCard,
   PageHeader,
 } from "@/components/dashboard";
+import { cn, formatCurrency, formatDate } from "@/lib/utils";
 import { ManagerLayout } from "@/components/dashboard/ManagerLayout";
 import { RouteProtection } from "@/components/auth/RouteProtection";
 import { useAuth } from "@/context/AuthContext";
+
+interface AnalyticsData {
+  totalClaims: number;
+  totalAmount: number;
+  averageClaim: number;
+  approvalRate: number;
+  rejectionRate: number;
+  pendingRate: number;
+  topCategories: {
+    category: string;
+    count: number;
+    amount: number;
+    percentage: number;
+  }[];
+  monthlyTrend: {
+    month: string;
+    claims: number;
+    amount: number;
+  }[];
+  teamPerformance: {
+    user: string;
+    claims: number;
+    amount: number;
+    avgTime: string;
+  }[];
+}
 
 // Quick actions for manager
 const quickActions = [
@@ -55,14 +93,6 @@ const quickActions = [
     icon: Users,
     href: "/manager/users",
     color: "bg-green-500"
-  },
-  // "Review Claims" removed as it's now on dashboard
-  {
-    title: "Analytics",
-    description: "View team reports",
-    icon: BarChart3,
-    href: "/manager/analytics",
-    color: "bg-orange-500"
   }
 ];
 
@@ -81,6 +111,7 @@ export default function ManagerDashboard() {
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [comment, setComment] = useState("");
   const [isProcessing, setIsProcessing] = useState(false);
+  const [timeRange, setTimeRange] = useState("6months");
 
   const fetchDashboardData = useCallback(async () => {
     if (!userProfile?.user_id) return;
@@ -219,111 +250,114 @@ export default function ManagerDashboard() {
   return (
     <RouteProtection allowedRoles={['manager']}>
       <ManagerLayout>
-        <div className="w-full max-w-full overflow-hidden">
+        <div className="flex flex-col gap-12">
           <PageHeader
-            title="Manager Dashboard"
-            description="Manage your team and review reimbursement claims"
-            icon={Users}
-            iconColor="text-purple-600 dark:text-purple-400"
-            iconBgColor="bg-purple-100 dark:bg-purple-900/30"
-            actions={
-              <div className="flex items-center space-x-2">
-                {/* Actions can go here if needed */}
-              </div>
-            }
+            title="Manager Command Center"
+            description="Operational oversight & team reimbursement control"
+            icon={Activity}
           />
 
           {/* Manager KPIs */}
-          <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6 mb-6 sm:mb-8 w-full min-w-0">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
             {managerStats.map((stat, index) => (
-              <div
+              <StatsCard
                 key={index}
+                title={stat.title}
+                value={stat.value}
+                change={stat.change}
+                changeType={stat.changeType}
+                icon={stat.icon}
                 className="animate-fade-in-up"
-                style={{ animationDelay: `${index * 100}ms` }}
-              >
-                <StatsCard
-                  title={stat.title}
-                  value={stat.value}
-                  change={stat.change}
-                  changeType={stat.changeType}
-                  icon={stat.icon}
-                />
-              </div>
+              />
             ))}
           </div>
 
-          {/* Main Content */}
-          <div className="space-y-8">
-
-            {/* 1. Pending Approvals Section */}
-            <section>
-              <div className="flex items-center justify-between mb-4">
-                <h2 className="text-xl font-bold text-slate-900 dark:text-slate-100 flex items-center">
-                  <Clock className="w-6 h-6 mr-2 text-orange-500" />
-                  Pending Approvals
-                </h2>
-                <Badge variant="secondary" className="bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-400">
-                  {pendingCount} pending
-                </Badge>
+          <div className="grid grid-cols-1 xl:grid-cols-3 gap-8">
+            {/* 1. Pending Approvals Section (2/3 width) */}
+            <div className="xl:col-span-2 flex flex-col gap-10">
+              <div className="flex items-center justify-between px-2">
+                <div className="flex items-center gap-3">
+                  <div className="h-10 w-10 rounded-xl bg-orange-500/20 flex items-center justify-center text-orange-400">
+                    <Clock className="w-6 h-6" />
+                  </div>
+                  <h2 className="text-2xl font-black text-[var(--text-primary)] uppercase tracking-tight">Pending Approvals</h2>
+                </div>
+                <span className="text-[10px] font-black uppercase tracking-widest text-orange-400 bg-orange-400/10 border border-orange-400/20 px-4 py-1.5 rounded-full">
+                  {pendingCount} ACTIONS REQUIRED
+                </span>
               </div>
 
               {isLoading ? (
-                <div className="flex justify-center py-8"><Loader2 className="animate-spin text-primary w-8 h-8" /></div>
+                <div className="flex justify-center py-20 bg-[var(--card-dark)] rounded-3xl border border-[var(--border-subtle)] shadow-sm">
+                  <Loader2 className="animate-spin text-purple-500 w-10 h-10" />
+                </div>
               ) : pendingApprovals.length === 0 ? (
-                <Card className="bg-white/80 dark:bg-slate-900/80 backdrop-blur-sm border-slate-200 dark:border-slate-700 p-8 text-center">
-                  <p className="text-slate-500">No pending approvals.</p>
+                <Card className="border-[var(--border-subtle)] bg-[var(--card-dark)] p-20 text-center rounded-3xl">
+                  <p className="text-[10px] font-black uppercase tracking-[0.3em] text-[var(--text-muted)]">All systems clear. No pending items discovered.</p>
                 </Card>
               ) : (
-                <div className="grid gap-4">
+                <div className="flex flex-col gap-6">
                   {pendingApprovals.map((claim) => (
-                    <Card key={claim.reimbursement_id} className="bg-white/80 dark:bg-slate-900/80 backdrop-blur-sm border-l-4 border-l-orange-500 border-y-slate-200 border-r-slate-200 dark:border-y-slate-700 dark:border-r-slate-700 shadow-sm hover:shadow-md transition-shadow">
-                      <CardContent className="p-4 sm:p-6">
-                        <div className="flex flex-col lg:flex-row gap-4 lg:items-center justify-between">
-                          {/* Claim Info */}
-                          <div className="flex-1 space-y-2">
-                            <div className="flex items-center gap-2 mb-1">
-                              <span className="font-bold text-lg text-slate-800 dark:text-slate-100">{claim.receipt_code}</span>
-                              <Badge className={priorityColors[claim.priority || 'medium']}>
-                                {(claim.priority || 'medium').toUpperCase()}
-                              </Badge>
+                    <Card key={claim.reimbursement_id} className="group overflow-hidden border-[var(--border-subtle)] bg-[var(--card-dark)] hover:bg-[var(--card-hover)] transition-all duration-500 rounded-3xl">
+                      <div className="absolute top-0 left-0 w-1.5 h-full bg-orange-500 opacity-60 group-hover:opacity-100 transition-opacity" />
+                      <CardContent className="p-8">
+                        {/* ... existing content ... */}
+                        <div className="flex flex-col lg:flex-row gap-8 lg:items-center justify-between">
+                          <div className="flex-1 flex flex-col gap-6">
+                            <div className="flex items-center gap-4">
+                              <span className="text-2xl font-black text-[var(--text-primary)] tracking-tight">{claim.receipt_code}</span>
+                              <span className={cn(
+                                "text-[10px] font-black uppercase tracking-[0.2em] px-3 py-1.5 rounded-xl border-2",
+                                claim.priority === 'high' ? "bg-red-500/10 text-red-400 border-red-500/20" :
+                                  claim.priority === 'medium' ? "bg-amber-500/10 text-amber-400 border-amber-500/20" :
+                                    "bg-blue-500/10 text-blue-400 border-blue-500/20"
+                              )}>
+                                {(claim.priority || 'medium')} PRIORITY
+                              </span>
                             </div>
-                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-8 gap-y-1 text-sm text-slate-600 dark:text-slate-400">
-                              <div className="flex items-center gap-2">
-                                <User className="w-4 h-4" /> {claim.users?.full_name || "Employee"}
+
+                            <div className="grid grid-cols-2 lg:grid-cols-4 gap-8">
+                              <div className="flex flex-col gap-1.5">
+                                <span className="text-[10px] font-black uppercase tracking-widest text-[var(--text-secondary)]">Employee</span>
+                                <span className="text-sm font-bold text-[var(--text-primary)] uppercase">{claim.users?.full_name || "Unidentified"}</span>
                               </div>
-                              <div className="flex items-center gap-2">
-                                <FileText className="w-4 h-4" /> {claim.categories?.category_name || "Uncategorized"}
+                              <div className="flex flex-col gap-1.5">
+                                <span className="text-[10px] font-black uppercase tracking-widest text-[var(--text-secondary)]">Category</span>
+                                <span className="text-sm font-bold text-[var(--text-primary)] uppercase">{claim.categories?.category_name || "Other"}</span>
                               </div>
-                              <div className="flex items-center gap-2">
-                                <DollarSign className="w-4 h-4" /> {formatCurrency(claim.amount_claimed)}
+                              <div className="flex flex-col gap-1.5">
+                                <span className="text-[10px] font-black uppercase tracking-widest text-[var(--text-secondary)]">Amount</span>
+                                <span className="text-lg font-black text-blue-400">{formatCurrency(claim.amount_claimed)}</span>
                               </div>
-                              <div className="flex items-center gap-2">
-                                <Calendar className="w-4 h-4" /> {formatDate(claim.created_at)}
+                              <div className="flex flex-col gap-1.5">
+                                <span className="text-[10px] font-black uppercase tracking-widest text-[var(--text-secondary)]">Submitted</span>
+                                <span className="text-sm font-bold text-[var(--text-secondary)] uppercase">{formatDate(claim.created_at)}</span>
                               </div>
                             </div>
+
                             {claim.policy_flags && claim.policy_flags.length > 0 && (
-                              <div className="flex flex-wrap gap-2 mt-2">
+                              <div className="flex flex-wrap gap-3 mt-2">
                                 {claim.policy_flags.map((flag: any, i: number) => (
-                                  <Badge key={i} variant="outline" className="text-xs border-red-200 text-red-600 bg-red-50">
-                                    <AlertTriangle className="w-3 h-3 mr-1" /> {flag.message}
-                                  </Badge>
+                                  <div key={i} className="inline-flex items-center gap-3 px-4 py-2 rounded-2xl bg-red-400/5 border border-red-400/20 shadow-lg shadow-red-500/5">
+                                    <AlertTriangle className="w-4 h-4 text-red-400" />
+                                    <span className="text-[10px] font-black text-red-400 uppercase tracking-widest">{flag.message}</span>
+                                  </div>
                                 ))}
                               </div>
                             )}
                           </div>
 
-                          {/* Actions */}
-                          <div className="flex flex-row lg:flex-col gap-2 shrink-0">
-                            <div className="flex gap-2 w-full lg:w-auto">
-                              <Button size="sm" className="bg-green-600 hover:bg-green-700 text-white flex-1 lg:flex-none" onClick={() => handleApprove(claim)}>
-                                <CheckCircle className="w-4 h-4 mr-1" /> Approve
+                          <div className="flex sm:flex-row lg:flex-col gap-4 shrink-0">
+                            <div className="flex gap-4">
+                              <Button className="h-12 text-[10px] font-black uppercase tracking-widest flex-1 px-8 bg-gradient-to-r from-blue-500 to-indigo-600 hover:from-blue-600 hover:to-indigo-700 text-white shadow-xl shadow-blue-500/20 rounded-2xl" onClick={() => handleApprove(claim)}>
+                                <CheckCircle className="w-5 h-5 mr-3" /> Approve
                               </Button>
-                              <Button size="sm" variant="destructive" className="flex-1 lg:flex-none" onClick={() => handleReject(claim)}>
-                                <XCircle className="w-4 h-4 mr-1" /> Reject
+                              <Button variant="outline" className="h-12 text-[10px] font-black uppercase tracking-widest border-red-500/30 bg-red-500/5 text-red-500 hover:bg-red-500 hover:text-white transition-all flex-1 rounded-2xl" onClick={() => handleReject(claim)}>
+                                <XCircle className="w-5 h-5 mr-3" /> Reject
                               </Button>
                             </div>
-                            <Button size="sm" variant="outline" className="w-full" onClick={() => router.push(`/manager/reimbursements/${claim.reimbursement_id}`)}>
-                              <Eye className="w-4 h-4 mr-1" /> View Details
+                            <Button variant="secondary" className="h-12 text-[10px] font-black uppercase tracking-widest border-[var(--border-subtle)] bg-[var(--card-dark)] text-[var(--text-secondary)] hover:bg-[var(--card-hover)] hover:text-[var(--text-primary)] transition-all rounded-2xl" onClick={() => router.push(`/manager/reimbursements/${claim.reimbursement_id}`)}>
+                              <Eye className="w-5 h-5 mr-3" /> Detailed Review
                             </Button>
                           </div>
                         </div>
@@ -332,90 +366,244 @@ export default function ManagerDashboard() {
                   ))}
                 </div>
               )}
-            </section>
 
-            {/* 2. Claim History Section */}
-            <section>
-              <div className="flex items-center justify-between mb-4">
-                <h2 className="text-xl font-bold text-slate-900 dark:text-slate-100 flex items-center">
-                  <Activity className="w-6 h-6 mr-2 text-blue-500" />
-                  Claim History
-                </h2>
-                <Badge variant="outline">
-                  {historyClaims.length} processed
-                </Badge>
-              </div>
-
-              {isLoading ? (
-                <div className="flex justify-center py-8"><Loader2 className="animate-spin text-primary w-8 h-8" /></div>
-              ) : historyClaims.length === 0 ? (
-                <Card className="bg-white/80 dark:bg-slate-900/80 backdrop-blur-sm border-slate-200 dark:border-slate-700 p-8 text-center">
-                  <p className="text-slate-500">No history found.</p>
-                </Card>
-              ) : (
-                <div className="grid gap-3">
-                  {historyClaims.slice(0, 10).map((claim) => (
-                    <div key={claim.reimbursement_id} className="flex flex-col sm:flex-row items-center justify-between p-4 bg-white dark:bg-slate-900 rounded-lg border border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors">
-                      <div className="flex items-center gap-4 w-full sm:w-auto">
-                        <div className={`p-2 rounded-full ${claim.status.toLowerCase() === 'approved' ? 'bg-green-100 text-green-600' : 'bg-red-100 text-red-600'}`}>
-                          {claim.status.toLowerCase() === 'approved' ? <CheckCircle className="w-5 h-5" /> : <XCircle className="w-5 h-5" />}
-                        </div>
-                        <div>
-                          <p className="font-medium text-slate-900 dark:text-slate-100">{claim.receipt_code}</p>
-                          <p className="text-xs text-slate-500">{claim.users?.full_name} • {formatDate(claim.created_at)}</p>
-                        </div>
-                      </div>
-                      <div className="flex items-center gap-4 w-full sm:w-auto justify-between sm:justify-end mt-2 sm:mt-0">
-                        <span className="font-bold text-slate-700 dark:text-slate-300">{formatCurrency(claim.amount_claimed)}</span>
-                        <Button size="sm" variant="ghost" onClick={() => router.push(`/manager/reimbursements/${claim.reimbursement_id}`)}>
-                          <Eye className="w-4 h-4 mr-1" /> Details
-                        </Button>
-                      </div>
+              {/* Analytics Section Integrated */}
+              <div className="mt-12 space-y-8">
+                <div className="flex items-center justify-between px-2">
+                  <div className="flex items-center gap-3">
+                    <div className="h-10 w-10 rounded-xl bg-purple-500/20 flex items-center justify-center text-purple-400">
+                      <BarChart3 className="w-6 h-6" />
                     </div>
-                  ))}
-                  {historyClaims.length > 10 && (
-                    <Button variant="ghost" className="w-full text-center text-sm text-slate-500" onClick={() => router.push('/manager/reimbursements')}>
-                      View All History
+                    <h2 className="text-2xl font-black text-[var(--text-primary)] uppercase tracking-tight">Team Analytics</h2>
+                  </div>
+                  <div className="flex items-center gap-3">
+                    <Select value={timeRange} onValueChange={setTimeRange}>
+                      <SelectTrigger className="w-40 h-10 glass-effect border-[var(--border-subtle)] text-[var(--text-primary)] rounded-xl">
+                        <Filter className="w-4 h-4 mr-2" />
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent className="bg-[var(--card-dark)] border-[var(--border-subtle)] rounded-xl">
+                        <SelectItem value="1month">Last Month</SelectItem>
+                        <SelectItem value="3months">Last 3 Months</SelectItem>
+                        <SelectItem value="6months">Last 6 Months</SelectItem>
+                        <SelectItem value="1year">Last Year</SelectItem>
+                      </SelectContent>
+                    </Select>
+                    <Button variant="outline" className="h-10 glass-effect border-[var(--border-subtle)] text-[var(--text-secondary)] hover:text-[var(--text-primary)] rounded-xl">
+                      <Download className="w-4 h-4" />
                     </Button>
-                  )}
+                  </div>
                 </div>
-              )}
-            </section>
 
-            {/* Quick Actions - Kept but 'Review' removed */}
-            <Card className="bg-white/80 dark:bg-slate-900/80 backdrop-blur-sm border-slate-200 dark:border-slate-700 shadow-lg">
-              <CardHeader className="pb-3">
-                <CardTitle className="text-lg font-semibold text-slate-900 dark:text-slate-100 flex items-center">
-                  <Plus className="w-5 h-5 mr-2 text-purple-500" />
-                  Quick Actions
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+                  {/* Top Categories */}
+                  <Card className="glass-effect border-[var(--border-subtle)] shadow-xl rounded-3xl overflow-hidden group">
+                    <CardHeader className="p-8 border-b border-white/[0.05]">
+                      <CardTitle className="text-sm font-black text-[var(--text-primary)] uppercase tracking-[0.2em] flex items-center gap-3">
+                        <BarChart3 className="w-4 h-4 text-purple-500" />
+                        Top Categories
+                      </CardTitle>
+                    </CardHeader>
+                    <CardContent className="p-8">
+                      <div className="space-y-6">
+                        {stats?.topCategories?.map((category: any, index: number) => (
+                          <div key={index} className="space-y-3">
+                            <div className="flex items-center justify-between">
+                              <span className="text-xs font-bold text-[var(--text-primary)] uppercase tracking-tight">
+                                {category.category}
+                              </span>
+                              <div className="text-right">
+                                <span className="text-xs font-black text-blue-400">
+                                  {formatCurrency(category.amount)}
+                                </span>
+                                <span className="text-[10px] text-[var(--text-muted)] ml-2 font-bold uppercase tracking-widest">
+                                  ({category.count} claims)
+                                </span>
+                              </div>
+                            </div>
+                            <div className="w-full bg-white/5 rounded-full h-3 p-0.5 border border-white/5">
+                              <div
+                                className="h-full rounded-full bg-gradient-to-r from-blue-500 via-indigo-500 to-purple-600 shadow-lg shadow-blue-500/20"
+                                style={{ width: `${category.percentage}%` }}
+                              />
+                            </div>
+                          </div>
+                        ))}
+                        {!stats?.topCategories && (
+                          <p className="text-[10px] font-black uppercase text-[var(--text-muted)] text-center tracking-[0.2em] py-10 opacity-50">No category data available.</p>
+                        )}
+                      </div>
+                    </CardContent>
+                  </Card>
+
+                  {/* Monthly Trend */}
+                  <Card className="glass-effect border-[var(--border-subtle)] shadow-xl rounded-3xl overflow-hidden">
+                    <CardHeader className="p-8 border-b border-white/[0.05]">
+                      <CardTitle className="text-sm font-black text-[var(--text-primary)] uppercase tracking-[0.2em] flex items-center gap-3">
+                        <TrendingUp className="w-4 h-4 text-emerald-500" />
+                        Monthly Trend
+                      </CardTitle>
+                    </CardHeader>
+                    <CardContent className="p-8">
+                      <div className="space-y-6">
+                        {stats?.monthlyTrend?.map((month: any, index: number) => {
+                          const maxAmount = Math.max(...stats.monthlyTrend.map((m: any) => m.amount));
+                          const percentage = (month.amount / maxAmount) * 100;
+
+                          return (
+                            <div key={index} className="space-y-3">
+                              <div className="flex items-center justify-between">
+                                <span className="text-xs font-bold text-[var(--text-primary)] uppercase tracking-tight">
+                                  {month.month}
+                                </span>
+                                <div className="text-right">
+                                  <span className="text-xs font-black text-emerald-400">
+                                    {formatCurrency(month.amount)}
+                                  </span>
+                                  <span className="text-[10px] text-[var(--text-muted)] ml-2 font-bold uppercase tracking-widest">
+                                    ({month.claims} claims)
+                                  </span>
+                                </div>
+                              </div>
+                              <div className="w-full bg-white/5 rounded-full h-3 p-0.5 border border-white/5">
+                                <div
+                                  className="h-full rounded-full bg-gradient-to-r from-emerald-500 to-blue-500 shadow-lg shadow-emerald-500/20"
+                                  style={{ width: `${percentage}%` }}
+                                />
+                              </div>
+                            </div>
+                          );
+                        })}
+                        {!stats?.monthlyTrend && (
+                          <p className="text-[10px] font-black uppercase text-[var(--text-muted)] text-center tracking-[0.2em] py-10 opacity-50">No trend data available.</p>
+                        )}
+                      </div>
+                    </CardContent>
+                  </Card>
+                </div>
+
+                {/* Team Performance */}
+                <Card className="glass-effect border-[var(--border-subtle)] shadow-xl rounded-3xl overflow-hidden">
+                  <CardHeader className="p-8 border-b border-white/[0.05]">
+                    <CardTitle className="text-sm font-black text-[var(--text-primary)] uppercase tracking-[0.2em] flex items-center gap-3">
+                      <Users className="w-4 h-4 text-blue-500" />
+                      Team Member Performance
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent className="p-8">
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                      {stats?.teamPerformance?.map((member: any, index: number) => (
+                        <div
+                          key={index}
+                          className="flex flex-col p-6 glass-effect border border-white/5 rounded-3xl hover:bg-white/[0.03] transition-all group/member"
+                        >
+                          <div className="flex items-center gap-4 mb-6">
+                            <div className="w-14 h-14 bg-gradient-to-br from-blue-500 to-indigo-600 rounded-2xl flex items-center justify-center text-white font-black text-lg shadow-lg shadow-blue-500/20 group-hover/member:scale-110 transition-transform">
+                              {member.user.split(" ").map((n: string) => n[0]).join("").toUpperCase().slice(0, 2)}
+                            </div>
+                            <div>
+                              <p className="text-sm font-black text-[var(--text-primary)] uppercase tracking-tight">
+                                {member.user}
+                              </p>
+                              <p className="text-[10px] font-bold text-blue-400 uppercase tracking-widest mt-0.5">
+                                {member.claims} total claims
+                              </p>
+                            </div>
+                          </div>
+                          <div className="space-y-4 pt-4 border-t border-white/5">
+                            <div className="flex justify-between items-center">
+                              <span className="text-[9px] font-black text-[var(--text-muted)] uppercase tracking-widest text-[var(--text-secondary)]">Volume</span>
+                              <span className="text-sm font-black text-[var(--text-primary)]">{formatCurrency(member.amount)}</span>
+                            </div>
+                            <div className="flex justify-between items-center">
+                              <span className="text-[9px] font-black text-[var(--text-muted)] uppercase tracking-widest text-[var(--text-secondary)]">Avg Resolve</span>
+                              <Badge className="bg-emerald-500/10 text-emerald-400 border-emerald-500/20 font-black text-[9px] uppercase tracking-widest rounded-xl px-3 py-1">
+                                {member.avgTime}
+                              </Badge>
+                            </div>
+                          </div>
+                        </div>
+                      ))}
+                      {!stats?.teamPerformance && (
+                        <div className="col-span-full py-12 text-center">
+                          <p className="text-[10px] font-black uppercase text-[var(--text-muted)] tracking-[0.2em] opacity-50">No team data discovered.</p>
+                        </div>
+                      )}
+                    </div>
+                  </CardContent>
+                </Card>
+              </div>
+            </div>
+
+            {/* 2. Side Panel: Quick Actions & History (1/3 width) */}
+            <div className="flex flex-col gap-8">
+              {/* Quick Actions Card */}
+              <Card className="border-[var(--border-subtle)] bg-[var(--card-dark)] shadow-sm relative overflow-hidden group">
+                <div className="absolute inset-0 bg-grid-slate-500/[0.05] bg-[length:30px_30px]" />
+                <CardHeader className="p-8 relative z-10">
+                  <CardTitle className="text-sm font-black text-[var(--text-primary)] uppercase tracking-[0.2em] flex items-center gap-3">
+                    <Plus className="w-4 h-4 text-purple-500" />
+                    Manager Actions
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="p-8 pt-0 relative z-10 flex flex-col gap-4">
                   {quickActions.map((action, index) => (
                     <Button
                       key={index}
-                      variant="outline"
+                      variant="ghost"
                       onClick={() => router.push(action.href)}
-                      className="h-auto p-4 flex flex-col items-center space-y-2 hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors cursor-pointer"
+                      className="h-auto p-4 flex items-center justify-start gap-5 bg-[var(--surface-elevated)] border border-[var(--border-subtle)] hover:bg-[var(--card-hover)] transition-all rounded-2xl text-left"
                     >
-                      <div className={`w-10 h-10 rounded-lg ${action.color} flex items-center justify-center`}>
-                        <action.icon className="w-5 h-5 text-white" />
+                      <div className={cn("w-10 h-10 rounded-xl flex items-center justify-center text-white shadow-sm group-hover:scale-110 transition-transform", action.color.replace('bg-', 'bg-opacity-80 text-').replace('-500', '-500'))}>
+                        <action.icon className="w-5 h-5" />
                       </div>
-                      <div className="text-center">
-                        <p className="text-sm font-medium text-slate-900 dark:text-slate-100">
+                      <div className="flex-1">
+                        <p className="text-[10px] font-black text-[var(--text-primary)] uppercase tracking-widest">
                           {action.title}
                         </p>
-                        <p className="text-xs text-slate-500 dark:text-slate-400">
+                        <p className="text-[9px] font-bold text-[var(--text-secondary)] uppercase mt-0.5">
                           {action.description}
                         </p>
                       </div>
                     </Button>
                   ))}
-                </div>
-              </CardContent>
-            </Card>
+                </CardContent>
+              </Card>
 
+              {/* Recent History Feed */}
+              <div className="flex flex-col gap-6">
+                <div className="flex items-center justify-between px-2">
+                  <h3 className="text-sm font-black text-[var(--text-primary)] uppercase tracking-[0.2em]">Activity Feed</h3>
+                  <Button variant="ghost" className="text-[9px] font-black uppercase text-[var(--text-secondary)] tracking-widest hover:text-[var(--text-primary)]" onClick={() => router.push('/manager/reimbursements')}>VIEW LOGS</Button>
+                </div>
+
+                <div className="flex flex-col gap-3">
+                  {isLoading ? (
+                    <div className="flex justify-center p-8"><Loader2 className="animate-spin text-purple-500 w-5 h-5" /></div>
+                  ) : historyClaims.length === 0 ? (
+                    <p className="text-[9px] font-black uppercase text-[var(--text-muted)] text-center py-10 tracking-[0.2em]">Log empty.</p>
+                  ) : (
+                    historyClaims.slice(0, 5).map((claim) => (
+                      <div key={claim.reimbursement_id} className="flex items-center justify-between p-4 bg-[var(--card-dark)] border border-[var(--border-subtle)] rounded-2xl hover:bg-[var(--card-hover)] transition-colors group cursor-pointer" onClick={() => router.push(`/manager/reimbursements/${claim.reimbursement_id}`)}>
+                        <div className="flex items-center gap-4">
+                          <div className={cn(
+                            "w-8 h-8 rounded-lg flex items-center justify-center",
+                            claim.status.toLowerCase() === 'approved' ? "bg-emerald-500/10 text-emerald-400" : "bg-red-500/10 text-red-500"
+                          )}>
+                            {claim.status.toLowerCase() === 'approved' ? <CheckCircle className="w-4 h-4" /> : <XCircle className="w-4 h-4" />}
+                          </div>
+                          <div>
+                            <p className="text-[10px] font-black text-[var(--text-primary)] uppercase tracking-wider">{claim.receipt_code}</p>
+                            <p className="text-[9px] font-bold text-[var(--text-secondary)] uppercase">{claim.users?.full_name}</p>
+                          </div>
+                        </div>
+                        <span className="text-[10px] font-black text-[var(--text-primary)] tracking-widest">{formatCurrency(claim.amount_claimed)}</span>
+                      </div>
+                    ))
+                  )}
+                </div>
+              </div>
+            </div>
           </div>
         </div>
 

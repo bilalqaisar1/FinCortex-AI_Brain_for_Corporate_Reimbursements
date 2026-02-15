@@ -37,11 +37,12 @@ import { Reimbursement } from "@/types/reimbursement";
 
 
 
+
 const statusColors = {
-  pending: "bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-400",
-  approved: "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400",
-  rejected: "bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400",
-  under_review: "bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400",
+  pending: "bg-amber-500/10 text-amber-500 border-amber-500/20 border",
+  approved: "bg-emerald-500/10 text-emerald-500 border-emerald-500/20 border",
+  rejected: "bg-red-500/10 text-red-500 border-red-500/20 border",
+  under_review: "bg-blue-500/10 text-blue-500 border-blue-500/20 border",
 };
 
 export default function ReimbursementsPage() {
@@ -115,13 +116,13 @@ export default function ReimbursementsPage() {
             title="Reimbursements"
             description="View and manage all reimbursement claims from your team"
             icon={Receipt}
-            iconColor="text-purple-600 dark:text-purple-400"
-            iconBgColor="bg-purple-100 dark:bg-purple-900/30"
+            iconColor="text-purple-500"
+            iconBgColor="bg-purple-500/10"
             actions={
               <div className="flex space-x-2">
                 <Button
                   variant="outline"
-                  className="hover:bg-green-50 hover:border-green-200 text-green-700 dark:text-green-400"
+                  className="hover:bg-green-500/10 hover:border-green-500/50 text-green-600 dark:text-green-400 border-[var(--border-subtle)] bg-transparent"
                   onClick={() => {
                     if (!userProfile?.user_id) return;
                     const url = `http://localhost:8000/api/v1/export/excel?manager_id=${userProfile.user_id}${statusFilter !== 'all' ? `&status=${statusFilter}` : ''}`;
@@ -133,7 +134,7 @@ export default function ReimbursementsPage() {
                 </Button>
                 <Button
                   variant="outline"
-                  className="hover:bg-blue-50 hover:border-blue-200 text-blue-700 dark:text-blue-400"
+                  className="hover:bg-blue-500/10 hover:border-blue-500/50 text-blue-600 dark:text-blue-400 border-[var(--border-subtle)] bg-transparent"
                   onClick={() => {
                     if (!userProfile?.user_id) return;
                     const url = `http://localhost:8000/api/v1/export/pdf?manager_id=${userProfile.user_id}${statusFilter !== 'all' ? `&status=${statusFilter}` : ''}`;
@@ -148,35 +149,35 @@ export default function ReimbursementsPage() {
           />
 
           {/* Filters and Search */}
-          <Card className="mb-6 bg-white/80 dark:bg-slate-900/80 backdrop-blur-sm border-slate-200 dark:border-slate-700 shadow-lg">
+          <Card className="mb-6 bg-[var(--card-dark)] border-[var(--border-subtle)] shadow-sm">
             <CardContent className="pt-6">
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                 <div className="relative">
-                  <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-slate-400 dark:text-slate-500" />
+                  <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-[var(--text-secondary)]" />
                   <Input
                     type="text"
                     placeholder="Search by receipt code, user, or vendor..."
                     value={searchQuery}
                     onChange={(e) => setSearchQuery(e.target.value)}
-                    className="pl-10 h-12 bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700 text-slate-900 dark:text-slate-100 placeholder-slate-400 focus:border-purple-300 dark:focus:border-purple-600 focus:ring-purple-200 dark:focus:ring-purple-800 rounded-xl"
+                    className="pl-10 h-12 bg-[var(--surface-elevated)] border-[var(--border-subtle)] text-[var(--text-primary)] placeholder-[var(--text-muted)] focus:border-purple-500/50 focus:ring rounded-xl"
                   />
                 </div>
                 <Select value={statusFilter} onValueChange={setStatusFilter}>
-                  <SelectTrigger className="h-12 bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700 text-slate-900 dark:text-slate-100 rounded-xl">
-                    <Filter className="w-4 h-4 mr-2 text-slate-600 dark:text-slate-400" />
+                  <SelectTrigger className="h-12 bg-[var(--surface-elevated)] border-[var(--border-subtle)] text-[var(--text-primary)] rounded-xl">
+                    <Filter className="w-4 h-4 mr-2 text-[var(--text-secondary)]" />
                     <SelectValue placeholder="Filter by status" />
                   </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">All Status</SelectItem>
-                    <SelectItem value="pending">Pending</SelectItem>
-                    <SelectItem value="approved">Approved</SelectItem>
-                    <SelectItem value="rejected">Rejected</SelectItem>
-                    <SelectItem value="under_review">Under Review</SelectItem>
+                  <SelectContent className="bg-[var(--card-dark)] border-[var(--border-subtle)]">
+                    <SelectItem value="all" className="text-[var(--text-primary)] focus:bg-[var(--card-hover)]">All Status</SelectItem>
+                    <SelectItem value="pending" className="text-[var(--text-primary)] focus:bg-[var(--card-hover)]">Pending</SelectItem>
+                    <SelectItem value="approved" className="text-[var(--text-primary)] focus:bg-[var(--card-hover)]">Approved</SelectItem>
+                    <SelectItem value="rejected" className="text-[var(--text-primary)] focus:bg-[var(--card-hover)]">Rejected</SelectItem>
+                    <SelectItem value="under_review" className="text-[var(--text-primary)] focus:bg-[var(--card-hover)]">Under Review</SelectItem>
                   </SelectContent>
                 </Select>
                 <Button
                   variant="outline"
-                  className="h-12 hover:bg-purple-50 dark:hover:bg-slate-800"
+                  className="h-12 hover:bg-[var(--card-hover)] border-[var(--border-subtle)] text-[var(--text-primary)] bg-transparent"
                   onClick={() => {
                     setSearchQuery("");
                     setStatusFilter("all");
@@ -200,11 +201,11 @@ export default function ReimbursementsPage() {
             const renderReimbursementItem = (reimb: Reimbursement) => (
               <div
                 key={reimb.reimbursement_id}
-                className="flex flex-col md:flex-row items-start md:items-center justify-between p-4 bg-slate-50 dark:bg-slate-800 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors gap-4"
+                className="flex flex-col md:flex-row items-start md:items-center justify-between p-4 bg-[var(--surface-elevated)] border border-[var(--border-subtle)] rounded-lg hover:bg-[var(--card-hover)] transition-colors gap-4"
               >
                 <div className="flex-1 min-w-0 space-y-2">
                   <div className="flex items-center space-x-3">
-                    <h3 className="font-semibold text-slate-900 dark:text-slate-100">
+                    <h3 className="font-semibold text-[var(--text-primary)]">
                       {reimb.receipt_code || "No Code"}
                     </h3>
                     {reimb.status && (
@@ -213,7 +214,7 @@ export default function ReimbursementsPage() {
                       </Badge>
                     )}
                   </div>
-                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-2 text-sm text-slate-600 dark:text-slate-400">
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-2 text-sm text-[var(--text-secondary)]">
                     <div className="flex items-center space-x-2">
                       <User className="w-4 h-4" />
                       <span>{reimb.user_name || "Unknown User"}</span>
@@ -253,7 +254,7 @@ export default function ReimbursementsPage() {
                     }}
                     disabled={!reimb.user_id}
                     title={!reimb.user_id ? "User ID missing" : "View Details"}
-                    className="hover:bg-purple-50 dark:hover:bg-slate-700"
+                    className="hover:bg-[var(--card-hover)] border-[var(--border-subtle)] text-[var(--text-secondary)] bg-transparent hover:text-[var(--text-primary)]"
                   >
                     <Eye className="w-4 h-4 mr-1" />
                     View Details
@@ -265,14 +266,14 @@ export default function ReimbursementsPage() {
             return (
               <>
                 {/* Pending Claims Section */}
-                <Card className="mb-6 bg-white/80 dark:bg-slate-900/80 backdrop-blur-sm border-yellow-200 dark:border-yellow-700 shadow-lg">
+                <Card className="mb-6 bg-[var(--card-dark)] border-[var(--border-subtle)] shadow-sm">
                   <CardHeader>
                     <CardTitle className="flex items-center justify-between">
-                      <span className="flex items-center">
-                        <Clock className="w-5 h-5 mr-2 text-yellow-600 dark:text-yellow-400" />
-                        <span className="text-slate-900 dark:text-slate-100">Pending Claims ({pendingReimbursements.length})</span>
+                      <span className="flex items-center text-[var(--text-primary)]">
+                        <Clock className="w-5 h-5 mr-2 text-amber-500" />
+                        <span>Pending Claims ({pendingReimbursements.length})</span>
                       </span>
-                      <Badge className="bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-400">
+                      <Badge className="bg-amber-500/10 text-amber-500 border border-amber-500/20">
                         Requires Review
                       </Badge>
                     </CardTitle>
@@ -280,7 +281,7 @@ export default function ReimbursementsPage() {
                   <CardContent>
                     {loading ? (
                       <div className="flex items-center justify-center py-12">
-                        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-yellow-600"></div>
+                        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-amber-500"></div>
                       </div>
                     ) : error ? (
                       <div className="text-center py-12 text-red-500">
@@ -289,8 +290,8 @@ export default function ReimbursementsPage() {
                       </div>
                     ) : pendingReimbursements.length === 0 ? (
                       <div className="text-center py-8">
-                        <CheckCircle className="w-12 h-12 mx-auto text-green-400 dark:text-green-500 mb-4" />
-                        <p className="text-slate-600 dark:text-slate-300">
+                        <CheckCircle className="w-12 h-12 mx-auto text-green-500 mb-4" />
+                        <p className="text-[var(--text-muted)]">
                           No pending claims to review. All caught up!
                         </p>
                       </div>
@@ -303,14 +304,14 @@ export default function ReimbursementsPage() {
                 </Card>
 
                 {/* All Reimbursements (Processed) Section */}
-                <Card className="bg-white/80 dark:bg-slate-900/80 backdrop-blur-sm border-slate-200 dark:border-slate-700 shadow-lg">
+                <Card className="bg-[var(--card-dark)] border-[var(--border-subtle)] shadow-sm">
                   <CardHeader>
                     <CardTitle className="flex items-center justify-between">
-                      <span className="flex items-center">
-                        <Receipt className="w-5 h-5 mr-2 text-purple-600 dark:text-purple-400" />
-                        <span className="text-slate-900 dark:text-slate-100">All Reimbursements ({processedReimbursements.length})</span>
+                      <span className="flex items-center text-[var(--text-primary)]">
+                        <Receipt className="w-5 h-5 mr-2 text-purple-500" />
+                        <span>All Reimbursements ({processedReimbursements.length})</span>
                       </span>
-                      <Badge className="bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300">
+                      <Badge className="bg-[var(--surface-elevated)] text-[var(--text-secondary)] border border-[var(--border-subtle)]">
                         Approved / Rejected
                       </Badge>
                     </CardTitle>
@@ -318,7 +319,7 @@ export default function ReimbursementsPage() {
                   <CardContent>
                     {loading ? (
                       <div className="flex items-center justify-center py-12">
-                        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-purple-600"></div>
+                        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-purple-500"></div>
                       </div>
                     ) : error ? (
                       <div className="text-center py-12 text-red-500">
@@ -327,8 +328,8 @@ export default function ReimbursementsPage() {
                       </div>
                     ) : processedReimbursements.length === 0 ? (
                       <div className="text-center py-8">
-                        <Receipt className="w-12 h-12 mx-auto text-slate-400 dark:text-slate-500 mb-4" />
-                        <p className="text-slate-600 dark:text-slate-300">
+                        <Receipt className="w-12 h-12 mx-auto text-[var(--text-muted)] mb-4" />
+                        <p className="text-[var(--text-muted)]">
                           {searchQuery || statusFilter !== "all"
                             ? "No processed reimbursements found matching your filters."
                             : "No processed reimbursements yet."}

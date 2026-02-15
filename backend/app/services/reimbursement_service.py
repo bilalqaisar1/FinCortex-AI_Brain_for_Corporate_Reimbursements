@@ -62,7 +62,7 @@ def _parse_decimal(value: str, fallback: str = "0") -> Decimal:
         return Decimal(fallback)
 
 
-def _get_or_create_vendor(name: str, vendor_type: Optional[str], address: Optional[str], company_id: Optional[int] = None) -> int:
+def _get_or_create_vendor(name: str, vendor_type: Optional[str], address: Optional[str]) -> int:
     """
     Get existing vendor by name (case-insensitive) or create new one.
     Updates vendor if new address/type provided.
@@ -110,8 +110,6 @@ def _get_or_create_vendor(name: str, vendor_type: Optional[str], address: Option
             "vendor_type": vendor_type.strip() if vendor_type and vendor_type.strip() else None,
             "address": address.strip() if address and address.strip() else None,
         }
-        if company_id:
-            vendor_data["company_id"] = company_id
         
         insert_response = supabase.table("vendors").insert(
             vendor_data,
@@ -123,8 +121,6 @@ def _get_or_create_vendor(name: str, vendor_type: Optional[str], address: Option
     except APIError as exc:
         logger.error("Failed to create vendor: %s", exc.message)
         raise ReimbursementServiceError(f"Failed to create vendor: {exc.message}") from exc
-
-
 def _insert_items(reimbursement_id: int, items: List[ReimbursementItemPayload]) -> None:
     """Insert reimbursement line items into database."""
     if not items:
@@ -263,14 +259,14 @@ def create_reimbursement(
         try:
             mgr_response = (
                 supabase.table("managers")
-                .select("admin_id")
+                .select("manager_admin_id")
                 .eq("manager_id", str(submission.manager_id))
                 .single()
                 .execute()
             )
-            if mgr_response.data and mgr_response.data.get("admin_id"):
+            if mgr_response.data and mgr_response.data.get("manager_admin_id"):
                 try:
-                    submission.admin_id = UUID(mgr_response.data["admin_id"])
+                    submission.admin_id = UUID(mgr_response.data["manager_admin_id"])
                 except Exception:
                     submission.admin_id = None
         except Exception as exc:
@@ -310,13 +306,64 @@ def create_reimbursement(
             except Exception as exc:
                 logger.warning("Could not fetch company by manager_id: %s", exc)
     
-    # Get or create vendor
+    # Validate category and subcategory belong to this admin
+    if submission.category_id or submission.subcategory_id:
+        if not submission.admin_id:
+            logger.warning("Submission has categories but no admin_id found for validation")
+            # If we can't find admin_id, we might want to allow it or reject it (fail-open vs fail-closed)
+            # Given the requirement "must be defined by admin", we should try to find admin from user
+            pass 
+
+        if submission.admin_id:
+            # Check category
+            if submission.category_id:
+                cat_check = (
+                    supabase.table("categories")
+                    .select("category_id")
+                    .eq("category_id", submission.category_id)
+                    .eq("admin_id", str(submission.admin_id))
+                    .execute()
+                )
+                if not cat_check.data:
+                    logger.error("Category %s does not belong to Admin %s", 
+                                 submission.category_id, submission.admin_id)
+                    raise ReimbursementServiceError("Invalid category selection for your organization.")
+
+            # Check subcategory (must belong to the selected category)
+            if submission.subcategory_id:
+                sub_check = (
+                    supabase.table("subcategories")
+                    .select("subcategory_id, category_id")
+                    .eq("subcategory_id", submission.subcategory_id)
+                    .execute()
+                )
+                if not sub_check.data:
+                    raise ReimbursementServiceError("Invalid subcategory selected.")
+                
+                sub_row = sub_check.data[0]
+                # If category_id was also provided, ensure subcategory belongs to it
+                if submission.category_id and sub_row["category_id"] != submission.category_id:
+                    raise ReimbursementServiceError("Subcategory does not belong to the selected category.")
+                
+                # Ensure the category the subcategory belongs to is owned by the admin
+                cat_id_of_sub = sub_row["category_id"]
+                cat_owner_check = (
+                    supabase.table("categories")
+                    .select("category_id")
+                    .eq("category_id", cat_id_of_sub)
+                    .eq("admin_id", str(submission.admin_id))
+                    .execute()
+                )
+                if not cat_owner_check.data:
+                    logger.error("Subcategory's parent category %s does not belong to Admin %s", 
+                                 cat_id_of_sub, submission.admin_id)
+                    raise ReimbursementServiceError("Invalid subcategory selection for your organization.")
+
     try:
         vendor_id = _get_or_create_vendor(
             submission.vendor_name, 
             submission.vendor_type, 
-            submission.address,
-            company_id=company_id
+            submission.address
         )
     except ReimbursementServiceError:
         raise

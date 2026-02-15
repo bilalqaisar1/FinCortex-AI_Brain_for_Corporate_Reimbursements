@@ -3,8 +3,7 @@
  */
 
 import { TeamMembersResponse } from '@/types/user';
-
-const BACKEND_URL = process.env.NEXT_PUBLIC_BACKEND_URL || 'http://localhost:8000';
+import { BACKEND_URL } from '@/lib/config';
 
 /**
  * Fetch all team members for a given manager

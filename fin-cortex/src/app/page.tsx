@@ -10,7 +10,7 @@ import { EnhancedSeparator } from "@/components/ui/separator-enhanced";
 
 export default function MainPage() {
   return (
-    <div className="min-h-screen">
+    <div className="min-h-screen bg-[var(--background-dark)] transition-colors duration-500">
       <Navbar />
       <HomePage />
       <EnhancedSeparator variant="gradient" thickness="medium" animated className="my-0" />

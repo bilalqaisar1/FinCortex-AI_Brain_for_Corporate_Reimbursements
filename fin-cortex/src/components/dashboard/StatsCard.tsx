@@ -71,35 +71,45 @@ export function StatsCard({
 
   return (
     <Card className={cn(
-      "bg-white/80 dark:bg-slate-900/80 backdrop-blur-sm border-slate-200 dark:border-slate-700 shadow-lg hover:shadow-xl transition-all duration-300 group hover:scale-105",
+      "bg-[var(--card-dark)] border border-[var(--border-subtle)] shadow-2xl transition-all duration-500 group overflow-hidden relative",
       className
     )}>
-      <CardContent className="p-4 sm:p-6">
-        <div className="flex items-center justify-between">
-          <div className="space-y-1 flex-1 min-w-0">
-            <p className="text-xs sm:text-sm font-medium text-slate-600 dark:text-slate-400 uppercase tracking-wide truncate">
+      {/* Background Accent Glow */}
+      <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-transparent via-purple-500/20 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
+
+      <CardContent className="p-8">
+        <div className="flex items-center justify-between gap-4">
+          <div className="flex-1 min-w-0 flex flex-col gap-1">
+            <p className="text-[10px] font-black uppercase tracking-[0.2em] text-[var(--text-muted)] group-hover:text-purple-400 transition-colors duration-300">
               {title}
             </p>
-            <p className="text-lg sm:text-xl lg:text-2xl font-bold text-slate-900 dark:text-slate-100 group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors">
+            <p className="text-3xl font-black text-[var(--text-primary)] tracking-tight">
               {value}
             </p>
-            {change && (
-              <div className={cn("flex items-center space-x-1 text-xs sm:text-sm", getChangeColor())}>
-                {getChangeIcon()}
-                <span className="truncate">{change}</span>
-              </div>
-            )}
-            {description && (
-              <p className="text-xs text-slate-500 dark:text-slate-400 mt-1 truncate">
-                {description}
-              </p>
-            )}
+
+            <div className="flex items-center gap-2 mt-2">
+              {change && (
+                <div className={cn("flex items-center gap-1.5 px-2 py-0.5 rounded-md bg-[var(--card-dark)] border border-[var(--border-subtle)] text-[10px] font-black uppercase tracking-wider", getChangeColor())}>
+                  {getChangeIcon()}
+                  <span>{change}</span>
+                </div>
+              )}
+              {description && (
+                <p className="text-[10px] font-bold text-[var(--text-muted)] uppercase tracking-widest truncate">
+                  {description}
+                </p>
+              )}
+            </div>
           </div>
+
           <div className={cn(
-            "w-10 h-10 sm:w-12 sm:h-12 rounded-lg flex items-center justify-center group-hover:scale-110 transition-transform duration-300 flex-shrink-0",
-            iconBgColor
+            "w-14 h-14 rounded-2xl flex items-center justify-center transition-all duration-500 relative overflow-hidden group-hover:scale-110",
+            "bg-[var(--card-dark)] border border-[var(--border-medium)] group-hover:border-purple-500/30 group-hover:bg-purple-500/10"
           )}>
-            <Icon className={cn("w-5 h-5 sm:w-6 sm:h-6", iconColor)} />
+            <div className="absolute inset-0 bg-gradient-to-br from-[#6366f1]/0 to-[#ec4899]/0 group-hover:from-[#6366f1]/10 group-hover:to-[#ec4899]/10 transition-all duration-500" />
+            <Icon className={cn("w-6 h-6 relative z-10 transition-colors duration-300",
+              "text-[var(--text-muted)] group-hover:text-[var(--text-primary)]"
+            )} />
           </div>
         </div>
       </CardContent>

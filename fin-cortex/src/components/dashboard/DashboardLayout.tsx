@@ -76,96 +76,102 @@ export function DashboardLayout({ children, className }: DashboardLayoutProps) {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-100 dark:from-slate-900 dark:via-blue-900 dark:to-indigo-900 transition-all duration-300">
+    <div className="min-h-screen bg-[var(--background-dark)] transition-all duration-500 overflow-x-hidden">
+      {/* Background Decorative Glows */}
+      <div className="fixed top-20 left-20 w-[600px] h-[600px] bg-indigo-600/5 blur-[150px] rounded-full pointer-events-none z-0" />
+      <div className="fixed bottom-20 right-20 w-[600px] h-[600px] bg-purple-600/5 blur-[150px] rounded-full pointer-events-none z-0" />
+
       {/* Desktop Layout */}
-      <div className="hidden lg:flex h-screen overflow-hidden">
+      <div className="hidden lg:flex h-screen overflow-hidden relative z-10">
         <AdminSidebar
           collapsed={sidebarCollapsed}
           onToggle={toggleSidebar}
         />
 
         {/* Main Content */}
-        <div className="flex-1 flex flex-col min-w-0 transition-all duration-300">
-          {/* Top Header - Enhanced Responsiveness */}
-          <header className="bg-white/80 dark:bg-slate-900/80 backdrop-blur-sm border-b border-slate-200 dark:border-slate-700 px-4 sm:px-6 py-3 sm:py-4 sticky top-0 z-40 transition-all duration-300">
+        <div className="flex-1 flex flex-col min-w-0 transition-all duration-500">
+          {/* Top Header - Glassmorphic Admin Style */}
+          <header className="bg-[var(--background-dark)]/40 backdrop-blur-3xl border-b border-[var(--border-subtle)] px-8 py-4 sticky top-0 z-40 transition-all duration-300">
             <div className="flex items-center justify-between">
-              <div className="flex items-center space-x-2 sm:space-x-4">
+              <div className="flex items-center gap-8">
                 <Button
                   variant="ghost"
-                  size="sm"
+                  size="icon"
                   onClick={toggleSidebar}
-                  className="lg:hidden hover:bg-blue-50 dark:hover:bg-slate-800"
+                  className="lg:hidden hover:bg-[var(--card-hover)] text-[var(--text-muted)] hover:text-[var(--text-primary)]"
                 >
-                  <Menu className="w-4 h-4 sm:w-5 sm:h-5" />
+                  <Menu className="w-5 h-5" />
                 </Button>
 
-                <div className="relative hidden sm:block">
-                  <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-slate-400 dark:text-slate-500" />
+                <div className="relative group hidden sm:block">
+                  <Search className="absolute left-4 top-1/2 transform -translate-y-1/2 w-4 h-4 text-[var(--text-muted)] group-focus-within:text-purple-400 transition-colors" />
                   <input
                     type="text"
-                    placeholder="Search admin panel..."
-                    className="w-48 lg:w-64 pl-10 pr-4 py-2 text-sm border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-200 dark:focus:ring-blue-800 focus:border-blue-300 dark:focus:border-blue-600 transition-all duration-200"
+                    placeholder="ADMIN CONSOLE SEARCH..."
+                    className="w-80 pl-11 pr-4 py-2.5 text-[10px] font-black tracking-widest bg-[var(--card-dark)] border border-[var(--border-medium)] text-[var(--text-primary)] rounded-xl focus:outline-none focus:ring-2 focus:ring-purple-500/20 focus:border-purple-500/40 transition-all placeholder:text-[var(--text-muted)]"
                   />
                 </div>
               </div>
 
-              <div className="flex items-center space-x-2 sm:space-x-4">
+              <div className="flex items-center gap-6">
                 <Button
                   variant="ghost"
-                  size="sm"
+                  size="icon"
                   onClick={toggleTheme}
-                  className="hover:bg-blue-50 dark:hover:bg-slate-800 transition-all duration-200"
+                  className="rounded-full bg-[var(--card-dark)] border border-[var(--border-medium)] hover:bg-[var(--card-hover)] text-[var(--text-secondary)] hover:text-[var(--text-primary)] transition-all duration-300"
                 >
                   {isDarkTheme ? (
-                    <Sun className="w-4 h-4 sm:w-5 sm:h-5 text-yellow-500" />
+                    <Sun className="w-4 h-4" />
                   ) : (
-                    <Moon className="w-4 h-4 sm:w-5 sm:h-5 text-slate-600" />
+                    <Moon className="w-4 h-4" />
                   )}
                 </Button>
+
+                <div className="h-6 w-px bg-[var(--border-medium)]" />
 
                 <NotificationCenter />
 
                 {/* User Profile Dropdown */}
                 <DropdownMenu>
                   <DropdownMenuTrigger asChild>
-                    <Button variant="ghost" className="h-9 w-9 rounded-full p-0 hover:bg-blue-50 dark:hover:bg-slate-800">
-                      <Avatar className="h-9 w-9">
+                    <Button variant="ghost" className="h-10 w-10 rounded-2xl p-0 hover:bg-[var(--card-hover)] transition-all duration-300 group">
+                      <Avatar className="h-10 w-10 rounded-2xl border border-[var(--border-subtle)] group-hover:border-purple-500/50 transition-all shadow-sm">
                         <AvatarImage src={user?.user_metadata?.avatar_url} alt={displayName} />
-                        <AvatarFallback className="bg-gradient-to-br from-blue-500 to-purple-600 text-white">
+                        <AvatarFallback className="bg-gradient-to-br from-[#6366f1] to-[#ec4899] text-white rounded-2xl font-black">
                           {userInitials}
                         </AvatarFallback>
                       </Avatar>
                     </Button>
                   </DropdownMenuTrigger>
-                  <DropdownMenuContent align="end" className="w-56">
-                    <DropdownMenuLabel className="font-normal">
-                      <div className="flex flex-col space-y-1">
-                        <p className="text-sm font-medium leading-none">{displayName}</p>
-                        <p className="text-xs leading-none text-muted-foreground">
-                          {userProfile?.email || user?.email || "No email"}
+                  <DropdownMenuContent align="end" className="w-64 bg-[var(--background-dark)]/90 backdrop-blur-3xl border-[var(--border-medium)] p-2">
+                    <DropdownMenuLabel className="p-4">
+                      <div className="flex flex-col gap-1">
+                        <p className="text-xs font-black uppercase tracking-widest text-[var(--text-primary)]">{displayName}</p>
+                        <p className="text-[10px] font-bold text-[var(--text-muted)] uppercase truncate">
+                          {userProfile?.email || user?.email}
                         </p>
-                        <p className="text-xs leading-none text-muted-foreground mt-1">
-                          Role: <span className="font-medium text-red-600 dark:text-red-400">Admin</span>
-                        </p>
+                        <div className="mt-3 inline-flex items-center px-2 py-0.5 rounded bg-red-500/10 border border-red-500/20 text-[9px] font-black text-red-400 uppercase tracking-widest leading-none">
+                          ADMINISTRATOR ROLE
+                        </div>
                       </div>
                     </DropdownMenuLabel>
-                    <DropdownMenuSeparator />
-                    <DropdownMenuItem asChild>
-                      <Link href={getProfileHref()} className="flex items-center cursor-pointer">
-                        <User className="mr-2 h-4 w-4" />
-                        <span>Profile</span>
+                    <DropdownMenuSeparator className="bg-[var(--border-subtle)]" />
+                    <DropdownMenuItem asChild className="p-3 focus:bg-[var(--card-hover)] cursor-pointer rounded-xl group">
+                      <Link href={getProfileHref()} className="flex items-center w-full">
+                        <User className="mr-3 h-4 w-4 text-[var(--text-muted)] group-hover:text-[var(--text-primary)]" />
+                        <span className="text-[10px] font-black uppercase tracking-widest text-[var(--text-muted)] group-hover:text-[var(--text-primary)]">Profile</span>
                       </Link>
                     </DropdownMenuItem>
-                    <DropdownMenuItem asChild>
-                      <Link href={`${getProfileHref()}/settings`} className="flex items-center cursor-pointer">
-                        <Settings className="mr-2 h-4 w-4" />
-                        <span>Settings</span>
+                    <DropdownMenuItem asChild className="p-3 focus:bg-[var(--card-hover)] cursor-pointer rounded-xl group">
+                      <Link href={`${getProfileHref()}/settings`} className="flex items-center w-full">
+                        <Settings className="mr-3 h-4 w-4 text-[var(--text-muted)] group-hover:text-[var(--text-primary)]" />
+                        <span className="text-[10px] font-black uppercase tracking-widest text-[var(--text-muted)] group-hover:text-[var(--text-primary)]">Settings</span>
                       </Link>
                     </DropdownMenuItem>
-                    <DropdownMenuSeparator />
-                    <DropdownMenuItem onClick={handleSignOut} className="text-red-600 dark:text-red-400 cursor-pointer">
-                      <LogOut className="mr-2 h-4 w-4" />
-                      <span>Log out</span>
+                    <DropdownMenuSeparator className="bg-[var(--border-subtle)]" />
+                    <DropdownMenuItem onClick={handleSignOut} className="p-3 focus:bg-red-500/10 cursor-pointer rounded-xl group">
+                      <LogOut className="mr-3 h-4 w-4 text-red-500/70" />
+                      <span className="text-[10px] font-black uppercase tracking-widest text-red-500/70">Secure Sign Out</span>
                     </DropdownMenuItem>
                   </DropdownMenuContent>
                 </DropdownMenu>
@@ -173,104 +179,43 @@ export function DashboardLayout({ children, className }: DashboardLayoutProps) {
             </div>
           </header>
 
-          {/* Page Content - Enhanced Responsiveness */}
-          <main className={cn("flex-1 p-3 sm:p-4 lg:p-6 overflow-auto min-w-0", className)}>
-            <div className="max-w-full overflow-x-auto">
+          {/* Page Content */}
+          <main className={cn("flex-1 p-8 lg:p-10 overflow-auto scrollbar-hide relative z-10", className)}>
+            <div className="max-w-7xl mx-auto w-full">
               {children}
             </div>
           </main>
         </div>
       </div>
 
-      {/* Mobile Layout - Enhanced */}
-      <div className="lg:hidden">
-        {/* Mobile Header */}
-        <header className="bg-white/80 dark:bg-slate-900/80 backdrop-blur-sm border-b border-slate-200 dark:border-slate-700 px-3 sm:px-4 py-2 sm:py-3 sticky top-0 z-40 transition-all duration-300">
+      {/* Mobile Layout */}
+      <div className="lg:hidden relative z-10">
+        <header className="bg-[var(--background-dark)]/60 backdrop-blur-xl border-b border-[var(--border-subtle)] px-6 py-4 sticky top-0 z-40">
           <div className="flex items-center justify-between">
-            <div className="flex items-center space-x-2 sm:space-x-3">
+            <div className="flex items-center gap-4">
               <Sheet open={mobileSidebarOpen} onOpenChange={setMobileSidebarOpen}>
                 <SheetTrigger asChild>
-                  <Button variant="ghost" size="sm" className="hover:bg-blue-50 dark:hover:bg-slate-800">
-                    <Menu className="w-4 h-4 sm:w-5 sm:h-5" />
+                  <Button variant="ghost" size="icon" className="hover:bg-[var(--card-hover)] text-[var(--text-muted)]">
+                    <Menu className="w-5 h-5" />
                   </Button>
                 </SheetTrigger>
-                <SheetContent side="left" className="w-72 p-0 bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-700">
-                  <AdminSidebar />
+                <SheetContent side="left" className="w-80 p-0 bg-[var(--background-dark)] border-[var(--border-medium)]">
+                  <AdminSidebar onToggle={() => setMobileSidebarOpen(false)} />
                 </SheetContent>
               </Sheet>
 
-              <div className="w-7 h-7 sm:w-8 sm:h-8 bg-gradient-to-br from-blue-500 to-purple-600 rounded-lg flex items-center justify-center shadow-lg">
-                <span className="text-white font-bold text-xs sm:text-sm">F</span>
+              <div className="w-10 h-10 bg-gradient-to-br from-[#6366f1] via-[#a855f7] to-[#ec4899] rounded-xl flex items-center justify-center shadow-lg shadow-purple-500/20">
+                <span className="text-white font-black text-lg">F</span>
               </div>
-              <span className="text-base sm:text-lg font-bold text-slate-900 dark:text-slate-100">FinCortex</span>
             </div>
 
-            <div className="flex items-center space-x-1 sm:space-x-2">
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={toggleTheme}
-                className="hover:bg-blue-50 dark:hover:bg-slate-800 transition-all duration-200"
-              >
-                {isDarkTheme ? (
-                  <Sun className="w-4 h-4 sm:w-5 sm:h-5 text-yellow-500" />
-                ) : (
-                  <Moon className="w-4 h-4 sm:w-5 sm:h-5 text-slate-600" />
-                )}
-              </Button>
-
+            <div className="flex items-center gap-4">
               <NotificationCenter />
-
-              {/* Mobile User Profile */}
-              <DropdownMenu>
-                <DropdownMenuTrigger asChild>
-                  <Button variant="ghost" className="h-8 w-8 rounded-full p-0 hover:bg-blue-50 dark:hover:bg-slate-800">
-                    <Avatar className="h-8 w-8">
-                      <AvatarImage src={user?.user_metadata?.avatar_url} alt={displayName} />
-                      <AvatarFallback className="bg-gradient-to-br from-blue-500 to-purple-600 text-white text-xs">
-                        {userInitials}
-                      </AvatarFallback>
-                    </Avatar>
-                  </Button>
-                </DropdownMenuTrigger>
-                <DropdownMenuContent align="end" className="w-56">
-                  <DropdownMenuLabel className="font-normal">
-                    <div className="flex flex-col space-y-1">
-                      <p className="text-sm font-medium leading-none">{displayName}</p>
-                      <p className="text-xs leading-none text-muted-foreground">
-                        {userProfile?.email || user?.email || "No email"}
-                      </p>
-                      <p className="text-xs leading-none text-muted-foreground mt-1">
-                        Role: <span className="font-medium text-red-600 dark:text-red-400">Admin</span>
-                      </p>
-                    </div>
-                  </DropdownMenuLabel>
-                  <DropdownMenuSeparator />
-                  <DropdownMenuItem asChild>
-                    <Link href={getProfileHref()} className="flex items-center cursor-pointer">
-                      <User className="mr-2 h-4 w-4" />
-                      <span>Profile</span>
-                    </Link>
-                  </DropdownMenuItem>
-                  <DropdownMenuItem asChild>
-                    <Link href={`${getProfileHref()}/settings`} className="flex items-center cursor-pointer">
-                      <Settings className="mr-2 h-4 w-4" />
-                      <span>Settings</span>
-                    </Link>
-                  </DropdownMenuItem>
-                  <DropdownMenuSeparator />
-                  <DropdownMenuItem onClick={handleSignOut} className="text-red-600 dark:text-red-400 cursor-pointer">
-                    <LogOut className="mr-2 h-4 w-4" />
-                    <span>Log out</span>
-                  </DropdownMenuItem>
-                </DropdownMenuContent>
-              </DropdownMenu>
             </div>
           </div>
         </header>
 
-        {/* Mobile Content - Enhanced */}
-        <main className={cn("p-3 sm:p-4 overflow-auto min-h-screen", className)}>
+        <main className={cn("p-6 overflow-auto min-h-screen", className)}>
           {children}
         </main>
       </div>

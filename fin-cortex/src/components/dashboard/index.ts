@@ -17,3 +17,4 @@ export { BudgetOverview } from "./BudgetOverview";
 export { UserManagement } from "./UserManagement";
 export { PolicyViolations } from "./PolicyViolations";
 export { QuickAnalytics } from "./QuickAnalytics";
+export { CategoriesManager } from "./CategoriesManager";

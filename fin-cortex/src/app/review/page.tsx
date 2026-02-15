@@ -8,14 +8,14 @@ export default function HappyClientsSection() {
   const clientReviews = [
     {
       node: (
-        <Card className="p-6 bg-card border border-subtle rounded-xl shadow-lg hover:shadow-xl transition-all duration-300 w-96 mx-4">
+        <Card className="p-6 bg-[var(--card-dark)] border border-[var(--border-subtle)] rounded-xl shadow-lg hover:shadow-xl transition-all duration-300 w-96 mx-4">
           <div className="flex items-center mb-4">
             <div className="w-12 h-12 bg-gradient-to-r from-blue-500 to-purple-600 rounded-full flex items-center justify-center text-white font-bold text-lg mr-4">
               JD
             </div>
             <div>
-              <h4 className="text-lg font-semibold text-primary">John Doe</h4>
-              <p className="text-sm text-muted">CEO, TechCorp</p>
+              <h4 className="text-lg font-semibold text-[var(--text-primary)]">John Doe</h4>
+              <p className="text-sm text-[var(--text-secondary)]">CEO, TechCorp</p>
             </div>
           </div>
           <div className="flex items-center mb-3">
@@ -25,7 +25,7 @@ export default function HappyClientsSection() {
           </div>
           <div className="relative">
             <Quote className="absolute -top-2 -left-2 w-6 h-6 text-accent/30" />
-            <p className="text-sm text-muted italic pl-4 leading-relaxed">
+            <p className="text-sm text-[var(--text-secondary)] italic pl-4 leading-relaxed">
               "&quot;FinCortex has revolutionized our expense management. The AI-powered &quot;OCR saves us hours every week, and the automated approval process is incredibly efficient.&quot;
             </p>
           </div>
@@ -35,14 +35,14 @@ export default function HappyClientsSection() {
     },
     {
       node: (
-        <Card className="p-6 bg-card border border-subtle rounded-xl shadow-lg hover:shadow-xl transition-all duration-300 w-96 mx-4">
+        <Card className="p-6 bg-[var(--card-dark)] border border-[var(--border-subtle)] rounded-xl shadow-lg hover:shadow-xl transition-all duration-300 w-96 mx-4">
           <div className="flex items-center mb-4">
             <div className="w-12 h-12 bg-gradient-to-r from-green-500 to-teal-600 rounded-full flex items-center justify-center text-white font-bold text-lg mr-4">
               SM
             </div>
             <div>
-              <h4 className="text-lg font-semibold text-primary">Sarah Miller</h4>
-              <p className="text-sm text-muted">CFO, FinanceFlow</p>
+              <h4 className="text-lg font-semibold text-[var(--text-primary)]">Sarah Miller</h4>
+              <p className="text-sm text-[var(--text-secondary)]">CFO, FinanceFlow</p>
             </div>
           </div>
           <div className="flex items-center mb-3">
@@ -52,7 +52,7 @@ export default function HappyClientsSection() {
           </div>
           <div className="relative">
             <Quote className="absolute -top-2 -left-2 w-6 h-6 text-accent/30" />
-            <p className="text-sm text-muted italic pl-4 leading-relaxed">
+            <p className="text-sm text-[var(--text-secondary)] italic pl-4 leading-relaxed">
               "The policy enforcement feature is a game-changer. We&apos;ve reduced compliance issues by 90% and our team loves how intuitive the interface is."
             </p>
           </div>
@@ -62,14 +62,14 @@ export default function HappyClientsSection() {
     },
     {
       node: (
-        <Card className="p-6 bg-card border border-subtle rounded-xl shadow-lg hover:shadow-xl transition-all duration-300 w-96 mx-4">
+        <Card className="p-6 bg-[var(--card-dark)] border border-[var(--border-subtle)] rounded-xl shadow-lg hover:shadow-xl transition-all duration-300 w-96 mx-4">
           <div className="flex items-center mb-4">
             <div className="w-12 h-12 bg-gradient-to-r from-purple-500 to-pink-600 rounded-full flex items-center justify-center text-white font-bold text-lg mr-4">
               RJ
             </div>
             <div>
-              <h4 className="text-lg font-semibold text-primary">Robert Johnson</h4>
-              <p className="text-sm text-muted">Operations Director, GlobalTech</p>
+              <h4 className="text-lg font-semibold text-[var(--text-primary)]">Robert Johnson</h4>
+              <p className="text-sm text-[var(--text-secondary)]">Operations Director, GlobalTech</p>
             </div>
           </div>
           <div className="flex items-center mb-3">
@@ -79,7 +79,7 @@ export default function HappyClientsSection() {
           </div>
           <div className="relative">
             <Quote className="absolute -top-2 -left-2 w-6 h-6 text-accent/30" />
-            <p className="text-sm text-muted italic pl-4 leading-relaxed">
+            <p className="text-sm text-[var(--text-secondary)] italic pl-4 leading-relaxed">
               &quot;Implementation was seamless and the support team is outstanding. Our reimbursement process is now 75% faster than before.&quot;
             </p>
           </div>
@@ -89,14 +89,14 @@ export default function HappyClientsSection() {
     },
     {
       node: (
-        <Card className="p-6 bg-card border border-subtle rounded-xl shadow-lg hover:shadow-xl transition-all duration-300 w-96 mx-4">
+        <Card className="p-6 bg-[var(--card-dark)] border border-[var(--border-subtle)] rounded-xl shadow-lg hover:shadow-xl transition-all duration-300 w-96 mx-4">
           <div className="flex items-center mb-4">
             <div className="w-12 h-12 bg-gradient-to-r from-orange-500 to-red-600 rounded-full flex items-center justify-center text-white font-bold text-lg mr-4">
               EW
             </div>
             <div>
-              <h4 className="text-lg font-semibold text-primary">Emily Wilson</h4>
-              <p className="text-sm text-muted">HR Manager, PeopleFirst</p>
+              <h4 className="text-lg font-semibold text-[var(--text-primary)]">Emily Wilson</h4>
+              <p className="text-sm text-[var(--text-secondary)]">HR Manager, PeopleFirst</p>
             </div>
           </div>
           <div className="flex items-center mb-3">
@@ -106,7 +106,7 @@ export default function HappyClientsSection() {
           </div>
           <div className="relative">
             <Quote className="absolute -top-2 -left-2 w-6 h-6 text-accent/30" />
-            <p className="text-sm text-muted italic pl-4 leading-relaxed">
+            <p className="text-sm text-[var(--text-secondary)] italic pl-4 leading-relaxed">
               &quot;The mobile app is fantastic! Our employees can submit expenses on the go, and the real-time notifications keep everyone in the loop.&quot;
             </p>
           </div>
@@ -116,14 +116,14 @@ export default function HappyClientsSection() {
     },
     {
       node: (
-        <Card className="p-6 bg-card border border-subtle rounded-xl shadow-lg hover:shadow-xl transition-all duration-300 w-96 mx-4">
+        <Card className="p-6 bg-[var(--card-dark)] border border-[var(--border-subtle)] rounded-xl shadow-lg hover:shadow-xl transition-all duration-300 w-96 mx-4">
           <div className="flex items-center mb-4">
             <div className="w-12 h-12 bg-gradient-to-r from-indigo-500 to-blue-600 rounded-full flex items-center justify-center text-white font-bold text-lg mr-4">
               MC
             </div>
             <div>
-              <h4 className="text-lg font-semibold text-primary">Michael Chen</h4>
-              <p className="text-sm text-muted">Finance Director, StartupHub</p>
+              <h4 className="text-lg font-semibold text-[var(--text-primary)]">Michael Chen</h4>
+              <p className="text-sm text-[var(--text-secondary)]">Finance Director, StartupHub</p>
             </div>
           </div>
           <div className="flex items-center mb-3">
@@ -133,7 +133,7 @@ export default function HappyClientsSection() {
           </div>
           <div className="relative">
             <Quote className="absolute -top-2 -left-2 w-6 h-6 text-accent/30" />
-            <p className="text-sm text-muted italic pl-4 leading-relaxed">
+            <p className="text-sm text-[var(--text-secondary)] italic pl-4 leading-relaxed">
               "The analytics dashboard provides incredible insights into our spending patterns. It&apos;s helped us make better financial decisions across the company."
             </p>
           </div>
@@ -144,21 +144,21 @@ export default function HappyClientsSection() {
   ];
 
   return (
-    <section className="py-20 px-4 relative">
+    <section id="reviews" className="py-20 px-4 relative">
       <div className="max-w-7xl mx-auto">
         {/* Header */}
         <div className="text-center mb-8">
-          <div className="inline-flex items-center px-4 py-2 bg-card backdrop-blur-sm rounded-full border border-subtle mb-6 animate-fade-in-up">
+          <div className="inline-flex items-center px-4 py-2 bg-[var(--card-dark)] backdrop-blur-sm rounded-full border border-[var(--border-subtle)] mb-6 animate-fade-in-up">
             <Star className="w-4 h-4 text-accent mr-2" />
             <span className="text-sm font-medium text-accent">Client Testimonials</span>
           </div>
-          
-          <h2 className="text-4xl md:text-5xl font-bold text-primary mb-4 animate-fade-in-up" style={{ animationDelay: '0.1s' }}>
+
+          <h2 className="text-4xl md:text-5xl font-bold text-[var(--text-primary)] mb-4 animate-fade-in-up" style={{ animationDelay: '0.1s' }}>
             Our Happy
             <span className="block text-gradient-primary">Clients</span>
           </h2>
-          
-          <p className="text-xl text-muted max-w-3xl mx-auto animate-fade-in-up" style={{ animationDelay: '0.2s' }}>
+
+          <p className="text-xl text-[var(--text-secondary)] max-w-3xl mx-auto animate-fade-in-up" style={{ animationDelay: '0.2s' }}>
             Don&apos;t just take our word for it. Here's what our clients have to say about their experience with FinCortex.
           </p>
         </div>
@@ -188,8 +188,8 @@ export default function HappyClientsSection() {
                 <Users className="w-8 h-8 text-white" />
               </div>
               <div className="text-center lg:text-left">
-                <div className="text-4xl font-bold text-primary mb-2">500+</div>
-                <div className="text-muted">Happy Clients</div>
+                <div className="text-4xl font-bold text-[var(--text-primary)] mb-2">500+</div>
+                <div className="text-[var(--text-secondary)]">Happy Clients</div>
               </div>
             </div>
           </div>
@@ -199,8 +199,8 @@ export default function HappyClientsSection() {
                 <StarIcon className="w-8 h-8 text-white" />
               </div>
               <div className="text-center lg:text-left">
-                <div className="text-4xl font-bold text-primary mb-2">4.9/5</div>
-                <div className="text-muted">Average Rating</div>
+                <div className="text-4xl font-bold text-[var(--text-primary)] mb-2">4.9/5</div>
+                <div className="text-[var(--text-secondary)]">Average Rating</div>
               </div>
             </div>
           </div>
@@ -210,8 +210,8 @@ export default function HappyClientsSection() {
                 <Heart className="w-8 h-8 text-white" />
               </div>
               <div className="text-center lg:text-left">
-                <div className="text-4xl font-bold text-primary mb-2">98%</div>
-                <div className="text-muted">Client Satisfaction</div>
+                <div className="text-4xl font-bold text-[var(--text-primary)] mb-2">98%</div>
+                <div className="text-[var(--text-secondary)]">Client Satisfaction</div>
               </div>
             </div>
           </div>
