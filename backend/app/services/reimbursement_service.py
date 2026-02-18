@@ -306,59 +306,6 @@ def create_reimbursement(
             except Exception as exc:
                 logger.warning("Could not fetch company by manager_id: %s", exc)
     
-    # Validate category and subcategory belong to this admin
-    if submission.category_id or submission.subcategory_id:
-        if not submission.admin_id:
-            logger.warning("Submission has categories but no admin_id found for validation")
-            # If we can't find admin_id, we might want to allow it or reject it (fail-open vs fail-closed)
-            # Given the requirement "must be defined by admin", we should try to find admin from user
-            pass 
-
-        if submission.admin_id:
-            # Check category
-            if submission.category_id:
-                cat_check = (
-                    supabase.table("categories")
-                    .select("category_id")
-                    .eq("category_id", submission.category_id)
-                    .eq("admin_id", str(submission.admin_id))
-                    .execute()
-                )
-                if not cat_check.data:
-                    logger.error("Category %s does not belong to Admin %s", 
-                                 submission.category_id, submission.admin_id)
-                    raise ReimbursementServiceError("Invalid category selection for your organization.")
-
-            # Check subcategory (must belong to the selected category)
-            if submission.subcategory_id:
-                sub_check = (
-                    supabase.table("subcategories")
-                    .select("subcategory_id, category_id")
-                    .eq("subcategory_id", submission.subcategory_id)
-                    .execute()
-                )
-                if not sub_check.data:
-                    raise ReimbursementServiceError("Invalid subcategory selected.")
-                
-                sub_row = sub_check.data[0]
-                # If category_id was also provided, ensure subcategory belongs to it
-                if submission.category_id and sub_row["category_id"] != submission.category_id:
-                    raise ReimbursementServiceError("Subcategory does not belong to the selected category.")
-                
-                # Ensure the category the subcategory belongs to is owned by the admin
-                cat_id_of_sub = sub_row["category_id"]
-                cat_owner_check = (
-                    supabase.table("categories")
-                    .select("category_id")
-                    .eq("category_id", cat_id_of_sub)
-                    .eq("admin_id", str(submission.admin_id))
-                    .execute()
-                )
-                if not cat_owner_check.data:
-                    logger.error("Subcategory's parent category %s does not belong to Admin %s", 
-                                 cat_id_of_sub, submission.admin_id)
-                    raise ReimbursementServiceError("Invalid subcategory selection for your organization.")
-
     try:
         vendor_id = _get_or_create_vendor(
             submission.vendor_name, 
@@ -370,6 +317,43 @@ def create_reimbursement(
     except Exception as exc:
         logger.error("Unexpected error getting/creating vendor: %s", exc)
         raise ReimbursementServiceError(f"Failed to process vendor: {str(exc)}") from exc
+
+    # Validate receipt_type_id exists in DB; seed if table is empty
+    if submission.receipt_type_id is not None:
+        try:
+            rt_check = (
+                supabase.table("receipt_types")
+                .select("receipt_type_id")
+                .execute()
+            )
+            existing_ids = {r["receipt_type_id"] for r in (rt_check.data or [])}
+
+            if not existing_ids:
+                # Table is empty — seed the standard receipt types
+                seed_types = [
+                    {"type_name": "Paper"},
+                    {"type_name": "Bank Transfer"},
+                    {"type_name": "Bill"},
+                    {"type_name": "Invoice"},
+                    {"type_name": "Digital Receipt"},
+                    {"type_name": "Credit Card Statement"},
+                ]
+                try:
+                    seed_resp = supabase.table("receipt_types").insert(seed_types).execute()
+                    existing_ids = {r["receipt_type_id"] for r in (seed_resp.data or [])}
+                    logger.info("Seeded receipt_types table with %d entries", len(existing_ids))
+                except Exception as seed_exc:
+                    logger.warning("Could not seed receipt_types: %s", seed_exc)
+
+            if submission.receipt_type_id not in existing_ids:
+                logger.warning(
+                    "receipt_type_id %s not found in receipt_types table, setting to None",
+                    submission.receipt_type_id,
+                )
+                submission.receipt_type_id = None
+        except Exception as rt_exc:
+            logger.warning("Could not validate receipt_type_id: %s", rt_exc)
+            submission.receipt_type_id = None
 
     # Parse amount
     amount_claimed = _parse_decimal(submission.amount_claimed, "0")

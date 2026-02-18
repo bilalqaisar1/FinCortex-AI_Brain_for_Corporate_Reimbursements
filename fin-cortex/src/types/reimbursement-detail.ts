@@ -71,6 +71,13 @@ export interface ReimbursementDetail {
     // Nested Data
     attachments: Attachment[];
     items: ReimbursementItem[];
+
+    // Policy Flags (violations)
+    policy_flags?: Array<{
+        code: string;
+        message: string;
+        severity: string;
+    }>;
 }
 
 export interface ReimbursementDetailResponse {

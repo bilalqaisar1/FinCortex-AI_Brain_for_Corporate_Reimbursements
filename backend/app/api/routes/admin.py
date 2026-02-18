@@ -451,10 +451,14 @@ async def get_admin_analytics(admin_id: Optional[str] = None, period: str = "30d
         total_claims = len(current_data)
         prev_total_claims = len(prev_data)
         
-        total_amount = sum(float(r.get("amount_approved") or r.get("amount_claimed") or 0) for r in current_data)
-        prev_total_amount = sum(float(r.get("amount_approved") or r.get("amount_claimed") or 0) for r in prev_data)
+        # Total Amount and Average Claim should only count APPROVED claims
+        approved_data = [r for r in current_data if r.get("status") == "approved"]
+        prev_approved_data = [r for r in prev_data if r.get("status") == "approved"]
         
-        average_claim = total_amount / total_claims if total_claims > 0 else 0
+        total_amount = sum(float(r.get("amount_approved") or r.get("amount_claimed") or 0) for r in approved_data)
+        prev_total_amount = sum(float(r.get("amount_approved") or r.get("amount_claimed") or 0) for r in prev_approved_data)
+        
+        average_claim = total_amount / len(approved_data) if len(approved_data) > 0 else 0
         
         # Status breakdown
         approved_claims = len([r for r in current_data if r.get("status") == "approved"])
@@ -515,75 +519,141 @@ async def get_admin_analytics(admin_id: Optional[str] = None, period: str = "30d
         active_managers_count = 0
         active_users_list = []
         active_managers_list = []
+        claims_list = []
+        all_managers = []
+        mgr_dept_map = {}  # department_id -> manager_name
+        mgr_id_name_map = {}  # manager_id -> manager_name
         
         try:
-            # Fetch all users with department info
-            # Note: joining definitions might vary, assuming departments(department_name) is accessible via join if setup,
-            # but simpler to fetch departments separately and map if foreign keys aren't perfect in Supabase ORM.
-            # Let's try direct select with map.
-            
-            u_query = supabase.table("users").select("user_id, full_name, email, role, department_id, is_active")
-            if company_id:
-                u_query = u_query.eq("company_id", company_id)
-            
-            users_resp = u_query.execute()
-            all_users = users_resp.data or []
-            
-            # Fetch departments for mapping
+            # Fetch departments for mapping (departments table has no company_id column)
             d_query = supabase.table("departments").select("department_id, department_name")
-            if company_id:
-                d_query = d_query.eq("company_id", company_id)
             dept_resp = d_query.execute()
             dept_map = {d["department_id"]: d["department_name"] for d in (dept_resp.data or [])}
             
-            # Identify Managers per Department (for "Assigned Manager" field)
-            dept_managers = {}
+            # --- Managers: query the dedicated managers table ---
+            # Use select("*") to get ALL columns regardless of naming convention
+            try:
+                mgr_resp = supabase.table("managers") \
+                    .select("*") \
+                    .eq("manager_admin_id", admin_id) \
+                    .execute()
+                all_managers = mgr_resp.data or []
+                
+                # If no results with manager_admin_id, try filtering by company_id
+                if not all_managers and company_id:
+                    mgr_resp = supabase.table("managers") \
+                        .select("*") \
+                        .eq("manager_company_id", company_id) \
+                        .execute()
+                    all_managers = mgr_resp.data or []
+                
+                for m in all_managers:
+                    is_active = m.get("is_active", True)
+                    dept_id = m.get("manager_department_id")
+                    dept_name = dept_map.get(dept_id, "Unknown")
+                    # Try both possible column names for manager name
+                    mgr_name = m.get("full_name") or m.get("manager_name") or "Unknown"
+                    mgr_email = m.get("email") or m.get("manager_email") or ""
+                    
+                    if is_active:
+                        mgr_dept_map[dept_id] = mgr_name
+                        mgr_id_name_map[m.get("manager_id")] = mgr_name
+                        active_managers_list.append({
+                            "id": m.get("manager_id"),
+                            "name": mgr_name,
+                            "email": mgr_email,
+                            "department": dept_name,
+                            "status": "Active",
+                            "role": "manager"
+                        })
+                
+                active_managers_count = len(active_managers_list)
+                logger.info(f"Found {active_managers_count} active managers for admin {admin_id}")
+            except Exception as mgr_err:
+                logger.warning(f"Error fetching managers from managers table: {mgr_err}")
+            
+            # --- Users: fetch all users for this admin's company ---
+            # The users table has NO company_id column. Users are linked via:
+            #   1. admin_id column (direct link to the admin who created them)
+            #   2. manager_id -> managers table (manager_admin_id = admin_id)
+            all_users = []
+            seen_user_ids = set()
+            
+            # Method 1: Fetch users by admin_id
+            if admin_id:
+                u_resp_1 = supabase.table("users").select("*").eq("admin_id", admin_id).execute()
+                for u in (u_resp_1.data or []):
+                    uid = u.get("user_id")
+                    if uid and uid not in seen_user_ids:
+                        seen_user_ids.add(uid)
+                        all_users.append(u)
+            
+            # Method 2: Fetch users via their manager_id (managers belonging to this admin)
+            manager_ids = [m.get("manager_id") for m in all_managers if m.get("manager_id")]
+            for mgr_id in manager_ids:
+                u_resp_2 = supabase.table("users").select("*").eq("manager_id", mgr_id).execute()
+                for u in (u_resp_2.data or []):
+                    uid = u.get("user_id")
+                    if uid and uid not in seen_user_ids:
+                        seen_user_ids.add(uid)
+                        all_users.append(u)
+            
+            # Process user list
             for u in all_users:
-                if u.get("role") == "manager" and u.get("is_active", True):
-                    dept_id = u.get("department_id")
-                    if dept_id:
-                        dept_managers[dept_id] = u.get("full_name")
-
-            # Process Lists
-            for u in all_users:
-                is_active = u.get("is_active", True)
-                role = u.get("role", "employee")
+                # Users table uses 'status' string field, not boolean 'is_active'
+                user_status = (u.get("status") or "").lower()
+                if user_status not in ("active", ""):
+                    continue
                 dept_id = u.get("department_id")
                 dept_name = dept_map.get(dept_id, "Unknown")
+                mgr_id = u.get("manager_id")
+                assigned_mgr = mgr_id_name_map.get(mgr_id) or mgr_dept_map.get(dept_id, "Unassigned")
                 
-                user_obj = {
+                active_users_list.append({
                     "id": u.get("user_id"),
                     "name": u.get("full_name", "Unknown"),
                     "email": u.get("email"),
                     "department": dept_name,
-                    "status": "Active" if is_active else "Inactive",
-                    "role": role
-                }
-                
-                if is_active:
-                    if role == "manager":
-                        active_managers_list.append(user_obj)
-                    else:
-                        # For regular users, add assigned manager
-                        user_obj["assigned_manager"] = dept_managers.get(dept_id, "Unassigned")
-                        active_users_list.append(user_obj)
-
-            active_managers_count = len(active_managers_list)
-            # update active_users count to reflect total active users (managers + employees) or just employees?
-            # "Active Users" card usually implies total active platform users. 
-            # But the request separates them. "List ALL active users... Assigned Manager". 
-            # Usually implies employees. Let's keep existing active_users count as specific count logic or update it?
-            # Existing logic: active_users = len(set(r.get("user_id") for r in current_data...)) -> distinct users who CLAIMED.
-            # Request says "Display total count of active users". 
-            # I should use the `all_users` count (managers + employees) or just employees?
-            # "Active Users" card usually means everyone.
-            # Let's stick to the list I just generated for the modal.
+                    "status": "Active",
+                    "role": "employee",
+                    "assigned_manager": assigned_mgr
+                })
             
-            # Override active_users count with actual DB count, not just claimers
-            active_users = len([u for u in all_users if u.get("is_active", True)])
+            # Override active_users count with actual DB count (non-admin active users)
+            active_users = len(active_users_list)
+            logger.info(f"Found {active_users} active users for company {company_id}")
+
+            # --- Build Claims List for the modal ---
+            # Build user_id -> name map
+            user_id_name = {u.get("user_id"): u.get("full_name", "Unknown") for u in all_users}
+            user_id_dept = {u.get("user_id"): u.get("department_id") for u in all_users}
+            user_id_mgr = {u.get("user_id"): u.get("manager_id") for u in all_users}
+            
+            # Fetch ALL reimbursements for this company (not period-filtered)
+            all_claims_resp = supabase.table("reimbursements") \
+                .select("reimbursement_id, receipt_code, status, amount_claimed, amount_approved, user_id, department_id, created_at") \
+                .eq("company_id", company_id) \
+                .order("created_at", desc=True) \
+                .execute()
+            all_claims = all_claims_resp.data or []
+            
+            for c in all_claims:
+                uid = c.get("user_id")
+                dept_id = c.get("department_id") or user_id_dept.get(uid)
+                mgr_id = user_id_mgr.get(uid)
+                claims_list.append({
+                    "id": c.get("receipt_code") or c.get("reimbursement_id", "")[:10],
+                    "reimbursement_id": c.get("reimbursement_id"),
+                    "employee_name": user_id_name.get(uid, "Unknown"),
+                    "department": dept_map.get(dept_id, "Unknown"),
+                    "manager": mgr_id_name_map.get(mgr_id) or mgr_dept_map.get(dept_id, "N/A"),
+                    "status": c.get("status", "pending"),
+                    "amount": float(c.get("amount_approved") or c.get("amount_claimed") or 0),
+                    "created_at": c.get("created_at")
+                })
 
         except Exception as user_err:
-            logger.error(f"Error fetching users for analytics: {user_err}")
+            logger.error(f"Error fetching users/managers for analytics: {user_err}")
         
         return {
             "success": True,
@@ -602,7 +672,8 @@ async def get_admin_analytics(admin_id: Optional[str] = None, period: str = "30d
                 "activeUsers": active_users,
                 "activeManagers": active_managers_count,
                 "managersList": active_managers_list,
-                "usersList": active_users_list
+                "usersList": active_users_list,
+                "claimsList": claims_list
             }
         }
         
@@ -625,7 +696,11 @@ def _get_empty_analytics_data() -> Dict[str, Any]:
         "topDepartment": "N/A",
         "monthlyTrend": 0,
         "weeklyTrend": 0,
-        "activeUsers": 0
+        "activeUsers": 0,
+        "activeManagers": 0,
+        "managersList": [],
+        "usersList": [],
+        "claimsList": []
     }
 
 

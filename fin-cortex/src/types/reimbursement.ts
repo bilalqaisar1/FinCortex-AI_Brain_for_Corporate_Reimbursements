@@ -14,6 +14,11 @@ export interface Reimbursement {
     vendor_name: string | null;
     created_at: string;
     currency: string;
+    policy_flags?: Array<{
+        code: string;
+        message: string;
+        severity: string;
+    }> | null;
 }
 
 export interface ManagerReimbursementsResponse {

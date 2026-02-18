@@ -6,6 +6,7 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from app.api.v1.router import api_v1_router
 from app.config import database  # noqa: F401 - Initialize database connection
+from app.config.settings import settings
 
 app = FastAPI(
     title="FinCortex Backend",
@@ -13,11 +14,8 @@ app = FastAPI(
     version="1.0.0",
 )
 
-# CORS - allow local frontend
-origins = [
-    "http://localhost:3000",
-    "http://127.0.0.1:3000",
-]
+# CORS - origins from environment
+origins = [url.strip() for url in settings.frontend_url.split(",") if url.strip()]
 
 app.add_middleware(
     CORSMiddleware,

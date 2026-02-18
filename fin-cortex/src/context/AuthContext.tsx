@@ -137,10 +137,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   };
 
-  const loadUserProfile = async (supabaseUser: User, role?: 'admin' | 'manager' | 'user') => {
+  const loadUserProfile = async (supabaseUser: User, role?: 'admin' | 'manager' | 'user'): Promise<UserProfile | null> => {
     if (!supabaseUser?.id) {
       setUserProfile(null);
-      return;
+      return null;
     }
 
     // Get the synced profile first - this is the source of truth from server-side API
@@ -151,7 +151,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       // Extract data from synced profile response structure
       const profileData = syncedProfile.profile || syncedProfile;
 
-      setUserProfile({
+      const profile: UserProfile = {
         user_id: profileData.user_id || profileData.manager_id || profileData.admin_id || supabaseUser.id,
         admin_id: profileData.admin_id || null,
         full_name: profileData.full_name || supabaseUser.user_metadata?.full_name || supabaseUser.email?.split('@')[0] || 'User',
@@ -166,14 +166,15 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         roles: profileData.roles || null,
         managers: profileData.manager || null,
         userRole: profileData.userRole || role || 'user'
-      });
+      };
+      setUserProfile(profile);
 
       console.log('✅ User profile loaded from synced profile:', {
         user_id: profileData.user_id || profileData.admin_id || profileData.manager_id,
         email: profileData.email,
         role: profileData.userRole || role
       });
-      return;
+      return profile;
     }
 
     // Fallback: Try to load from client-side database queries (may fail due to RLS)
@@ -185,7 +186,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       if (role === 'manager') {
         const { data: managerProfile, error: managerError } = await db.getManagerProfile(userId);
         if (!managerError && managerProfile) {
-          setUserProfile({
+          const profile: UserProfile = {
             user_id: managerProfile.manager_id,
             admin_id: (managerProfile as any).admin_id || null,
             full_name: managerProfile.full_name || fallbackFullName,
@@ -195,14 +196,15 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
             role_id: managerProfile.role_id?.toString() || null,
             roles: managerProfile.roles,
             userRole: 'manager'
-          });
+          };
+          setUserProfile(profile);
           console.log('✅ Manager profile loaded from client query');
-          return;
+          return profile;
         }
       } else if (role === 'admin') {
         const { data: adminProfile, error: adminError } = await db.getAdminProfile(userId);
         if (!adminError && adminProfile) {
-          setUserProfile({
+          const profile: UserProfile = {
             user_id: adminProfile.admin_id,
             admin_id: adminProfile.admin_id,
             full_name: adminProfile.full_name || fallbackFullName,
@@ -212,43 +214,49 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
             role_id: adminProfile.role_id?.toString() || null,
             roles: adminProfile.roles,
             userRole: 'admin'
-          });
+          };
+          setUserProfile(profile);
           console.log('✅ Admin profile loaded from client query');
-          return;
+          return profile;
         }
       } else if (role === 'user') {
         const { data: userProfile, error: userError } = await db.getUserProfile(userId);
         if (!userError && userProfile) {
-          setUserProfile({
+          const profile: UserProfile = {
             ...userProfile,
             admin_id: (userProfile as any).admin_id || null,
             full_name: userProfile.full_name || fallbackFullName,
             userRole: 'user'
-          });
+          };
+          setUserProfile(profile);
           console.log('✅ User profile loaded from client query');
-          return;
+          return profile;
         }
       }
 
       // If all queries failed, use minimal profile from Supabase user
       console.warn('⚠️ Could not load full profile, using minimal profile from Supabase user');
-      setUserProfile({
+      const fallbackProfile: UserProfile = {
         user_id: userId,
         full_name: fallbackFullName,
         email: supabaseUser.email || '',
         status: 'active',
         userRole: role || 'user'
-      });
+      };
+      setUserProfile(fallbackProfile);
+      return fallbackProfile;
     } catch (error) {
       console.error('Error loading user profile:', error);
       // Use minimal profile even on error
-      setUserProfile({
+      const fallbackProfile: UserProfile = {
         user_id: userId,
         full_name: fallbackFullName,
         email: supabaseUser.email || '',
         status: 'active',
         userRole: role || 'user'
-      });
+      };
+      setUserProfile(fallbackProfile);
+      return fallbackProfile;
     }
   };
 
@@ -395,10 +403,23 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       if (result.error) {
         showToast('error', 'Login Failed', result.error.message);
       } else {
-        showToast('success', 'Welcome Back', `Welcome back, ${result.data?.user?.user_metadata?.full_name || 'User'}!`);
         if (result.data?.user) {
-          await loadUserProfile(result.data.user);
+          const profile = await loadUserProfile(result.data.user);
+
+          // Block inactive/disabled users
+          const accountStatus = profile?.status?.toLowerCase();
+          if (accountStatus === 'inactive' || accountStatus === 'disabled') {
+            console.warn('🚫 Login blocked: account status is', accountStatus);
+            await supabase.auth.signOut();
+            setSession(null);
+            setUser(null);
+            setUserProfile(null);
+            showToast('error', 'Account Disabled',
+              'Your account has been deactivated. Please contact your administrator.');
+            return { data: null, error: { message: 'Account is inactive or disabled' } };
+          }
         }
+        showToast('success', 'Welcome Back', `Welcome back, ${result.data?.user?.user_metadata?.full_name || 'User'}!`);
       }
       return result;
     } catch (error) {

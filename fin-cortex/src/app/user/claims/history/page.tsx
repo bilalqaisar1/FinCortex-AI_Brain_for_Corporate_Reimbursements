@@ -32,6 +32,7 @@ import {
 import { Calendar, FileDown, ExternalLink, ReceiptText, CheckCircle2, Clock, Loader2, XCircle } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
 import { UserNavbar } from "@/components/dashboard/UserNavbar";
+import { BACKEND_URL } from "@/lib/config";
 
 type ClaimStatus = "Approved" | "Pending" | "Rejected";
 
@@ -67,8 +68,7 @@ export default function ClaimHistoryPage() {
     if (!user?.id) return;
     setIsLoading(true);
     try {
-      const baseUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
-      const response = await fetch(`${baseUrl}/api/v1/reimbursements/user/${user.id}`);
+      const response = await fetch(`${BACKEND_URL}/api/v1/reimbursements/user/${user.id}`);
       const payload = await response.json();
       if (payload.success) {
         setClaims(payload.data.map((item: any) => ({

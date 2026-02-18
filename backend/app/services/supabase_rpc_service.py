@@ -206,6 +206,85 @@ def get_expense_categories_with_subcategories(admin_uuid: str) -> List[Dict[str,
         raise SupabaseRPCError(error_msg) from e
 
 
+def get_categories_direct(admin_uuid: str) -> List[Dict[str, Any]]:
+    """
+    Fetch expense categories and subcategories using direct table queries.
+
+    This is a fallback/replacement for the RPC approach. It queries
+    ``expense_categories`` filtered by ``admin_uuid``, falling back to ALL
+    categories when no admin-scoped rows are found (because category creation
+    may not populate the ``admin_uuid`` column).
+
+    Returns a list identical in shape to the RPC variant::
+
+        [
+            {
+                "category_id": 1,
+                "category_name": "Medical",
+                "subcategories": [
+                    {"subcategory_id": 10, "subcategory_name": "Lab Tests"},
+                    ...
+                ]
+            },
+            ...
+        ]
+    """
+    try:
+        supabase = get_supabase_client()
+
+        # 1) Try to fetch categories scoped to this admin
+        resp = (
+            supabase.table("expense_categories")
+            .select("category_id, category_name, admin_uuid, subcategories:expense_subcategories(subcategory_id, subcategory_name)")
+            .eq("admin_uuid", admin_uuid)
+            .execute()
+        )
+        categories = resp.data or []
+
+        # 2) If admin-scoped query returned nothing, the categories may have
+        #    been created *without* setting admin_uuid.  Fall back to ALL
+        #    categories so the system still works.
+        if not categories:
+            logger.warning(
+                "⚠️ No categories found for admin_uuid=%s; "
+                "falling back to ALL categories (admin_uuid may be NULL in DB).",
+                admin_uuid,
+            )
+            resp = (
+                supabase.table("expense_categories")
+                .select("category_id, category_name, admin_uuid, subcategories:expense_subcategories(subcategory_id, subcategory_name)")
+                .execute()
+            )
+            categories = resp.data or []
+
+        logger.info(
+            "✅ get_categories_direct: found %d categories for admin %s",
+            len(categories),
+            admin_uuid,
+        )
+
+        # DEBUG output
+        import json
+        print("\n" + "=" * 80)
+        print("🔍 DEBUG - get_categories_direct OUTPUT")
+        print("=" * 80)
+        print(f"Admin UUID: {admin_uuid}")
+        print(f"Categories Count: {len(categories)}")
+        for i, cat in enumerate(categories, 1):
+            subs = cat.get("subcategories") or []
+            print(f"  {i}. {cat.get('category_name')} (ID: {cat.get('category_id')}) – {len(subs)} subcategories")
+            for sub in subs:
+                print(f"       - {sub.get('subcategory_name')} (ID: {sub.get('subcategory_id')})")
+        print("=" * 80 + "\n")
+
+        return categories
+
+    except Exception as e:
+        error_msg = f"get_categories_direct failed: {str(e)}"
+        logger.error("❌ %s", error_msg)
+        raise SupabaseRPCError(error_msg) from e
+
+
 def get_users_by_manager(manager_id: str) -> List[Dict[str, Any]]:
     """
     Fetch users (team members) for a given manager.
@@ -313,6 +392,27 @@ def get_all_reimbursements_by_manager(manager_id: str) -> List[Dict[str, Any]]:
         if not isinstance(result, list):
             raise SupabaseRPCError(f"Unexpected RPC response format: {type(result)}")
 
+        # Supplement with policy_flags from the reimbursements table
+        # (RPC stored procedure may not return this column)
+        try:
+            reimb_ids = [r.get("reimbursement_id") for r in result if r.get("reimbursement_id")]
+            if reimb_ids:
+                flags_resp = supabase.table("reimbursements").select(
+                    "reimbursement_id, policy_flags"
+                ).in_("reimbursement_id", reimb_ids).execute()
+                flags_map = {
+                    row["reimbursement_id"]: row.get("policy_flags")
+                    for row in (flags_resp.data or [])
+                }
+                for r in result:
+                    rid = r.get("reimbursement_id")
+                    if rid and rid in flags_map:
+                        r["policy_flags"] = flags_map[rid]
+                    elif "policy_flags" not in r:
+                        r["policy_flags"] = None
+        except Exception as flags_err:
+            logger.warning("Could not supplement policy_flags: %s", flags_err)
+
         logger.info(
             "✅ Supabase RPC: get_all_reimbursements_by_manager successful for manager %s",
             manager_id,
@@ -373,6 +473,18 @@ def get_reimbursement_full_detail(manager_id: str, user_id: str, reimbursement_i
         
         if not result:
             raise SupabaseRPCError("Reimbursement not found or access denied")
+
+        # Supplement with policy_flags from the reimbursements table
+        # (RPC stored procedure may not return this column)
+        try:
+            if isinstance(result, dict) and "policy_flags" not in result:
+                flags_resp = supabase.table("reimbursements").select(
+                    "policy_flags"
+                ).eq("reimbursement_id", reimbursement_id).single().execute()
+                if flags_resp.data:
+                    result["policy_flags"] = flags_resp.data.get("policy_flags")
+        except Exception as flags_err:
+            logger.warning("Could not supplement policy_flags for detail: %s", flags_err)
 
         logger.info(
             "✅ Supabase RPC: get_reimbursement_full_detail successful for ID %s",

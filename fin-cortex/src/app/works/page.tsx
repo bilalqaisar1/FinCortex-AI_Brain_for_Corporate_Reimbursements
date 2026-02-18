@@ -12,7 +12,7 @@ import {
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { EnhancedSeparator } from "@/components/ui/separator-enhanced";
-import Link from "next/link";
+
 
 export default function WorksPage() {
   const [visibleSteps, setVisibleSteps] = useState<number[]>([]);
@@ -189,18 +189,20 @@ export default function WorksPage() {
             Deploy custom intelligence layers and automate complex financial workflows with precision.
           </p>
           <div className="flex flex-col sm:flex-row gap-6">
-            <Link
-              href="/contact"
-              className="px-12 py-4 rounded-2xl bg-[var(--text-primary)] text-[var(--background-dark)] text-xs font-black uppercase tracking-[0.3em] hover:opacity-90 transition-all shadow-[0_20px_40px_rgba(0,0,0,0.3)]"
+            <a
+              href="#contact"
+              onClick={(e) => { e.preventDefault(); document.getElementById('contact')?.scrollIntoView({ behavior: 'smooth' }); }}
+              className="px-12 py-4 rounded-2xl bg-[var(--text-primary)] text-[var(--background-dark)] text-xs font-black uppercase tracking-[0.3em] hover:opacity-90 transition-all shadow-[0_20px_40px_rgba(0,0,0,0.3)] cursor-pointer"
             >
               Initialize Protocol
-            </Link>
-            <Link
-              href="/solutions"
-              className="px-12 py-4 rounded-2xl bg-[var(--card-dark)] border border-[var(--border-subtle)] text-[var(--text-primary)] text-xs font-black uppercase tracking-[0.3em] hover:bg-[var(--card-hover)] transition-all backdrop-blur-sm"
+            </a>
+            <a
+              href="#solutions"
+              onClick={(e) => { e.preventDefault(); document.getElementById('solutions')?.scrollIntoView({ behavior: 'smooth' }); }}
+              className="px-12 py-4 rounded-2xl bg-[var(--card-dark)] border border-[var(--border-subtle)] text-[var(--text-primary)] text-xs font-black uppercase tracking-[0.3em] hover:bg-[var(--card-hover)] transition-all backdrop-blur-sm cursor-pointer"
             >
               View Solutions
-            </Link>
+            </a>
           </div>
         </div>
       </section>

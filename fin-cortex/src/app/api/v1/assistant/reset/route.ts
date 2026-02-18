@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 
-const MCP_SERVER_URL = process.env.MCP_SERVER_URL || 'http://localhost:8001';
+const MCP_SERVER_URL = process.env.MCP_SERVER_URL || '';
 
 export async function POST(request: NextRequest) {
     try {

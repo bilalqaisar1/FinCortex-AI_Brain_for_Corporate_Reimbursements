@@ -52,7 +52,11 @@ export default function UserDashboardPage() {
       const response = await fetch(`${BACKEND_URL}/api/v1/reimbursements/user/${user.id}/dashboard-stats`);
 
       if (!response.ok) {
-        throw new Error('Failed to fetch dashboard statistics');
+        // Log the error but don't crash the page — show empty dashboard
+        const errorBody = await response.text().catch(() => "");
+        console.warn(`Dashboard stats returned ${response.status}: ${errorBody}`);
+        setLoading(false);
+        return;
       }
 
       const result = await response.json();
@@ -61,7 +65,7 @@ export default function UserDashboardPage() {
       }
     } catch (err: any) {
       console.error("Error fetching dashboard stats:", err);
-      setError(err.message);
+      // Don't set error state — just show empty dashboard
     } finally {
       setLoading(false);
     }

@@ -6,6 +6,7 @@ export interface PolicyRule {
     rule_type: 'max_claims_per_day' | 'max_amount' | 'monthly_limit' | 'restricted_keywords';
     rule_value: string;
     category_id?: string;
+    department_id?: string;
     description?: string;
     is_active: boolean;
     severity: 'low' | 'medium' | 'high' | 'critical';
@@ -26,6 +27,7 @@ export interface CreateRuleInput {
     rule_type: string;
     rule_value: string;
     category_id?: string;
+    department_id?: string;
     description?: string;
     is_active?: boolean;
     severity?: string;
@@ -36,6 +38,7 @@ export interface UpdateRuleInput {
     rule_type?: string;
     rule_value?: string;
     category_id?: string;
+    department_id?: string;
     description?: string;
     is_active?: boolean;
     severity?: string;

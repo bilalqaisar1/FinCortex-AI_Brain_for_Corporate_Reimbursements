@@ -29,17 +29,58 @@ export async function POST(request: Request) {
 
     const userId = data.user?.id
     if (userId) {
+      // Ensure the 'admin' role exists in the roles table
+      let roleId: number | null = null;
+      try {
+        // Try to find existing admin role
+        const { data: existingRole } = await supabaseAdmin
+          .from('roles')
+          .select('role_id')
+          .eq('role_name', 'admin')
+          .maybeSingle();
+
+        if (existingRole) {
+          roleId = existingRole.role_id;
+        } else {
+          // Create the admin role if it doesn't exist
+          const { data: newRole } = await supabaseAdmin
+            .from('roles')
+            .insert({ role_name: 'admin' })
+            .select('role_id')
+            .single();
+          roleId = newRole?.role_id || null;
+
+          // Also seed 'manager' and 'user' roles so the rest of the app works
+          const existingRoles = await supabaseAdmin
+            .from('roles')
+            .select('role_name');
+          const existingNames = new Set((existingRoles.data || []).map((r: any) => r.role_name));
+          const toSeed = ['manager', 'user'].filter(r => !existingNames.has(r));
+          if (toSeed.length > 0) {
+            await supabaseAdmin
+              .from('roles')
+              .insert(toSeed.map(r => ({ role_name: r })));
+          }
+        }
+      } catch (roleErr) {
+        console.warn('Could not resolve/create admin role, proceeding without role_id:', roleErr);
+      }
+
       // Insert into admins table
+      const adminInsert: Record<string, any> = {
+        admin_id: userId,
+        full_name,
+        email,
+        password_hash: 'legacy_auth_handled_by_supabase', // Required field in schema
+        phone_number: phone_number || null,
+      };
+      if (roleId) {
+        adminInsert.role_id = roleId;
+      }
+
       const { error: dbError } = await supabaseAdmin
         .from('admins')
-        .insert({
-          admin_id: userId,
-          full_name,
-          email,
-          password_hash: 'legacy_auth_handled_by_supabase', // Required field in schema
-          phone_number: phone_number || null,
-          role_id: 1, // Admin role ID
-        })
+        .insert(adminInsert)
 
       if (dbError) {
         console.error('Failed to create admin profile:', dbError)

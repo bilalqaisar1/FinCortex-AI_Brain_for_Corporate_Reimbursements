@@ -23,6 +23,7 @@ class CreatePolicyRuleModel(BaseModel):
     rule_type: str = Field(..., description="Type: max_claims_per_day, max_amount, monthly_limit, restricted_keywords")
     rule_value: str = Field(..., description="Value for the rule (number or comma-separated keywords)")
     category_id: Optional[str] = Field(None, description="Optional category ID to scope rule")
+    department_id: Optional[str] = Field(None, description="Optional department ID; null means all departments")
     company_id: Optional[str] = Field(None, description="Optional company ID to scope rule")
     description: Optional[str] = Field(None, description="Description of the rule")
     is_active: bool = Field(default=True, description="Whether rule is active")
@@ -34,6 +35,7 @@ class UpdatePolicyRuleModel(BaseModel):
     rule_type: Optional[str] = None
     rule_value: Optional[str] = None
     category_id: Optional[str] = None
+    department_id: Optional[str] = None
     company_id: Optional[str] = None
     description: Optional[str] = None
     is_active: Optional[bool] = None
@@ -50,70 +52,77 @@ async def get_policy_rules(
     supabase = get_supabase_client()
     
     try:
-        # 1. Resolve Company ID if not provided
-        if not company_id and admin_id:
-            logger.info(f"🔍 Resolving company for admin: {admin_id}")
-            comp_resp = supabase.table("companies").select("company_id").eq("admin_id", admin_id).limit(1).execute()
-            if comp_resp.data:
-                company_id = comp_resp.data[0].get("company_id")
-        
-        # 2. Enforce company_id for security
-        if not company_id:
-            logger.warning("⚠️ No company_id resolved for policy rules fetch. Returning empty.")
+        # 1. Resolve admin_id (created_by references admins table)
+        if not admin_id:
+            logger.warning("⚠️ No admin_id provided for policy rules fetch. Returning empty.")
             return {"success": True, "data": []}
 
         query = supabase.table("reimbursement_rules").select("*")
-        query = query.eq("created_by", company_id)
+        query = query.eq("created_by", admin_id)
         
         resp = query.order("created_at", desc=True).execute()
         
         # Transform reimbursement_rules to policy_rules format for frontend
         rules = []
         for r in (resp.data or []):
-            # Monthly Limit Rule
-            if r.get("monthly_limit"):
-                rules.append({
-                    "rule_id": str(r.get("rule_id")),
-                    "rule_name": f"Monthly Limit - Category {r.get('category_id')}",
-                    "rule_type": "monthly_limit",
-                    "rule_value": str(r.get("monthly_limit")),
-                    "category_id": str(r.get("category_id")),
-                    "description": f"Monthly limit for category {r.get('category_id')}",
-                    "is_active": True,
-                    "severity": "high",
-                    "created_at": r.get("created_at"),
-                    "updated_at": r.get("updated_at")
-                })
+            stored_name = r.get("rule_name") or ""
+            stored_severity = r.get("severity") or "high"
+            stored_is_active = r.get("is_active") if r.get("is_active") is not None else True
+            stored_description = r.get("description") or ""
+            dept_id = r.get("department_id")
+            cat_id = r.get("category_id")
             
-            # Max Amount Rule
-            if r.get("max_amount"):
-                rules.append({
-                    "rule_id": f"{r.get('rule_id')}_max",
-                    "rule_name": f"Max Amount - Category {r.get('category_id')}",
-                    "rule_type": "max_amount",
-                    "rule_value": str(r.get("max_amount")),
-                    "category_id": str(r.get("category_id")),
-                    "description": f"Maximum amount per claim for category {r.get('category_id')}",
-                    "is_active": True,
-                    "severity": "high",
-                    "created_at": r.get("created_at"),
-                    "updated_at": r.get("updated_at")
-                })
-
-            # Restricted Keywords Rule
-            if r.get("restricted_keywords"):
-                rules.append({
-                    "rule_id": f"{r.get('rule_id')}_keywords",
-                    "rule_name": f"Restricted Keywords - Category {r.get('category_id')}",
-                    "rule_type": "restricted_keywords",
-                    "rule_value": r.get("restricted_keywords"),
-                    "category_id": str(r.get("category_id")),
-                    "description": f"Restricted items for category {r.get('category_id')}",
-                    "is_active": True,
-                    "severity": "critical",
-                    "created_at": r.get("created_at"),
-                    "updated_at": r.get("updated_at")
-                })
+            # Determine rule_type and rule_value from the data
+            rule_type = None
+            rule_value = "0"
+            
+            mcpd = r.get("max_claims_per_day") or 0
+            max_amt = float(r.get("max_amount") or 0)
+            monthly = float(r.get("monthly_limit") or 0)
+            keywords = (r.get("restricted_keywords") or "").strip()
+            
+            if mcpd and int(mcpd) > 0:
+                rule_type = "max_claims_per_day"
+                rule_value = str(int(mcpd))
+            elif max_amt > 0:
+                rule_type = "max_amount"
+                rule_value = str(max_amt)
+            elif monthly > 0:
+                rule_type = "monthly_limit"
+                rule_value = str(monthly)
+            elif keywords:
+                rule_type = "restricted_keywords"
+                rule_value = keywords
+            elif stored_name:
+                # Fallback: rule exists with metadata but no recognizable value
+                rule_type = "max_amount"
+                rule_value = "0"
+            else:
+                continue  # Skip rows with no useful data
+            
+            # Auto-generate name if not stored
+            if not stored_name:
+                type_labels = {
+                    "max_claims_per_day": "Max Claims Per Day",
+                    "max_amount": f"Max Amount - Category {cat_id}",
+                    "monthly_limit": f"Monthly Limit - Category {cat_id}",
+                    "restricted_keywords": f"Restricted Keywords",
+                }
+                stored_name = type_labels.get(rule_type, "Policy Rule")
+            
+            rules.append({
+                "rule_id": str(r.get("rule_id")),
+                "rule_name": stored_name,
+                "rule_type": rule_type,
+                "rule_value": rule_value,
+                "category_id": str(cat_id) if cat_id else None,
+                "department_id": str(dept_id) if dept_id else None,
+                "description": stored_description,
+                "is_active": stored_is_active,
+                "severity": stored_severity,
+                "created_at": r.get("created_at"),
+                "updated_at": r.get("updated_at")
+            })
         
         return {"success": True, "data": rules}
         
@@ -132,30 +141,42 @@ async def create_policy_rule(
     supabase = get_supabase_client()
     
     try:
-        company_id = payload.company_id
-        # 1. Resolve Company ID from admin_id if not in payload
-        if not company_id and admin_id:
-             comp_resp = supabase.table("companies").select("company_id").eq("admin_id", admin_id).limit(1).execute()
-             if comp_resp.data:
-                 company_id = comp_resp.data[0].get("company_id")
-        
-        if not company_id:
-            raise HTTPException(status_code=400, detail="Company ID or Admin ID is required to create a rule")
+        # 1. Resolve admin_id for created_by (FK to admins table)
+        if not admin_id:
+            raise HTTPException(status_code=400, detail="Admin ID is required to create a rule")
 
+        # Build insert payload aligned to actual DB columns
         reimb_rule_data = {
+            # NOT NULL columns with defaults
+            "max_amount": 0,
+            "monthly_limit": 0,
+            # Nullable columns
             "category_id": int(payload.category_id) if payload.category_id and payload.category_id.isdigit() else None,
-            "created_by": company_id,
-            "updated_at": datetime.now().isoformat()
+            "department_id": int(payload.department_id) if payload.department_id and payload.department_id.isdigit() else None,
+            "restricted_keywords": "",
+            "max_claims_per_day": 0,
+            "created_by": admin_id,
+            "updated_at": datetime.now().isoformat(),
+            # Metadata columns (added via ALTER)
+            "rule_name": payload.rule_name,
+            "description": payload.description or "",
+            "severity": payload.severity,
+            "is_active": payload.is_active,
         }
         
+        # Set the rule-type-specific value
         if payload.rule_type == "max_amount":
             reimb_rule_data["max_amount"] = float(payload.rule_value)
         elif payload.rule_type == "monthly_limit":
             reimb_rule_data["monthly_limit"] = float(payload.rule_value)
         elif payload.rule_type == "restricted_keywords":
             reimb_rule_data["restricted_keywords"] = payload.rule_value
+        elif payload.rule_type == "max_claims_per_day":
+            reimb_rule_data["max_claims_per_day"] = int(payload.rule_value)
         
+        logger.info(f"Inserting rule data: {reimb_rule_data}")
         resp = supabase.table("reimbursement_rules").insert(reimb_rule_data).execute()
+
         if not resp.data:
             raise HTTPException(status_code=500, detail="Failed to create reimbursement rule")
             
@@ -177,21 +198,15 @@ async def update_policy_rule(
     rule_id: str, 
     payload: UpdatePolicyRuleModel = Body(...),
     admin_id: Optional[str] = None
-) -> Dict[Dict[str, Any], Any]:
+) -> Dict[str, Any]:
     """Update an existing policy rule."""
     logger.info(f"📥 PUT /admin/policy-rules/{rule_id} (admin_id: {admin_id})")
     supabase = get_supabase_client()
     
     try:
-        # 1. Resolve Company ID from admin_id
-        company_id = payload.company_id
-        if not company_id and admin_id:
-             comp_resp = supabase.table("companies").select("company_id").eq("admin_id", admin_id).limit(1).execute()
-             if comp_resp.data:
-                 company_id = comp_resp.data[0].get("company_id")
-        
-        if not company_id:
-            raise HTTPException(status_code=400, detail="Company ID or Admin ID is required to verify ownership")
+        # 1. Verify admin_id is provided (created_by FK to admins table)
+        if not admin_id:
+            raise HTTPException(status_code=400, detail="Admin ID is required to verify ownership")
 
         # 2. Get actual rule ID (supporting composite IDs)
         if rule_id.isdigit():
@@ -199,46 +214,56 @@ async def update_policy_rule(
         else:
             actual_rule_id = int(rule_id.split('_')[0])
 
-        # 3. Verify ownership
+        # 3. Verify ownership (created_by could be admin_id or company_id for older rules)
         rule_check = supabase.table("reimbursement_rules").select("created_by").eq("rule_id", actual_rule_id).single().execute()
-        if not rule_check.data or rule_check.data.get("created_by") != company_id:
-            logger.warning(f"⚠️ Security: Admin {admin_id} tried to update rule {actual_rule_id} belonging to another company")
+        if not rule_check.data:
+            raise HTTPException(status_code=404, detail="Rule not found")
+        
+        rule_owner = rule_check.data.get("created_by")
+        # Allow if created_by matches admin_id directly, OR if the rule belongs to the admin's company
+        is_owner = (rule_owner == admin_id)
+        if not is_owner:
+            # Check if rule was created by admin's company_id (backward compat)
+            comp_resp = supabase.table("companies").select("company_id").eq("admin_id", admin_id).limit(1).execute()
+            company_id = comp_resp.data[0].get("company_id") if comp_resp.data else None
+            is_owner = (rule_owner == company_id)
+        
+        if not is_owner:
+            logger.warning(f"⚠️ Security: Admin {admin_id} tried to update rule {actual_rule_id} belonging to another admin")
             raise HTTPException(status_code=403, detail="Access denied: Rule does not belong to your organization")
 
-        update_data = {"updated_at": datetime.now().isoformat()}
+        reimb_update = {"updated_at": datetime.now().isoformat()}
         
+        # Metadata columns
         if payload.rule_name is not None:
-            update_data["rule_name"] = payload.rule_name
-        if payload.rule_type is not None:
-            update_data["rule_type"] = payload.rule_type
-        if payload.rule_value is not None:
-            update_data["rule_value"] = payload.rule_value
-        if payload.category_id is not None:
-            update_data["category_id"] = payload.category_id
+            reimb_update["rule_name"] = payload.rule_name
         if payload.description is not None:
-            update_data["description"] = payload.description
+            reimb_update["description"] = payload.description
         if payload.is_active is not None:
-            update_data["is_active"] = payload.is_active
+            reimb_update["is_active"] = payload.is_active
         if payload.severity is not None:
-            update_data["severity"] = payload.severity
-        
-        if rule_id.isdigit():
-            actual_rule_id = int(rule_id)
-        else:
-            # Handle the composite IDs created in get_policy_rules (e.g. "1_max")
-            actual_rule_id = int(rule_id.split('_')[0])
-
-        reimb_update = {"updated_at": update_data["updated_at"]}
+            reimb_update["severity"] = payload.severity
         if payload.category_id is not None:
             reimb_update["category_id"] = int(payload.category_id) if payload.category_id.isdigit() else None
+        if payload.department_id is not None:
+            reimb_update["department_id"] = int(payload.department_id) if payload.department_id and payload.department_id.isdigit() else None
         
-        if payload.rule_value is not None:
-            if payload.rule_type == "max_amount" or "max" in rule_id:
+        # Rule value mapped to correct DB column based on rule_type
+        if payload.rule_value is not None and payload.rule_type is not None:
+            # Reset all rule value columns first, then set the active one
+            reimb_update["max_amount"] = 0
+            reimb_update["monthly_limit"] = 0
+            reimb_update["restricted_keywords"] = ""
+            reimb_update["max_claims_per_day"] = 0
+            
+            if payload.rule_type == "max_amount":
                 reimb_update["max_amount"] = float(payload.rule_value)
-            elif payload.rule_type == "monthly_limit" or "keywords" not in rule_id:
+            elif payload.rule_type == "monthly_limit":
                 reimb_update["monthly_limit"] = float(payload.rule_value)
-            elif payload.rule_type == "restricted_keywords" or "keywords" in rule_id:
+            elif payload.rule_type == "restricted_keywords":
                 reimb_update["restricted_keywords"] = payload.rule_value
+            elif payload.rule_type == "max_claims_per_day":
+                reimb_update["max_claims_per_day"] = int(payload.rule_value)
         
         resp = supabase.table("reimbursement_rules").update(reimb_update).eq("rule_id", actual_rule_id).execute()
         
@@ -268,11 +293,9 @@ async def delete_policy_rule(rule_id: str, admin_id: Optional[str] = None) -> Di
         if not admin_id:
              raise HTTPException(status_code=400, detail="Admin ID is required to verify ownership")
              
-        # 1. Resolve Company ID from admin_id
+        # 1. Resolve Company ID from admin_id for backward compat ownership check
         comp_resp = supabase.table("companies").select("company_id").eq("admin_id", admin_id).limit(1).execute()
-        if not comp_resp.data:
-            raise HTTPException(status_code=404, detail="Company not found for this admin")
-        company_id = comp_resp.data[0].get("company_id")
+        company_id = comp_resp.data[0].get("company_id") if comp_resp.data else None
 
         # 2. Get actual rule ID (supporting composite IDs)
         actual_rule_id_str = rule_id.split('_')[0]
@@ -280,10 +303,14 @@ async def delete_policy_rule(rule_id: str, admin_id: Optional[str] = None) -> Di
             raise HTTPException(status_code=400, detail="Invalid rule ID format")
         actual_rule_id = int(actual_rule_id_str)
 
-        # 3. Verify ownership
+        # 3. Verify ownership (created_by could be admin_id or company_id for older rules)
         rule_check = supabase.table("reimbursement_rules").select("created_by").eq("rule_id", actual_rule_id).single().execute()
-        if not rule_check.data or rule_check.data.get("created_by") != company_id:
-            logger.warning(f"⚠️ Security: Admin {admin_id} tried to delete rule {actual_rule_id} belonging to another company")
+        if not rule_check.data:
+            raise HTTPException(status_code=404, detail="Rule not found")
+        
+        rule_owner = rule_check.data.get("created_by")
+        if rule_owner != admin_id and rule_owner != company_id:
+            logger.warning(f"⚠️ Security: Admin {admin_id} tried to delete rule {actual_rule_id} belonging to another admin")
             raise HTTPException(status_code=403, detail="Access denied: Rule does not belong to your organization")
             
         supabase.table("reimbursement_rules").delete().eq("rule_id", actual_rule_id).execute()

@@ -58,6 +58,11 @@ import {
     type PolicyViolation
 } from "@/app/api/v1/admin/policy-rules-api";
 
+interface Department {
+    department_id: number;
+    department_name: string;
+}
+
 const ruleTypeIcons: Record<string, typeof FileText> = {
     max_claims_per_day: Clock,
     max_amount: DollarSign,
@@ -96,9 +101,13 @@ export default function PolicyRulesPage() {
         rule_type: "max_claims_per_day",
         rule_value: "",
         description: "",
+        department_id: "",
         is_active: true,
         severity: "high"
     });
+
+    // Departments state
+    const [departments, setDepartments] = useState<Department[]>([]);
 
     const { userProfile } = useAuth();
 
@@ -119,6 +128,15 @@ export default function PolicyRulesPage() {
             ]);
             setRules(rulesData);
             setRuleTypes(typesData);
+
+            // Load departments
+            try {
+                const deptResp = await fetch('/api/v1/admin/departments');
+                const deptJson = await deptResp.json();
+                if (deptJson.success) setDepartments(deptJson.data || []);
+            } catch (e) {
+                console.error("Failed to load departments:", e);
+            }
 
             // Also load violations in background
             loadViolations();
@@ -214,6 +232,7 @@ export default function PolicyRulesPage() {
             rule_type: rule.rule_type,
             rule_value: rule.rule_value,
             description: rule.description || "",
+            department_id: rule.department_id || "",
             is_active: rule.is_active,
             severity: rule.severity
         });
@@ -231,6 +250,7 @@ export default function PolicyRulesPage() {
             rule_type: "max_claims_per_day",
             rule_value: "",
             description: "",
+            department_id: "",
             is_active: true,
             severity: "high"
         });
@@ -240,28 +260,34 @@ export default function PolicyRulesPage() {
         return ruleTypes.find(t => t.type === type);
     };
 
-    const RuleForm = ({ isEdit = false }: { isEdit?: boolean }) => (
+    const ruleFormInputClasses = "bg-[var(--card-dark)] border border-[var(--border-subtle)] text-[var(--text-primary)] placeholder:text-[var(--text-muted)] focus:ring-purple-500 focus:border-purple-500";
+    const ruleFormLabelClasses = "text-[var(--text-secondary)] font-medium";
+    const ruleFormSelectTriggerClasses = "bg-[var(--card-dark)] border border-[var(--border-subtle)] text-[var(--text-primary)]";
+    const ruleFormSelectContentClasses = "bg-[var(--card-dark)] border border-[var(--border-subtle)] text-[var(--text-primary)] z-[200]";
+
+    const renderRuleForm = () => (
         <div className="grid gap-4 py-4">
             <div className="grid gap-2">
-                <Label htmlFor="rule_name">Rule Name</Label>
+                <Label htmlFor="rule_name" className={ruleFormLabelClasses}>Rule Name</Label>
                 <Input
                     id="rule_name"
                     value={formData.rule_name}
-                    onChange={(e) => setFormData({ ...formData, rule_name: e.target.value })}
+                    onChange={(e) => setFormData(prev => ({ ...prev, rule_name: e.target.value }))}
                     placeholder="e.g. Max 3 Claims Per Day"
+                    className={ruleFormInputClasses}
                 />
             </div>
 
             <div className="grid gap-2">
-                <Label htmlFor="rule_type">Rule Type</Label>
+                <Label htmlFor="rule_type" className={ruleFormLabelClasses}>Rule Type</Label>
                 <Select
                     value={formData.rule_type}
-                    onValueChange={(value) => setFormData({ ...formData, rule_type: value })}
+                    onValueChange={(value) => setFormData(prev => ({ ...prev, rule_type: value }))}
                 >
-                    <SelectTrigger>
+                    <SelectTrigger className={ruleFormSelectTriggerClasses}>
                         <SelectValue placeholder="Select rule type" />
                     </SelectTrigger>
-                    <SelectContent>
+                    <SelectContent className={ruleFormSelectContentClasses}>
                         {ruleTypes.map((type) => (
                             <SelectItem key={type.type} value={type.type}>
                                 {type.label}
@@ -270,37 +296,38 @@ export default function PolicyRulesPage() {
                     </SelectContent>
                 </Select>
                 {formData.rule_type && (
-                    <p className="text-xs text-[var(--text-muted)]">
+                    <p className="text-xs text-gray-500 dark:text-[var(--text-muted)]">
                         {getRuleTypeInfo(formData.rule_type)?.description}
                     </p>
                 )}
             </div>
 
             <div className="grid gap-2">
-                <Label htmlFor="rule_value">
+                <Label htmlFor="rule_value" className={ruleFormLabelClasses}>
                     Rule Value
-                    <span className="text-xs text-[var(--text-muted)] ml-2">
+                    <span className="text-xs text-gray-400 dark:text-[var(--text-muted)] ml-2">
                         (e.g. {getRuleTypeInfo(formData.rule_type)?.example})
                     </span>
                 </Label>
                 <Input
                     id="rule_value"
                     value={formData.rule_value}
-                    onChange={(e) => setFormData({ ...formData, rule_value: e.target.value })}
+                    onChange={(e) => setFormData(prev => ({ ...prev, rule_value: e.target.value }))}
                     placeholder={getRuleTypeInfo(formData.rule_type)?.example || "Enter value"}
+                    className={ruleFormInputClasses}
                 />
             </div>
 
             <div className="grid gap-2">
-                <Label htmlFor="severity">Severity</Label>
+                <Label htmlFor="severity" className={ruleFormLabelClasses}>Severity</Label>
                 <Select
                     value={formData.severity}
-                    onValueChange={(value) => setFormData({ ...formData, severity: value })}
+                    onValueChange={(value) => setFormData(prev => ({ ...prev, severity: value }))}
                 >
-                    <SelectTrigger>
+                    <SelectTrigger className={ruleFormSelectTriggerClasses}>
                         <SelectValue placeholder="Select severity" />
                     </SelectTrigger>
-                    <SelectContent>
+                    <SelectContent className={ruleFormSelectContentClasses}>
                         <SelectItem value="low">Low</SelectItem>
                         <SelectItem value="medium">Medium</SelectItem>
                         <SelectItem value="high">High</SelectItem>
@@ -310,23 +337,47 @@ export default function PolicyRulesPage() {
             </div>
 
             <div className="grid gap-2">
-                <Label htmlFor="description">Description (Optional)</Label>
+                <Label htmlFor="description" className={ruleFormLabelClasses}>Description (Optional)</Label>
                 <Textarea
                     id="description"
                     value={formData.description}
-                    onChange={(e) => setFormData({ ...formData, description: e.target.value })}
+                    onChange={(e) => setFormData(prev => ({ ...prev, description: e.target.value }))}
                     placeholder="Describe what this rule does..."
                     rows={2}
+                    className={ruleFormInputClasses}
                 />
+            </div>
+
+            <div className="grid gap-2">
+                <Label htmlFor="department" className={ruleFormLabelClasses}>Department Scope</Label>
+                <Select
+                    value={formData.department_id || "all"}
+                    onValueChange={(value) => setFormData(prev => ({ ...prev, department_id: value === "all" ? "" : value }))}
+                >
+                    <SelectTrigger className={ruleFormSelectTriggerClasses}>
+                        <SelectValue placeholder="Select department" />
+                    </SelectTrigger>
+                    <SelectContent className={ruleFormSelectContentClasses}>
+                        <SelectItem value="all">All Departments</SelectItem>
+                        {departments.map((dept) => (
+                            <SelectItem key={dept.department_id} value={String(dept.department_id)}>
+                                {dept.department_name}
+                            </SelectItem>
+                        ))}
+                    </SelectContent>
+                </Select>
+                <p className="text-xs text-[var(--text-muted)]">
+                    Choose a specific department or apply rule to all departments
+                </p>
             </div>
 
             <div className="flex items-center space-x-2">
                 <Switch
                     id="is_active"
                     checked={formData.is_active}
-                    onCheckedChange={(checked) => setFormData({ ...formData, is_active: checked })}
+                    onCheckedChange={(checked) => setFormData(prev => ({ ...prev, is_active: checked }))}
                 />
-                <Label htmlFor="is_active">Rule is Active</Label>
+                <Label htmlFor="is_active" className={ruleFormLabelClasses}>Rule is Active</Label>
             </div>
         </div>
     );
@@ -337,8 +388,8 @@ export default function PolicyRulesPage() {
                 title="Policy Rules"
                 description="Define and manage reimbursement policies that are automatically applied to claims"
                 icon={Shield}
-                iconColor="text-orange-400"
-                iconBgColor="bg-orange-500/20"
+                iconColor="text-purple-400"
+                iconBgColor="bg-purple-500/20"
                 actions={
                     <div className="flex items-center space-x-2">
                         <Button
@@ -358,21 +409,22 @@ export default function PolicyRulesPage() {
                                     Add Rule
                                 </Button>
                             </DialogTrigger>
-                            <DialogContent className="sm:max-w-[500px]">
+                            <DialogContent className="sm:max-w-[500px] bg-[var(--card-dark)] border border-[var(--border-subtle)] text-[var(--text-primary)] backdrop-blur-xl shadow-xl">
                                 <DialogHeader>
-                                    <DialogTitle>Create New Policy Rule</DialogTitle>
-                                    <DialogDescription>
+                                    <DialogTitle className="text-[var(--text-primary)]">Create New Policy Rule</DialogTitle>
+                                    <DialogDescription className="text-[var(--text-secondary)]">
                                         Define a new rule that will be automatically applied to claims
                                     </DialogDescription>
                                 </DialogHeader>
-                                <RuleForm />
+                                {renderRuleForm()}
                                 <DialogFooter>
-                                    <Button variant="outline" onClick={() => setIsAddDialogOpen(false)}>
+                                    <Button variant="outline" onClick={() => setIsAddDialogOpen(false)} className="bg-[var(--card-dark)] border-[var(--border-medium)] hover:bg-[var(--card-hover)] text-[var(--text-secondary)]">
                                         Cancel
                                     </Button>
                                     <Button
                                         onClick={handleAddRule}
                                         disabled={isSaving || !formData.rule_name || !formData.rule_value}
+                                        className="bg-[linear-gradient(135deg,#6366f1_0%,#a855f7_50%,#ec4899_100%)] hover:shadow-purple-500/20 text-white shadow-lg"
                                     >
                                         {isSaving ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : null}
                                         Create Rule
@@ -387,7 +439,7 @@ export default function PolicyRulesPage() {
             {/* Loading State */}
             {loading && (
                 <div className="flex flex-col items-center justify-center py-24 gap-4 bg-[var(--card-dark)] border border-[var(--border-subtle)] rounded-3xl shadow-2xl">
-                    <Loader2 className="w-12 h-12 animate-spin text-orange-500" />
+                    <Loader2 className="w-12 h-12 animate-spin text-purple-500" />
                     <span className="text-[10px] font-black uppercase tracking-[0.3em] text-[var(--text-muted)]">Loading policy rules...</span>
                 </div>
             )}
@@ -425,7 +477,7 @@ export default function PolicyRulesPage() {
                     </TabsTrigger>
                     <TabsTrigger
                         value="violations"
-                        className="data-[state=active]:bg-red-500 data-[state=active]:text-white text-[10px] font-black uppercase tracking-widest px-6"
+                        className="data-[state=active]:bg-[linear-gradient(135deg,#6366f1_0%,#a855f7_50%,#ec4899_100%)] data-[state=active]:text-white data-[state=active]:shadow-lg data-[state=active]:shadow-purple-500/20 text-[10px] font-black uppercase tracking-widest px-6"
                     >
                         <AlertTriangle className="w-3.5 h-3.5 mr-2" />
                         Violations Monitor
@@ -439,7 +491,7 @@ export default function PolicyRulesPage() {
                             <CardHeader>
                                 <CardTitle className="flex items-center justify-between">
                                     <span className="flex items-center">
-                                        <FileText className="w-5 h-5 mr-2 text-orange-400" />
+                                        <FileText className="w-5 h-5 mr-2 text-purple-400" />
                                         <span className="text-[var(--text-primary)]">Active Rules ({rules.filter(r => r.is_active).length})</span>
                                     </span>
                                     <Badge variant="outline" className="text-[var(--text-secondary)] border-[var(--border-medium)] bg-[var(--card-dark)] text-[10px] font-black uppercase tracking-widest">
@@ -468,8 +520,8 @@ export default function PolicyRulesPage() {
                                                 >
                                                     <div className="flex items-start justify-between">
                                                         <div className="flex items-start space-x-3">
-                                                            <div className="w-10 h-10 rounded-lg bg-orange-500/20 flex items-center justify-center">
-                                                                <IconComponent className="w-5 h-5 text-orange-400" />
+                                                            <div className="w-10 h-10 rounded-lg bg-purple-500/20 flex items-center justify-center">
+                                                                <IconComponent className="w-5 h-5 text-purple-400" />
                                                             </div>
                                                             <div>
                                                                 <div className="flex items-center space-x-2 mb-1">
@@ -501,7 +553,7 @@ export default function PolicyRulesPage() {
                                                                 size="sm"
                                                                 variant="ghost"
                                                                 onClick={() => openEditDialog(rule)}
-                                                                className="h-8 w-8 p-0"
+                                                                className="h-8 w-8 p-0 text-[var(--text-muted)] hover:text-purple-500 hover:bg-purple-500/10 transition-colors"
                                                             >
                                                                 <Edit2 className="w-4 h-4" />
                                                             </Button>
@@ -509,7 +561,7 @@ export default function PolicyRulesPage() {
                                                                 size="sm"
                                                                 variant="ghost"
                                                                 onClick={() => openDeleteDialog(rule)}
-                                                                className="h-8 w-8 p-0 text-red-500 hover:text-red-400 hover:bg-red-500/10"
+                                                                className="h-8 w-8 p-0 text-red-400 hover:text-red-600 hover:bg-red-500/10 transition-colors"
                                                             >
                                                                 <Trash2 className="w-4 h-4" />
                                                             </Button>
@@ -528,16 +580,16 @@ export default function PolicyRulesPage() {
                 <TabsContent value="violations" className="mt-0 outline-none animate-in fade-in duration-500">
                     {violationsLoading ? (
                         <div className="flex flex-col items-center justify-center py-24 gap-4 bg-[var(--card-dark)] border border-[var(--border-subtle)] rounded-3xl shadow-2xl">
-                            <Loader2 className="w-12 h-12 animate-spin text-red-500" />
+                            <Loader2 className="w-12 h-12 animate-spin text-purple-500" />
                             <span className="text-[10px] font-black uppercase tracking-[0.3em] text-[var(--text-muted)]">Scanning for violations...</span>
                         </div>
                     ) : violationsError ? (
-                        <div className="text-center py-12 text-red-500 bg-red-500/5 border border-red-500/20 rounded-xl">
+                        <div className="text-center py-12 text-[var(--text-secondary)] bg-[var(--card-dark)] border border-[var(--border-subtle)] rounded-xl">
                             <span className="text-xs font-black uppercase tracking-widest">{violationsError}</span>
                             <Button
                                 onClick={loadViolations}
                                 variant="outline"
-                                className="ml-4 text-[10px] font-black uppercase tracking-widest border-red-500/20 text-red-500"
+                                className="ml-4 text-[10px] font-black uppercase tracking-widest border-[var(--border-medium)] text-[var(--text-secondary)]"
                             >
                                 Retry
                             </Button>
@@ -569,21 +621,22 @@ export default function PolicyRulesPage() {
                     resetForm();
                 }
             }}>
-                <DialogContent className="sm:max-w-[500px]">
+                <DialogContent className="sm:max-w-[500px] bg-[var(--card-dark)] border border-[var(--border-subtle)] text-[var(--text-primary)] backdrop-blur-xl shadow-xl">
                     <DialogHeader>
-                        <DialogTitle>Edit Policy Rule</DialogTitle>
-                        <DialogDescription>
+                        <DialogTitle className="text-[var(--text-primary)]">Edit Policy Rule</DialogTitle>
+                        <DialogDescription className="text-[var(--text-secondary)]">
                             Update the rule configuration
                         </DialogDescription>
                     </DialogHeader>
-                    <RuleForm isEdit />
+                    {renderRuleForm()}
                     <DialogFooter>
-                        <Button variant="outline" onClick={() => setIsEditDialogOpen(false)}>
+                        <Button variant="outline" onClick={() => setIsEditDialogOpen(false)} className="bg-[var(--card-dark)] border-[var(--border-medium)] hover:bg-[var(--card-hover)] text-[var(--text-secondary)]">
                             Cancel
                         </Button>
                         <Button
                             onClick={handleEditRule}
                             disabled={isSaving || !formData.rule_name || !formData.rule_value}
+                            className="bg-[linear-gradient(135deg,#6366f1_0%,#a855f7_50%,#ec4899_100%)] hover:shadow-purple-500/20 text-white shadow-lg"
                         >
                             {isSaving ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : null}
                             Save Changes
@@ -594,21 +647,21 @@ export default function PolicyRulesPage() {
 
             {/* Delete Confirmation Dialog */}
             <Dialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>
-                <DialogContent>
+                <DialogContent className="bg-[var(--card-dark)] border border-[var(--border-subtle)] text-[var(--text-primary)] backdrop-blur-xl shadow-xl">
                     <DialogHeader>
-                        <DialogTitle>Delete Policy Rule</DialogTitle>
-                        <DialogDescription>
+                        <DialogTitle className="text-[var(--text-primary)]">Delete Policy Rule</DialogTitle>
+                        <DialogDescription className="text-[var(--text-secondary)]">
                             Are you sure you want to delete "{selectedRule?.rule_name}"? This action cannot be undone.
                         </DialogDescription>
                     </DialogHeader>
                     <DialogFooter>
-                        <Button variant="outline" onClick={() => setIsDeleteDialogOpen(false)}>
+                        <Button variant="outline" onClick={() => setIsDeleteDialogOpen(false)} className="bg-[var(--card-dark)] border-[var(--border-medium)] hover:bg-[var(--card-hover)] text-[var(--text-secondary)]">
                             Cancel
                         </Button>
                         <Button
-                            variant="destructive"
                             onClick={handleDeleteRule}
                             disabled={isSaving}
+                            className="bg-red-600 hover:bg-red-700 text-white font-semibold shadow-lg"
                         >
                             {isSaving ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : null}
                             Delete Rule

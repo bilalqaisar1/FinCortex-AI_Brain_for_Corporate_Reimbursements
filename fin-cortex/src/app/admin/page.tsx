@@ -22,6 +22,13 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+} from "@/components/ui/dialog";
+import {
   StatsCard,
   PageHeader,
   QuickAnalytics
@@ -94,6 +101,7 @@ export default function AdminDashboard() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [companyName, setCompanyName] = useState<string>("Executive Console");
+  const [auditApproval, setAuditApproval] = useState<PendingApproval | null>(null);
 
   useEffect(() => {
     const loadData = async () => {
@@ -280,7 +288,7 @@ export default function AdminDashboard() {
                               </div>
                               <Button
                                 variant="secondary"
-                                onClick={() => router.push("/admin/approvals")}
+                                onClick={() => setAuditApproval(approval)}
                                 className="h-10 text-[10px] font-black uppercase tracking-widest bg-[var(--card-dark)] border-[var(--border-subtle)] hover:bg-[var(--card-hover)]"
                               >
                                 <Eye className="w-4 h-4 mr-2" /> Audit
@@ -361,25 +369,7 @@ export default function AdminDashboard() {
                     </Button>
                   </div>
 
-                  {/* System Status Mock */}
-                  <Card className="border-[var(--border-subtle)] bg-gradient-to-br from-indigo-900/10 to-transparent p-8">
-                    <div className="flex flex-col gap-4">
-                      <div className="flex items-center justify-between">
-                        <span className="text-[9px] font-black text-[var(--text-muted)] uppercase tracking-widest">Network Latency</span>
-                        <span className="text-[10px] font-black text-emerald-500">12MS</span>
-                      </div>
-                      <div className="w-full h-1 bg-[var(--card-dark)] rounded-full overflow-hidden">
-                        <div className="w-[12%] h-full bg-emerald-500" />
-                      </div>
-                      <div className="flex items-center justify-between">
-                        <span className="text-[9px] font-black text-[var(--text-muted)] uppercase tracking-widest">Database Load</span>
-                        <span className="text-[10px] font-black text-blue-400">24%</span>
-                      </div>
-                      <div className="w-full h-1 bg-[var(--card-dark)] rounded-full overflow-hidden">
-                        <div className="w-[24%] h-full bg-blue-400" />
-                      </div>
-                    </div>
-                  </Card>
+
                 </div>
               </div>
             )}
@@ -393,6 +383,70 @@ export default function AdminDashboard() {
           />
         </TabsContent>
       </Tabs>
+
+      {/* Audit Detail Modal */}
+      <Dialog open={!!auditApproval} onOpenChange={(open) => { if (!open) setAuditApproval(null); }}>
+        <DialogContent className="sm:max-w-[520px] bg-[var(--card-dark)] border-[var(--border-subtle)] text-[var(--text-primary)] backdrop-blur-xl">
+          <DialogHeader>
+            <DialogTitle className="text-[var(--text-primary)] text-lg font-black uppercase tracking-tight">
+              Audit Details
+            </DialogTitle>
+            <DialogDescription className="text-[var(--text-secondary)]">
+              Verification record for claim {auditApproval?.id}
+            </DialogDescription>
+          </DialogHeader>
+
+          {auditApproval && (
+            <div className="space-y-6 py-4">
+              {/* Claim ID & Priority */}
+              <div className="flex items-center justify-between">
+                <span className="text-xl font-black text-[var(--text-primary)] tracking-tight">{auditApproval.id}</span>
+                <Badge
+                  className={cn(
+                    "text-[9px] font-black uppercase tracking-widest",
+                    auditApproval.priority === 'high' ? "bg-red-500/10 text-red-500 border-red-500/20" :
+                      auditApproval.priority === 'medium' ? "bg-amber-500/10 text-amber-500 border-amber-500/20" :
+                        "bg-blue-500/10 text-blue-500 border-blue-500/20"
+                  )}
+                >
+                  {auditApproval.priority} PRIORITY
+                </Badge>
+              </div>
+
+              {/* Details Grid */}
+              <div className="grid grid-cols-2 gap-6">
+                <div className="flex flex-col gap-1">
+                  <span className="text-[9px] font-black uppercase text-[var(--text-muted)] tracking-widest">Originator</span>
+                  <span className="text-sm font-bold text-[var(--text-primary)] uppercase">{auditApproval.user}</span>
+                </div>
+                <div className="flex flex-col gap-1">
+                  <span className="text-[9px] font-black uppercase text-[var(--text-muted)] tracking-widest">Valuation</span>
+                  <span className="text-sm font-bold text-purple-400">{auditApproval.amount}</span>
+                </div>
+                <div className="flex flex-col gap-1">
+                  <span className="text-[9px] font-black uppercase text-[var(--text-muted)] tracking-widest">Sector</span>
+                  <span className="text-sm font-bold text-[var(--text-secondary)] uppercase">{auditApproval.category}</span>
+                </div>
+                <div className="flex flex-col gap-1">
+                  <span className="text-[9px] font-black uppercase text-[var(--text-muted)] tracking-widest">Submitted</span>
+                  <span className="text-sm font-bold text-[var(--text-muted)] uppercase">{auditApproval.submitted}</span>
+                </div>
+              </div>
+
+              {/* Close Button */}
+              <div className="flex justify-end pt-2">
+                <Button
+                  variant="outline"
+                  onClick={() => setAuditApproval(null)}
+                  className="bg-[var(--card-dark)] border-[var(--border-medium)] hover:bg-[var(--card-hover)] text-[var(--text-secondary)] text-[10px] font-black uppercase tracking-widest"
+                >
+                  Close
+                </Button>
+              </div>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

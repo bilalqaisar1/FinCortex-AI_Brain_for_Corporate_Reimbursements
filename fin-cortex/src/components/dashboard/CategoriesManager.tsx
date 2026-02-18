@@ -32,11 +32,10 @@ import {
     deleteSubcategory,
     type Category,
     type Subcategory,
-    type CreateCategoryInput,
     type CreateSubcategoryInput
 } from "@/app/api/v1/admin/categories-api";
 
-export function CategoriesManager() {
+export function CategoriesManager({ companyId }: { companyId: number | null }) {
     const [categories, setCategories] = useState<Category[]>([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
@@ -55,7 +54,7 @@ export function CategoriesManager() {
     const [isSaving, setIsSaving] = useState(false);
 
     // Form states
-    const [catForm, setCatForm] = useState<CreateCategoryInput>({
+    const [catForm, setCatForm] = useState<{ category_name: string; description?: string }>({
         category_name: "",
         description: ""
     });
@@ -68,7 +67,7 @@ export function CategoriesManager() {
 
     useEffect(() => {
         loadData();
-    }, []);
+    }, [companyId]);
 
     const loadData = async () => {
         try {
@@ -131,7 +130,6 @@ export function CategoriesManager() {
         } catch (err: any) {
             console.error("Failed to delete category:", err);
             const message = err?.message || "Failed to delete category";
-            // Show the backend's detailed error (e.g. FK constraint reason)
             alert(message);
         } finally {
             setIsSaving(false);

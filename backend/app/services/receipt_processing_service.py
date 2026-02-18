@@ -12,8 +12,8 @@ from app.config.settings import settings
 
 logger = logging.getLogger(__name__)
 
-# MCP Server Configuration (should ideally move to settings)
-MCP_SERVER_URL = "http://localhost:8001/api/v1"
+# MCP Server Configuration
+MCP_SERVER_URL = settings.mcp_server_url
 
 class ReceiptProcessingError(Exception):
     """Custom exception for receipt processing errors."""

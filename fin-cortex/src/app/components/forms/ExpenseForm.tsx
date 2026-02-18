@@ -323,8 +323,12 @@ const ExpenseForm: React.FC<ExpenseFormProps> = ({ isDarkTheme }) => {
           body.append("admin_uuid", adminUuid);
           console.log("📤 Sending admin_uuid to backend:", adminUuid);
         } else {
-          console.log("⚠️ No admin_uuid available - categories will not be scoped");
-          console.log("⚠️ userProfile details:", JSON.stringify(userProfile, null, 2));
+          console.log("⚠️ No admin_uuid available - backend will resolve from user_id");
+        }
+
+        // Always send user_id so backend can resolve admin_uuid server-side if needed
+        if (user?.id) {
+          body.append("user_id", user.id);
         }
 
         const response = await fetch(RECEIPT_UPLOAD_ENDPOINT, {
@@ -418,6 +422,12 @@ const ExpenseForm: React.FC<ExpenseFormProps> = ({ isDarkTheme }) => {
     if (!formData.vendorType) newErrors.vendorType = "Vendor type is required";
     if (!uploadedFile) newErrors.file = "Please upload a receipt image";
 
+    // Check that there is at least one reimbursable item
+    const reimbursableItems = formData.items.filter(i => i.reimbursable !== false);
+    if (reimbursableItems.length === 0) {
+      (newErrors as any).items = "No reimbursable items found. Please add at least one reimbursable item.";
+    }
+
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
   };
@@ -442,6 +452,13 @@ const ExpenseForm: React.FC<ExpenseFormProps> = ({ isDarkTheme }) => {
 
     setIsSubmitting(true);
     try {
+      // Calculate reimbursable total (exclude non-reimbursable items)
+      // This matches the "Reimbursable Total" displayed in the UI
+      const reimbursableTotal = formData.items
+        .filter(i => i.reimbursable !== false)
+        .reduce((sum, i) => sum + (parseFloat(i.price) || 0) * (parseFloat(i.quantity) || 1), 0)
+        .toFixed(2);
+
       const formPayload = new FormData();
       formPayload.append("receipt_code", formData.receiptCode);
       formPayload.append("user_id", user.id);
@@ -455,7 +472,7 @@ const ExpenseForm: React.FC<ExpenseFormProps> = ({ isDarkTheme }) => {
       }
       formPayload.append("receipt_type_id", formData.receiptType);
       formPayload.append("vendor_type", formData.vendorType);
-      formPayload.append("amount_claimed", formData.totalAmount);
+      formPayload.append("amount_claimed", reimbursableTotal);
       if (formData.invoiceNumber) {
         formPayload.append("invoice_number", formData.invoiceNumber);
       }
@@ -470,8 +487,9 @@ const ExpenseForm: React.FC<ExpenseFormProps> = ({ isDarkTheme }) => {
       }
       formPayload.append("receipt_file", uploadedFile);
 
-      // Add items as JSON string
+      // Add items as JSON string (only reimbursable items)
       const itemsData = formData.items
+        .filter((item) => item.reimbursable !== false)
         .filter((item) => item.item || item.price)
         .map((item) => ({
           item: item.item,
@@ -917,6 +935,12 @@ const ExpenseForm: React.FC<ExpenseFormProps> = ({ isDarkTheme }) => {
             )}
 
             {/* Non-Reimbursable Items */}
+            {(errors as any).items && (
+              <div className="flex items-center gap-2 p-3 rounded-lg bg-red-500/10 border border-red-500/20 mt-4">
+                <Ban className="size-4 text-red-400 flex-shrink-0" />
+                <span className="text-xs font-semibold text-red-400">{(errors as any).items}</span>
+              </div>
+            )}
             {formData.items.filter(i => i.reimbursable === false).length > 0 && (
               <div className="space-y-3 mt-4">
                 <div className="flex items-center gap-2">
@@ -1092,28 +1116,47 @@ const ExpenseForm: React.FC<ExpenseFormProps> = ({ isDarkTheme }) => {
         >
           Cancel
         </Button>
-        <Button
-          type="submit"
-          disabled={isSubmitting}
-          className="w-full sm:min-w-[200px] order-1 sm:order-2 h-12 relative overflow-hidden group shadow-lg shadow-primary/20 hover:shadow-primary/30 active:scale-[0.98] transition-all"
-        >
-          {/* Custom Gradient Background */}
-          <div className="absolute inset-0 bg-primary-gradient group-hover:opacity-90 transition-opacity" />
+        {(() => {
+          const reimbursableAmt = formData.items
+            .filter(i => i.reimbursable !== false)
+            .reduce((sum, i) => sum + (parseFloat(i.price) || 0) * (parseFloat(i.quantity) || 1), 0);
+          const noReimbursable = formData.items.length > 0 && reimbursableAmt <= 0;
+          return (
+            <div className="flex flex-col items-center sm:items-end order-1 sm:order-2 w-full sm:w-auto">
+              <Button
+                type="submit"
+                disabled={isSubmitting || noReimbursable}
+                className={`w-full sm:min-w-[200px] h-12 relative overflow-hidden group shadow-lg transition-all ${noReimbursable
+                  ? 'opacity-50 cursor-not-allowed shadow-none'
+                  : 'shadow-primary/20 hover:shadow-primary/30 active:scale-[0.98]'
+                  }`}
+              >
+                {/* Custom Gradient Background */}
+                <div className={`absolute inset-0 bg-primary-gradient transition-opacity ${noReimbursable ? 'opacity-40' : 'group-hover:opacity-90'
+                  }`} />
 
-          <div className="relative z-10 flex items-center justify-center gap-2 font-bold text-white">
-            {isSubmitting ? (
-              <>
-                <Loader2 className="size-5 animate-spin" />
-                <span>Submitting...</span>
-              </>
-            ) : (
-              <>
-                <Send className="size-5 group-hover:translate-x-1 group-hover:-translate-y-1 transition-transform" />
-                <span>Submit Claim</span>
-              </>
-            )}
-          </div>
-        </Button>
+                <div className="relative z-10 flex items-center justify-center gap-2 font-bold text-white">
+                  {isSubmitting ? (
+                    <>
+                      <Loader2 className="size-5 animate-spin" />
+                      <span>Submitting...</span>
+                    </>
+                  ) : (
+                    <>
+                      <Send className={`size-5 ${noReimbursable ? '' : 'group-hover:translate-x-1 group-hover:-translate-y-1'} transition-transform`} />
+                      <span>Submit Claim</span>
+                    </>
+                  )}
+                </div>
+              </Button>
+              {noReimbursable && (
+                <p className="text-xs text-red-400 mt-1.5 text-center sm:text-right">
+                  Cannot submit — no reimbursable items (PKR 0.00)
+                </p>
+              )}
+            </div>
+          );
+        })()}
       </div>
     </form>
   );

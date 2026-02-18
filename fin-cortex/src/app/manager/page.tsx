@@ -22,7 +22,11 @@ import {
   TrendingUp,
   TrendingDown,
   Filter,
-  Download
+  Download,
+  ArrowLeft,
+  X,
+  Wallet,
+  PieChart
 } from "lucide-react";
 import {
   Select,
@@ -47,8 +51,9 @@ import {
   StatsCard,
   PageHeader,
 } from "@/components/dashboard";
-import { cn, formatCurrency, formatDate } from "@/lib/utils";
+import { cn, formatDate } from "@/lib/utils";
 import { ManagerLayout } from "@/components/dashboard/ManagerLayout";
+import { BACKEND_URL } from "@/lib/config";
 import { RouteProtection } from "@/components/auth/RouteProtection";
 import { useAuth } from "@/context/AuthContext";
 
@@ -111,28 +116,45 @@ export default function ManagerDashboard() {
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [comment, setComment] = useState("");
   const [isProcessing, setIsProcessing] = useState(false);
+  const [budgetError, setBudgetError] = useState<string | null>(null);
   const [timeRange, setTimeRange] = useState("6months");
+
+  // Budget data state
+  const [budgetData, setBudgetData] = useState<any>(null);
+
+  // State for Card Popup Modals
+  const [showTeamClaims, setShowTeamClaims] = useState(false);
+  const [showPendingPopup, setShowPendingPopup] = useState(false);
+  const [showBudgetPopup, setShowBudgetPopup] = useState(false);
+  const [showTeamMembers, setShowTeamMembers] = useState(false);
+  const [showAcceptedPopup, setShowAcceptedPopup] = useState(false);
+  const [showRejectedPopup, setShowRejectedPopup] = useState(false);
 
   const fetchDashboardData = useCallback(async () => {
     if (!userProfile?.user_id) return;
     setIsLoading(true);
     try {
-      const baseUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
+      const baseUrl = BACKEND_URL;
 
-      // Fetch claims and stats in parallel
-      const [claimsRes, statsRes] = await Promise.all([
+      // Fetch claims, stats, and budget in parallel
+      const [claimsRes, statsRes, budgetRes] = await Promise.all([
         fetch(`${baseUrl}/api/v1/reimbursements/manager/${userProfile.user_id}`),
-        fetch(`${baseUrl}/api/v1/reimbursements/manager/${userProfile.user_id}/stats`)
+        fetch(`${baseUrl}/api/v1/reimbursements/manager/${userProfile.user_id}/stats`),
+        fetch(`${baseUrl}/api/v1/manager/budget?manager_id=${userProfile.user_id}`)
       ]);
 
       const claimsPayload = await claimsRes.json();
       const statsPayload = await statsRes.json();
+      const budgetPayload = await budgetRes.json();
 
       if (claimsPayload.success) {
         setClaims(claimsPayload.data);
       }
       if (statsPayload.success) {
         setStats(statsPayload.data);
+      }
+      if (budgetPayload.success) {
+        setBudgetData(budgetPayload.data);
       }
     } catch (error) {
       console.error("Failed to fetch dashboard data:", error);
@@ -147,11 +169,21 @@ export default function ManagerDashboard() {
 
   // Derived state
   const pendingApprovals = claims.filter(c => c.status.toLowerCase() === 'pending');
+  const acceptedClaims = claims.filter(c => c.status.toLowerCase() === 'approved');
+  const rejectedClaims = claims.filter(c => c.status.toLowerCase() === 'rejected');
   const historyClaims = claims.filter(c => c.status.toLowerCase() !== 'pending');
+
+  const formatCurrency = (amount: any) => {
+    const val = parseFloat(amount);
+    if (isNaN(val)) return amount;
+    return "PKR " + val.toLocaleString();
+  };
 
   // Stats for cards
   const totalTeamClaims = claims.length;
   const pendingCount = pendingApprovals.length;
+  const acceptedCount = acceptedClaims.length;
+  const rejectedCount = rejectedClaims.length;
 
   const managerStats = [
     {
@@ -169,11 +201,20 @@ export default function ManagerDashboard() {
       icon: Clock
     },
     {
-      title: "Team Budget",
-      value: stats ? `${stats.budgetUtilization}%` : "—",
-      change: stats ? "Used" : "Loading...",
+      title: "Allocated Budget",
+      value: budgetData ? formatCurrency(budgetData.total_budget) : "—",
+      change: budgetData?.department_name || "Department",
       changeType: "neutral" as const,
-      icon: DollarSign
+      icon: Wallet
+    },
+    {
+      title: "Budget Used",
+      value: budgetData ? `${Math.min(100, budgetData.utilization_percentage)}%` : "—",
+      change: budgetData ? `${formatCurrency(budgetData.used_budget)} spent` : "Loading...",
+      changeType: budgetData && budgetData.utilization_percentage >= 90 ? "negative" as const
+        : budgetData && budgetData.utilization_percentage >= 70 ? "warning" as const
+          : "positive" as const,
+      icon: PieChart
     },
     {
       title: "Team Members",
@@ -181,6 +222,20 @@ export default function ManagerDashboard() {
       change: "Active",
       changeType: "neutral" as const,
       icon: Users
+    },
+    {
+      title: "Accepted Claims",
+      value: acceptedCount.toString(),
+      change: "Approved",
+      changeType: "positive" as const,
+      icon: CheckCircle
+    },
+    {
+      title: "Rejected Claims",
+      value: rejectedCount.toString(),
+      change: "Rejected",
+      changeType: rejectedCount > 0 ? "negative" as const : "neutral" as const,
+      icon: XCircle
     }
   ];
 
@@ -202,8 +257,9 @@ export default function ManagerDashboard() {
     if (decisionType === "rejected" && !comment.trim()) return;
 
     setIsProcessing(true);
+    setBudgetError(null);
     try {
-      const baseUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
+      const baseUrl = BACKEND_URL;
       const response = await fetch(`${baseUrl}/api/v1/reimbursements/${selectedApproval.reimbursement_id}/status`, {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
@@ -214,15 +270,29 @@ export default function ManagerDashboard() {
         })
       });
       const payload = await response.json();
+
+      if (!response.ok) {
+        // Handle budget exceeded error
+        const detail = payload.detail;
+        if (detail && typeof detail === 'object' && detail.error_code === 'budget_exceeded') {
+          setBudgetError(detail.message || 'Insufficient department budget. Please contact admin to increase allocation.');
+        } else {
+          setBudgetError(typeof detail === 'string' ? detail : 'Failed to update claim status.');
+        }
+        return;
+      }
+
       if (payload.success) {
         setIsDialogOpen(false);
         setComment("");
         setSelectedApproval(null);
         setDecisionType(null);
+        setBudgetError(null);
         fetchDashboardData(); // Refresh data
       }
     } catch (error) {
       console.error("Failed to update status:", error);
+      setBudgetError('Network error. Please try again.');
     } finally {
       setIsProcessing(false);
     }
@@ -235,11 +305,7 @@ export default function ManagerDashboard() {
     });
   };
 
-  const formatCurrency = (amount: any) => {
-    const val = parseFloat(amount);
-    if (isNaN(val)) return amount;
-    return "PKR " + val.toLocaleString();
-  };
+
 
   const priorityColors: Record<string, string> = {
     high: "bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400",
@@ -258,7 +324,7 @@ export default function ManagerDashboard() {
           />
 
           {/* Manager KPIs */}
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
             {managerStats.map((stat, index) => (
               <StatsCard
                 key={index}
@@ -268,6 +334,15 @@ export default function ManagerDashboard() {
                 changeType={stat.changeType}
                 icon={stat.icon}
                 className="animate-fade-in-up"
+                onClick={[
+                  () => setShowTeamClaims(true),
+                  () => setShowPendingPopup(true),
+                  () => setShowBudgetPopup(true),
+                  () => setShowBudgetPopup(true),
+                  () => setShowTeamMembers(true),
+                  () => setShowAcceptedPopup(true),
+                  () => setShowRejectedPopup(true),
+                ][index]}
               />
             ))}
           </div>
@@ -356,7 +431,7 @@ export default function ManagerDashboard() {
                                 <XCircle className="w-5 h-5 mr-3" /> Reject
                               </Button>
                             </div>
-                            <Button variant="secondary" className="h-12 text-[10px] font-black uppercase tracking-widest border-[var(--border-subtle)] bg-[var(--card-dark)] text-[var(--text-secondary)] hover:bg-[var(--card-hover)] hover:text-[var(--text-primary)] transition-all rounded-2xl" onClick={() => router.push(`/manager/reimbursements/${claim.reimbursement_id}`)}>
+                            <Button variant="secondary" className="h-12 text-[10px] font-black uppercase tracking-widest border-[var(--border-subtle)] bg-[var(--card-dark)] text-[var(--text-secondary)] hover:bg-[var(--card-hover)] hover:text-[var(--text-primary)] transition-all rounded-2xl" onClick={() => router.push(`/manager/reimbursements/${claim.reimbursement_id}?userId=${claim.user_id}`)}>
                               <Eye className="w-5 h-5 mr-3" /> Detailed Review
                             </Button>
                           </div>
@@ -584,7 +659,7 @@ export default function ManagerDashboard() {
                     <p className="text-[9px] font-black uppercase text-[var(--text-muted)] text-center py-10 tracking-[0.2em]">Log empty.</p>
                   ) : (
                     historyClaims.slice(0, 5).map((claim) => (
-                      <div key={claim.reimbursement_id} className="flex items-center justify-between p-4 bg-[var(--card-dark)] border border-[var(--border-subtle)] rounded-2xl hover:bg-[var(--card-hover)] transition-colors group cursor-pointer" onClick={() => router.push(`/manager/reimbursements/${claim.reimbursement_id}`)}>
+                      <div key={claim.reimbursement_id} className="flex items-center justify-between p-4 bg-[var(--card-dark)] border border-[var(--border-subtle)] rounded-2xl hover:bg-[var(--card-hover)] transition-colors group cursor-pointer" onClick={() => router.push(`/manager/reimbursements/${claim.reimbursement_id}?userId=${claim.user_id}`)}>
                         <div className="flex items-center gap-4">
                           <div className={cn(
                             "w-8 h-8 rounded-lg flex items-center justify-center",
@@ -607,32 +682,45 @@ export default function ManagerDashboard() {
           </div>
         </div>
 
-        {/* Approval Dialog */}
+        {/* Approval Dialog — Theme-aware */}
         <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
-          <DialogContent className="bg-white dark:bg-slate-900">
+          <DialogContent className="bg-[var(--card-dark)] border border-[var(--border-subtle)] shadow-2xl rounded-2xl max-w-lg">
             <DialogHeader>
-              <DialogTitle>
+              <DialogTitle className="text-lg font-black uppercase tracking-wider text-[var(--text-primary)]">
                 {decisionType === "approved" ? "Approve" : "Reject"} Reimbursement
               </DialogTitle>
-              <DialogDescription>
+              <DialogDescription className="text-sm text-[var(--text-secondary)]">
                 {decisionType === "approved"
                   ? "Are you sure you want to approve this reimbursement claim?"
                   : "Are you sure you want to reject this reimbursement claim? Please provide a reason."}
               </DialogDescription>
             </DialogHeader>
             <div className="space-y-4 py-4">
+              {budgetError && (
+                <div className="p-4 bg-red-500/10 border border-red-500/30 rounded-xl flex items-start gap-3">
+                  <AlertTriangle className="w-5 h-5 text-red-400 mt-0.5 flex-shrink-0" />
+                  <div className="flex-1">
+                    <p className="text-sm font-bold text-red-400 mb-1">Budget Exceeded</p>
+                    <p className="text-xs text-red-300/80">{budgetError}</p>
+                    <p className="text-xs text-amber-400/80 mt-2 font-medium">Please contact your admin to increase budget allocation.</p>
+                  </div>
+                  <button onClick={() => setBudgetError(null)} className="text-red-400/60 hover:text-red-400">
+                    <X className="w-4 h-4" />
+                  </button>
+                </div>
+              )}
               {selectedApproval && (
-                <div className="p-4 bg-slate-50 dark:bg-slate-800 rounded-lg">
-                  <p className="font-medium text-slate-900 dark:text-slate-100 mb-2">
+                <div className="p-4 bg-[var(--surface-elevated)] border border-[var(--border-subtle)] rounded-xl">
+                  <p className="font-bold text-[var(--text-primary)] mb-1">
                     {selectedApproval.receipt_code}
                   </p>
-                  <p className="text-sm text-slate-600 dark:text-slate-400">
+                  <p className="text-sm text-[var(--text-secondary)]">
                     {selectedApproval.receipt_code} • {formatCurrency(selectedApproval.amount_claimed)}
                   </p>
                 </div>
               )}
               <div>
-                <label className="text-sm font-medium text-slate-700 dark:text-slate-300 mb-2 block">
+                <label className="text-sm font-semibold text-[var(--text-primary)] mb-2 block">
                   {decisionType === "approved" ? "Comments (Optional)" : "Reason for Rejection *"}
                 </label>
                 <Textarea
@@ -641,42 +729,363 @@ export default function ManagerDashboard() {
                   placeholder={decisionType === "approved"
                     ? "Add any comments..."
                     : "Please provide a reason for rejection..."}
-                  className="min-h-[100px] bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700"
+                  className="min-h-[100px] bg-[var(--surface-elevated)] border-[var(--border-subtle)] text-[var(--text-primary)] placeholder-[var(--text-muted)] focus:border-purple-500/50 focus:ring-purple-500/20 rounded-xl"
                   required={decisionType === "rejected"}
                 />
               </div>
             </div>
-            <DialogFooter>
+            <DialogFooter className="gap-3">
               <Button
                 variant="outline"
                 onClick={() => {
                   setIsDialogOpen(false);
                   setComment("");
                   setDecisionType(null);
+                  setBudgetError(null);
                 }}
                 disabled={isProcessing}
+                className="border-[var(--border-subtle)] text-[var(--text-secondary)] bg-[var(--surface-elevated)] hover:bg-[var(--card-hover)] hover:text-[var(--text-primary)] rounded-xl"
               >
                 Cancel
               </Button>
               <Button
                 onClick={confirmDecision}
                 disabled={isProcessing || (decisionType === "rejected" && !comment.trim())}
-                className={decisionType === "approved"
-                  ? "bg-green-600 hover:bg-green-700"
-                  : "bg-red-600 hover:bg-red-700"}
+                className={cn(
+                  "text-white font-bold rounded-xl shadow-lg",
+                  decisionType === "approved"
+                    ? "bg-gradient-to-r from-blue-500 to-indigo-600 hover:from-blue-600 hover:to-indigo-700 shadow-blue-500/20"
+                    : "bg-gradient-to-r from-red-500 to-rose-600 hover:from-red-600 hover:to-rose-700 shadow-red-500/20"
+                )}
               >
                 {isProcessing ? (
                   <div className="flex items-center space-x-2">
-                    <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                    <Loader2 className="w-4 h-4 animate-spin" />
                     <span>Processing...</span>
                   </div>
                 ) : (
                   <>
-                    {decisionType === "approved" ? "Approve" : "Reject"}
+                    {decisionType === "approved" ? (
+                      <><CheckCircle className="w-4 h-4 mr-2" />Approve</>
+                    ) : (
+                      <><XCircle className="w-4 h-4 mr-2" />Reject</>
+                    )}
                   </>
                 )}
               </Button>
             </DialogFooter>
+          </DialogContent>
+        </Dialog>
+
+        {/* ========== CARD POPUP MODALS ========== */}
+
+        {/* My Team Claims Popup */}
+        <Dialog open={showTeamClaims} onOpenChange={setShowTeamClaims}>
+          <DialogContent className="bg-[var(--card-dark)] border border-[var(--border-subtle)] shadow-2xl rounded-2xl max-w-3xl max-h-[80vh] overflow-hidden flex flex-col">
+            <DialogHeader>
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <div className="h-10 w-10 rounded-xl bg-blue-500/20 flex items-center justify-center text-blue-400">
+                    <Receipt className="w-5 h-5" />
+                  </div>
+                  <div>
+                    <DialogTitle className="text-lg font-black uppercase tracking-wider text-[var(--text-primary)]">My Team Claims</DialogTitle>
+                    <DialogDescription className="text-xs text-[var(--text-secondary)] uppercase tracking-widest">All claims under your management</DialogDescription>
+                  </div>
+                </div>
+              </div>
+            </DialogHeader>
+            <div className="overflow-y-auto flex-1 -mx-6 px-6">
+              {claims.length === 0 ? (
+                <p className="text-center text-[var(--text-muted)] py-12 text-sm">No claims found.</p>
+              ) : (
+                <div className="space-y-3">
+                  {claims.map((claim) => (
+                    <div key={claim.reimbursement_id} className="flex items-center justify-between p-4 bg-[var(--surface-elevated)] border border-[var(--border-subtle)] rounded-xl hover:bg-[var(--card-hover)] transition-colors">
+                      <div className="flex items-center gap-4 flex-1 min-w-0">
+                        <div className={cn(
+                          "w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0",
+                          claim.status?.toLowerCase() === 'approved' ? "bg-emerald-500/10 text-emerald-400" :
+                            claim.status?.toLowerCase() === 'rejected' ? "bg-red-500/10 text-red-400" :
+                              "bg-amber-500/10 text-amber-400"
+                        )}>
+                          {claim.status?.toLowerCase() === 'approved' ? <CheckCircle className="w-4 h-4" /> :
+                            claim.status?.toLowerCase() === 'rejected' ? <XCircle className="w-4 h-4" /> :
+                              <Clock className="w-4 h-4" />}
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <p className="text-xs font-bold text-[var(--text-primary)] uppercase tracking-wider truncate">{claim.receipt_code}</p>
+                          <p className="text-[10px] text-[var(--text-secondary)] uppercase">{claim.users?.full_name || "Unknown"} • {claim.categories?.category_name || "Other"}</p>
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-4 shrink-0">
+                        <Badge className={cn(
+                          "text-[9px] font-bold uppercase tracking-wider rounded-lg px-2 py-0.5",
+                          claim.status?.toLowerCase() === 'approved' ? "bg-emerald-500/10 text-emerald-400 border-emerald-500/20" :
+                            claim.status?.toLowerCase() === 'rejected' ? "bg-red-500/10 text-red-400 border-red-500/20" :
+                              "bg-amber-500/10 text-amber-400 border-amber-500/20"
+                        )}>{claim.status}</Badge>
+                        <span className="text-xs font-black text-blue-400 whitespace-nowrap">{formatCurrency(claim.amount_claimed)}</span>
+                        <span className="text-[10px] text-[var(--text-muted)] whitespace-nowrap">{formatDate(claim.created_at)}</span>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          </DialogContent>
+        </Dialog>
+
+        {/* Pending Approvals Popup */}
+        <Dialog open={showPendingPopup} onOpenChange={setShowPendingPopup}>
+          <DialogContent className="bg-[var(--card-dark)] border border-[var(--border-subtle)] shadow-2xl rounded-2xl max-w-3xl max-h-[80vh] overflow-hidden flex flex-col">
+            <DialogHeader>
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <div className="h-10 w-10 rounded-xl bg-orange-500/20 flex items-center justify-center text-orange-400">
+                    <Clock className="w-5 h-5" />
+                  </div>
+                  <div>
+                    <DialogTitle className="text-lg font-black uppercase tracking-wider text-[var(--text-primary)]">Pending Approvals</DialogTitle>
+                    <DialogDescription className="text-xs text-[var(--text-secondary)] uppercase tracking-widest">{pendingCount} claims awaiting your decision</DialogDescription>
+                  </div>
+                </div>
+              </div>
+            </DialogHeader>
+            <div className="overflow-y-auto flex-1 -mx-6 px-6">
+              {pendingApprovals.length === 0 ? (
+                <p className="text-center text-[var(--text-muted)] py-12 text-sm">No pending claims.</p>
+              ) : (
+                <div className="space-y-3">
+                  {pendingApprovals.map((claim) => (
+                    <div key={claim.reimbursement_id} className="flex items-center justify-between p-4 bg-[var(--surface-elevated)] border border-[var(--border-subtle)] rounded-xl hover:bg-[var(--card-hover)] transition-colors">
+                      <div className="flex items-center gap-4 flex-1 min-w-0">
+                        <div className="w-8 h-8 rounded-lg bg-amber-500/10 text-amber-400 flex items-center justify-center flex-shrink-0">
+                          <Clock className="w-4 h-4" />
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <p className="text-xs font-bold text-[var(--text-primary)] uppercase tracking-wider truncate">{claim.receipt_code}</p>
+                          <p className="text-[10px] text-[var(--text-secondary)] uppercase">{claim.users?.full_name || "Unknown"} • {claim.categories?.category_name || "Other"}</p>
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-4 shrink-0">
+                        <Badge className="bg-amber-500/10 text-amber-400 border-amber-500/20 text-[9px] font-bold uppercase tracking-wider rounded-lg px-2 py-0.5">Pending</Badge>
+                        <span className="text-xs font-black text-blue-400 whitespace-nowrap">{formatCurrency(claim.amount_claimed)}</span>
+                        <span className="text-[10px] text-[var(--text-muted)] whitespace-nowrap">{formatDate(claim.created_at)}</span>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          </DialogContent>
+        </Dialog>
+
+        {/* Team Budget Popup */}
+        <Dialog open={showBudgetPopup} onOpenChange={setShowBudgetPopup}>
+          <DialogContent className="bg-[var(--card-dark)] border border-[var(--border-subtle)] shadow-2xl rounded-2xl max-w-2xl max-h-[80vh] overflow-hidden flex flex-col">
+            <DialogHeader>
+              <div className="flex items-center gap-3">
+                <div className="h-10 w-10 rounded-xl bg-emerald-500/20 flex items-center justify-center text-emerald-400">
+                  <DollarSign className="w-5 h-5" />
+                </div>
+                <div>
+                  <DialogTitle className="text-lg font-black uppercase tracking-wider text-[var(--text-primary)]">Team Budget</DialogTitle>
+                  <DialogDescription className="text-xs text-[var(--text-secondary)] uppercase tracking-widest">Budget allocation and usage overview</DialogDescription>
+                </div>
+              </div>
+            </DialogHeader>
+            <div className="overflow-y-auto flex-1 -mx-6 px-6 space-y-6">
+              {/* Budget Summary Cards */}
+              <div className="grid grid-cols-3 gap-4">
+                <div className="p-4 bg-[var(--surface-elevated)] border border-[var(--border-subtle)] rounded-xl text-center">
+                  <p className="text-[10px] font-black uppercase tracking-widest text-[var(--text-muted)] mb-1">Utilization</p>
+                  <p className={cn("text-2xl font-black",
+                    (stats?.budgetUtilization || 0) >= 90 ? "text-red-400" :
+                      (stats?.budgetUtilization || 0) >= 70 ? "text-amber-400" : "text-emerald-400"
+                  )}>{stats?.budgetUtilization || 0}%</p>
+                </div>
+                <div className="p-4 bg-[var(--surface-elevated)] border border-[var(--border-subtle)] rounded-xl text-center">
+                  <p className="text-[10px] font-black uppercase tracking-widest text-[var(--text-muted)] mb-1">Total Budget</p>
+                  <p className="text-lg font-black text-[var(--text-primary)]">{stats?.totalBudget ? formatCurrency(stats.totalBudget) : "—"}</p>
+                </div>
+                <div className="p-4 bg-[var(--surface-elevated)] border border-[var(--border-subtle)] rounded-xl text-center">
+                  <p className="text-[10px] font-black uppercase tracking-widest text-[var(--text-muted)] mb-1">Used</p>
+                  <p className="text-lg font-black text-blue-400">{stats?.usedBudget ? formatCurrency(stats.usedBudget) : "—"}</p>
+                </div>
+              </div>
+
+              {/* Progress Bar */}
+              <div className="space-y-2">
+                <div className="flex justify-between text-xs">
+                  <span className="text-[var(--text-secondary)] font-bold uppercase tracking-wider">Budget Usage</span>
+                  <span className="text-[var(--text-primary)] font-black">{stats?.budgetUtilization || 0}%</span>
+                </div>
+                <div className="w-full bg-[var(--border-medium)] rounded-full h-4 p-0.5 border border-[var(--border-subtle)]">
+                  <div
+                    className={cn("h-full rounded-full transition-all duration-700",
+                      (stats?.budgetUtilization || 0) >= 90 ? "bg-gradient-to-r from-red-500 to-rose-500" :
+                        (stats?.budgetUtilization || 0) >= 70 ? "bg-gradient-to-r from-amber-500 to-orange-500" :
+                          "bg-gradient-to-r from-emerald-500 to-blue-500"
+                    )}
+                    style={{ width: `${Math.min(stats?.budgetUtilization || 0, 100)}%` }}
+                  />
+                </div>
+              </div>
+
+              {/* Category Breakdown */}
+              {stats?.topCategories && stats.topCategories.length > 0 && (
+                <div className="space-y-3">
+                  <h4 className="text-xs font-black uppercase tracking-widest text-[var(--text-secondary)]">Spending by Category</h4>
+                  {stats.topCategories.map((cat: any, i: number) => (
+                    <div key={i} className="flex items-center justify-between p-3 bg-[var(--surface-elevated)] border border-[var(--border-subtle)] rounded-xl">
+                      <span className="text-xs font-bold text-[var(--text-primary)] uppercase">{cat.category}</span>
+                      <div className="flex items-center gap-3">
+                        <div className="w-24 bg-[var(--border-medium)] rounded-full h-2">
+                          <div className="h-full rounded-full bg-gradient-to-r from-blue-500 to-indigo-500" style={{ width: `${cat.percentage}%` }} />
+                        </div>
+                        <span className="text-xs font-black text-blue-400 w-20 text-right">{formatCurrency(cat.amount)}</span>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              {!stats && (
+                <p className="text-center text-[var(--text-muted)] py-8 text-sm">Budget data not available.</p>
+              )}
+            </div>
+          </DialogContent>
+        </Dialog>
+
+        {/* Team Members Popup */}
+        <Dialog open={showTeamMembers} onOpenChange={setShowTeamMembers}>
+          <DialogContent className="bg-[var(--card-dark)] border border-[var(--border-subtle)] shadow-2xl rounded-2xl max-w-2xl max-h-[80vh] overflow-hidden flex flex-col">
+            <DialogHeader>
+              <div className="flex items-center gap-3">
+                <div className="h-10 w-10 rounded-xl bg-purple-500/20 flex items-center justify-center text-purple-400">
+                  <Users className="w-5 h-5" />
+                </div>
+                <div>
+                  <DialogTitle className="text-lg font-black uppercase tracking-wider text-[var(--text-primary)]">Team Members</DialogTitle>
+                  <DialogDescription className="text-xs text-[var(--text-secondary)] uppercase tracking-widest">{stats?.teamMemberCount || 0} active team members</DialogDescription>
+                </div>
+              </div>
+            </DialogHeader>
+            <div className="overflow-y-auto flex-1 -mx-6 px-6">
+              {stats?.teamPerformance && stats.teamPerformance.length > 0 ? (
+                <div className="space-y-3">
+                  {stats.teamPerformance.map((member: any, index: number) => (
+                    <div key={index} className="flex items-center justify-between p-4 bg-[var(--surface-elevated)] border border-[var(--border-subtle)] rounded-xl hover:bg-[var(--card-hover)] transition-colors">
+                      <div className="flex items-center gap-4">
+                        <div className="w-10 h-10 bg-gradient-to-br from-blue-500 to-indigo-600 rounded-xl flex items-center justify-center text-white font-black text-sm shadow-lg shadow-blue-500/20">
+                          {member.user.split(" ").map((n: string) => n[0]).join("").toUpperCase().slice(0, 2)}
+                        </div>
+                        <div>
+                          <p className="text-sm font-bold text-[var(--text-primary)] uppercase tracking-tight">{member.user}</p>
+                          <p className="text-[10px] text-[var(--text-secondary)] uppercase tracking-wider">{member.claims} claims • {formatCurrency(member.amount)}</p>
+                        </div>
+                      </div>
+                      <Badge className="bg-emerald-500/10 text-emerald-400 border-emerald-500/20 font-bold text-[9px] uppercase tracking-widest rounded-lg px-2 py-0.5">
+                        {member.avgTime}
+                      </Badge>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <p className="text-center text-[var(--text-muted)] py-12 text-sm">No team members found.</p>
+              )}
+            </div>
+          </DialogContent>
+        </Dialog>
+
+        {/* Accepted Claims Popup */}
+        <Dialog open={showAcceptedPopup} onOpenChange={setShowAcceptedPopup}>
+          <DialogContent className="bg-[var(--card-dark)] border border-[var(--border-subtle)] shadow-2xl rounded-2xl max-w-3xl max-h-[80vh] overflow-hidden flex flex-col">
+            <DialogHeader>
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <div className="h-10 w-10 rounded-xl bg-emerald-500/20 flex items-center justify-center text-emerald-400">
+                    <CheckCircle className="w-5 h-5" />
+                  </div>
+                  <div>
+                    <DialogTitle className="text-lg font-black uppercase tracking-wider text-[var(--text-primary)]">Accepted Claims</DialogTitle>
+                    <DialogDescription className="text-xs text-[var(--text-secondary)] uppercase tracking-widest">{acceptedCount} approved claims in your department</DialogDescription>
+                  </div>
+                </div>
+              </div>
+            </DialogHeader>
+            <div className="overflow-y-auto flex-1 -mx-6 px-6">
+              {acceptedClaims.length === 0 ? (
+                <p className="text-center text-[var(--text-muted)] py-12 text-sm">No approved claims found.</p>
+              ) : (
+                <div className="space-y-3">
+                  {acceptedClaims.map((claim) => (
+                    <div key={claim.reimbursement_id} className="flex items-center justify-between p-4 bg-[var(--surface-elevated)] border border-[var(--border-subtle)] rounded-xl hover:bg-[var(--card-hover)] transition-colors">
+                      <div className="flex items-center gap-4 flex-1 min-w-0">
+                        <div className="w-8 h-8 rounded-lg bg-emerald-500/10 text-emerald-400 flex items-center justify-center flex-shrink-0">
+                          <CheckCircle className="w-4 h-4" />
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <p className="text-xs font-bold text-[var(--text-primary)] uppercase tracking-wider truncate">{claim.receipt_code}</p>
+                          <p className="text-[10px] text-[var(--text-secondary)] uppercase">{claim.users?.full_name || "Unknown"} • {claim.categories?.category_name || "Other"}</p>
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-4 shrink-0">
+                        <Badge className="bg-emerald-500/10 text-emerald-400 border-emerald-500/20 text-[9px] font-bold uppercase tracking-wider rounded-lg px-2 py-0.5">Approved</Badge>
+                        <span className="text-xs font-black text-blue-400 whitespace-nowrap">{formatCurrency(claim.amount_claimed)}</span>
+                        <span className="text-[10px] text-[var(--text-muted)] whitespace-nowrap">{formatDate(claim.created_at)}</span>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          </DialogContent>
+        </Dialog>
+
+        {/* Rejected Claims Popup */}
+        <Dialog open={showRejectedPopup} onOpenChange={setShowRejectedPopup}>
+          <DialogContent className="bg-[var(--card-dark)] border border-[var(--border-subtle)] shadow-2xl rounded-2xl max-w-3xl max-h-[80vh] overflow-hidden flex flex-col">
+            <DialogHeader>
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <div className="h-10 w-10 rounded-xl bg-red-500/20 flex items-center justify-center text-red-400">
+                    <XCircle className="w-5 h-5" />
+                  </div>
+                  <div>
+                    <DialogTitle className="text-lg font-black uppercase tracking-wider text-[var(--text-primary)]">Rejected Claims</DialogTitle>
+                    <DialogDescription className="text-xs text-[var(--text-secondary)] uppercase tracking-widest">{rejectedCount} rejected claims in your department</DialogDescription>
+                  </div>
+                </div>
+              </div>
+            </DialogHeader>
+            <div className="overflow-y-auto flex-1 -mx-6 px-6">
+              {rejectedClaims.length === 0 ? (
+                <p className="text-center text-[var(--text-muted)] py-12 text-sm">No rejected claims found.</p>
+              ) : (
+                <div className="space-y-3">
+                  {rejectedClaims.map((claim) => (
+                    <div key={claim.reimbursement_id} className="flex items-center justify-between p-4 bg-[var(--surface-elevated)] border border-[var(--border-subtle)] rounded-xl hover:bg-[var(--card-hover)] transition-colors">
+                      <div className="flex items-center gap-4 flex-1 min-w-0">
+                        <div className="w-8 h-8 rounded-lg bg-red-500/10 text-red-400 flex items-center justify-center flex-shrink-0">
+                          <XCircle className="w-4 h-4" />
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <p className="text-xs font-bold text-[var(--text-primary)] uppercase tracking-wider truncate">{claim.receipt_code}</p>
+                          <p className="text-[10px] text-[var(--text-secondary)] uppercase">{claim.users?.full_name || "Unknown"} • {claim.categories?.category_name || "Other"}</p>
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-4 shrink-0">
+                        <Badge className="bg-red-500/10 text-red-400 border-red-500/20 text-[9px] font-bold uppercase tracking-wider rounded-lg px-2 py-0.5">Rejected</Badge>
+                        <span className="text-xs font-black text-blue-400 whitespace-nowrap">{formatCurrency(claim.amount_claimed)}</span>
+                        <span className="text-[10px] text-[var(--text-muted)] whitespace-nowrap">{formatDate(claim.created_at)}</span>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
           </DialogContent>
         </Dialog>
 

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import {
   BudgetOverview,
@@ -9,20 +9,51 @@ import {
 } from "@/components/dashboard";
 import { DollarSign, Tag, Calculator } from "lucide-react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { useAuth } from "@/context/AuthContext";
+import { createClient } from "@supabase/supabase-js";
+
+const supabaseAdmin = createClient(
+  process.env.NEXT_PUBLIC_SUPABASE_URL!,
+  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+);
 
 export default function BudgetPage() {
   const router = useRouter();
+  const { userProfile } = useAuth();
+  const [companyId, setCompanyId] = useState<number | null>(null);
+
+  // Resolve company_id from admin profile
+  useEffect(() => {
+    const resolveCompanyId = async () => {
+      const adminId = userProfile?.admin_id || userProfile?.user_id;
+      if (!adminId) return;
+
+      try {
+        const { data, error } = await supabaseAdmin
+          .from("companies")
+          .select("company_id")
+          .eq("admin_id", adminId)
+          .maybeSingle();
+
+        if (!error && data) {
+          setCompanyId(data.company_id);
+        } else {
+          console.error("Failed to resolve company_id for admin:", error);
+        }
+      } catch (err) {
+        console.error("Error resolving company_id:", err);
+      }
+    };
+
+    resolveCompanyId();
+  }, [userProfile]);
 
   const handleViewDetails = (companyId: string) => {
-    // Navigate to detailed budget view
     console.log("View budget details for company:", companyId);
-    // router.push(`/admin/budget/${companyId}`);
   };
 
   const handleAddBudget = () => {
-    // Navigate to add budget form or open modal
     console.log("Add budget clicked");
-    // router.push("/admin/budget/add");
   };
 
   return (
@@ -69,7 +100,7 @@ export default function BudgetPage() {
         </TabsContent>
 
         <TabsContent value="categories" className="mt-0 outline-none animate-in fade-in duration-500">
-          <CategoriesManager />
+          <CategoriesManager companyId={companyId} />
         </TabsContent>
       </Tabs>
     </div>

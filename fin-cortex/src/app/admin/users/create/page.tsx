@@ -34,16 +34,15 @@ export default function CreateManagerPage() {
         status: "active",
     });
 
-    // Fetch departments on load
+    // Fetch departments
     useEffect(() => {
         const fetchDepartments = async () => {
             try {
-                const { data, error } = await supabaseClient
-                    .from('departments')
-                    .select('department_id, department_name');
-
-                if (error) throw error;
-                if (data) setDepartments(data);
+                const resp = await fetch('/api/v1/admin/departments');
+                const result = await resp.json();
+                if (result.success && result.data) {
+                    setDepartments(result.data);
+                }
             } catch (error) {
                 console.error("Error fetching departments:", error);
             }

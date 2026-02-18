@@ -9,7 +9,6 @@ export interface Subcategory {
 export interface Category {
     category_id: number;
     category_name: string;
-    company_id?: number | null;
     description?: string;
     created_at?: string;
     subcategories?: Subcategory[];
@@ -17,7 +16,6 @@ export interface Category {
 
 export interface CreateCategoryInput {
     category_name: string;
-    company_id?: number | null;
     description?: string;
 }
 
@@ -27,29 +25,26 @@ export interface CreateSubcategoryInput {
     description?: string;
 }
 
-// Helper to get the base URL
+import { BACKEND_URL } from "@/lib/config";
+
+// Helper to get the base URL with /api/v1 prefix
 const getBaseUrl = () => {
-    // In production, this would be an environment variable
-    return "http://localhost:8000/api/v1";
+    return BACKEND_URL.endsWith("/api/v1") ? BACKEND_URL : `${BACKEND_URL}/api/v1`;
 };
 
-export async function fetchCategories(companyId?: number): Promise<Category[]> {
+export async function fetchCategories(): Promise<Category[]> {
     try {
-        let url = `${getBaseUrl()}/categories`;
-        if (companyId) {
-            url += `?company_id=${companyId}`;
-        }
-
+        const url = `${getBaseUrl()}/categories`;
         const response = await fetch(url);
         if (!response.ok) {
-            throw new Error(`Failed to fetch categories: ${response.statusText}`);
+            console.warn(`Categories fetch returned ${response.status}: ${response.statusText}`);
+            return [];
         }
-
         const data = await response.json();
         return data.data || [];
     } catch (error) {
         console.error("Error fetching categories:", error);
-        throw error;
+        return [];
     }
 }
 
@@ -99,7 +94,8 @@ export async function createSubcategory(input: CreateSubcategoryInput): Promise<
 
 export async function deleteCategory(categoryId: number): Promise<void> {
     try {
-        const response = await fetch(`${getBaseUrl()}/categories/${categoryId}`, {
+        const url = `${getBaseUrl()}/categories/${categoryId}`;
+        const response = await fetch(url, {
             method: "DELETE",
         });
 
@@ -107,7 +103,6 @@ export async function deleteCategory(categoryId: number): Promise<void> {
             let errorMessage = `Failed to delete category: ${response.statusText}`;
             try {
                 const errorData = await response.json();
-                // Prefer 'detail' from FastAPI/HTTPException
                 if (errorData.detail) errorMessage = errorData.detail;
                 else if (errorData.message) errorMessage = errorData.message;
             } catch (e) {

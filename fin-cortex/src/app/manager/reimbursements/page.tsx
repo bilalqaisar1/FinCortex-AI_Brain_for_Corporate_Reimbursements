@@ -33,6 +33,7 @@ import {
 } from "@/components/ui/select";
 import { useAuth } from "@/context/AuthContext";
 import { fetchManagerReimbursements } from "@/app/api/v1/manager/fetch-reimbursements/reimbursements";
+import { BACKEND_URL } from "@/lib/config";
 import { Reimbursement } from "@/types/reimbursement";
 
 
@@ -125,7 +126,7 @@ export default function ReimbursementsPage() {
                   className="hover:bg-green-500/10 hover:border-green-500/50 text-green-600 dark:text-green-400 border-[var(--border-subtle)] bg-transparent"
                   onClick={() => {
                     if (!userProfile?.user_id) return;
-                    const url = `http://localhost:8000/api/v1/export/excel?manager_id=${userProfile.user_id}${statusFilter !== 'all' ? `&status=${statusFilter}` : ''}`;
+                    const url = `${BACKEND_URL}/api/v1/export/excel?manager_id=${userProfile.user_id}${statusFilter !== 'all' ? `&status=${statusFilter}` : ''}`;
                     window.open(url, '_blank');
                   }}
                 >
@@ -137,7 +138,7 @@ export default function ReimbursementsPage() {
                   className="hover:bg-blue-500/10 hover:border-blue-500/50 text-blue-600 dark:text-blue-400 border-[var(--border-subtle)] bg-transparent"
                   onClick={() => {
                     if (!userProfile?.user_id) return;
-                    const url = `http://localhost:8000/api/v1/export/pdf?manager_id=${userProfile.user_id}${statusFilter !== 'all' ? `&status=${statusFilter}` : ''}`;
+                    const url = `${BACKEND_URL}/api/v1/export/pdf?manager_id=${userProfile.user_id}${statusFilter !== 'all' ? `&status=${statusFilter}` : ''}`;
                     window.open(url, '_blank');
                   }}
                 >

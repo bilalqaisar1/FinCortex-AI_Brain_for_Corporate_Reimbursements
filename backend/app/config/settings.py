@@ -39,6 +39,12 @@ class Settings(BaseSettings):
     max_upload_size_mb: int = 10
     request_timeout_seconds: int = 30
 
+    # Server & Service URLs
+    frontend_url: str = "http://localhost:3000"
+    mcp_server_url: str = "http://localhost:8001/api/v1"
+    backend_host: str = "0.0.0.0"
+    backend_port: int = 8000
+
     model_config = SettingsConfigDict(
         env_file=".env",
         env_file_encoding="utf-8",

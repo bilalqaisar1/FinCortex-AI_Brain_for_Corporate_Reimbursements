@@ -30,7 +30,7 @@ from app.services.reimbursement_service import (
 from app.services.policy_service import check_policy
 from app.services.storage_service import StorageUploadError, upload_receipt_to_bucket
 from app.services.remote_receipt_service import process_remote_receipt
-from app.services.supabase_rpc_service import get_expense_categories_with_subcategories, SupabaseRPCError
+from app.services.supabase_rpc_service import get_expense_categories_with_subcategories, get_categories_direct, SupabaseRPCError
 from app.services.fraud_detection_service import fraud_detection_service
 from app.services.email_service import email_service
 from app.services.supabase_service import get_supabase_client
@@ -39,6 +39,54 @@ from app.config.settings import settings
 logger = logging.getLogger(__name__)
 
 router = APIRouter()
+
+
+def _resolve_admin_uuid_from_user(user_id: str) -> Optional[str]:
+    """
+    Resolve admin_uuid for a given user by following the chain:
+      users.user_id → users.manager_id → managers.manager_admin_id
+    NOTE: users.admin_id is a SELF-referencing FK (→ users.user_id),
+    NOT a link to the admins table. So we must always go via manager.
+    Returns the admin UUID string or None.
+    """
+    try:
+        supabase = get_supabase_client()
+
+        # Query the users table for manager_id
+        user_resp = (
+            supabase.table("users")
+            .select("manager_id")
+            .eq("user_id", user_id)
+            .maybeSingle()
+            .execute()
+        )
+        if not user_resp.data:
+            logger.warning("Could not find user %s in users table for admin resolution", user_id)
+            return None
+
+        # Resolve via manager_id → managers.manager_admin_id
+        manager_id = user_resp.data.get("manager_id")
+        if not manager_id:
+            logger.warning("User %s has no manager_id — cannot resolve admin", user_id)
+            return None
+
+        mgr_resp = (
+            supabase.table("managers")
+            .select("manager_admin_id")
+            .eq("manager_id", manager_id)
+            .maybeSingle()
+            .execute()
+        )
+        if mgr_resp.data and mgr_resp.data.get("manager_admin_id"):
+            admin_uuid = str(mgr_resp.data["manager_admin_id"])
+            logger.info("Resolved admin_uuid=%s via manager %s for user %s", admin_uuid, manager_id, user_id)
+            return admin_uuid
+
+        logger.warning("Manager %s has no manager_admin_id for user %s", manager_id, user_id)
+        return None
+    except Exception as exc:
+        logger.warning("Failed to resolve admin_uuid from user_id %s: %s", user_id, exc)
+        return None
 
 
 class ReimbursementItemModel(BaseModel):
@@ -102,6 +150,7 @@ def _normalize_date(date_str: Optional[str]) -> Optional[str]:
 async def upload_receipt(
     file: UploadFile = File(...),
     admin_uuid: Optional[str] = Form(None),
+    user_id: Optional[str] = Form(None),
 ) -> JSONResponse:
     """
     Upload receipt image and process it through OCR + GPT.
@@ -109,6 +158,7 @@ async def upload_receipt(
     Args:
         file: Uploaded receipt image file
         admin_uuid: Optional admin UUID to scope categories/subcategories
+        user_id: Optional user UUID — used to resolve admin_uuid if not provided
 
     Returns:
         JSON response with raw_text and structured data
@@ -116,8 +166,14 @@ async def upload_receipt(
     Raises:
         HTTPException: If file processing fails
     """
-    logger.info("📥 POST /receipt/upload - Request received: filename='%s', content_type='%s', admin_uuid='%s'", 
-                file.filename, file.content_type, admin_uuid)
+    logger.info("📥 POST /receipt/upload - Request received: filename='%s', content_type='%s', admin_uuid='%s', user_id='%s'", 
+                file.filename, file.content_type, admin_uuid, user_id)
+
+    # --- Server-side admin_uuid resolution fallback ---
+    if not admin_uuid and user_id:
+        admin_uuid = _resolve_admin_uuid_from_user(user_id)
+        if admin_uuid:
+            logger.info("🔄 Resolved admin_uuid=%s from user_id=%s (server-side fallback)", admin_uuid, user_id)
     
     if not file.content_type or not file.content_type.startswith("image/"):
         # Also allow PDF uploads
@@ -165,18 +221,31 @@ async def upload_receipt(
         categories_data = None
         if admin_uuid:
             try:
-                categories_data = get_expense_categories_with_subcategories(admin_uuid)
+                # Use direct-query approach (mirrors the admin dashboard).
+                # This also falls back to ALL categories when admin_uuid-scoped
+                # query finds nothing (because category creation may not populate
+                # the admin_uuid column in expense_categories).
+                categories_data = get_categories_direct(admin_uuid)
+                logger.info(
+                    "📂 Fetched %d categories for admin %s via direct query",
+                    len(categories_data) if categories_data else 0,
+                    admin_uuid,
+                )
             except SupabaseRPCError as rpc_exc:
                 logger.warning(
-                    "⚠️ Failed to fetch categories for admin %s: %s",
+                    "⚠️ Direct category fetch failed for admin %s, trying RPC: %s",
                     admin_uuid,
                     rpc_exc,
                 )
-            except Exception as rpc_exc:
+                try:
+                    categories_data = get_expense_categories_with_subcategories(admin_uuid)
+                except Exception:
+                    logger.warning("⚠️ RPC fallback also failed for admin %s", admin_uuid)
+            except Exception as exc:
                 logger.warning(
                     "⚠️ Unexpected error fetching categories for admin %s: %s",
                     admin_uuid,
-                    rpc_exc,
+                    exc,
                 )
 
         result = process_receipt(
@@ -184,6 +253,53 @@ async def upload_receipt(
             admin_uuid=admin_uuid,
             categories_data=categories_data,
         )
+
+        # --- Enforce admin category allow-list on items (deterministic) ---
+        # This runs if categories_data was fetched (even if empty).
+        # categories_data is a list: [] means admin has zero categories → all non-reimbursable.
+        if categories_data is not None:
+            try:
+                allowed_cats = set()
+                allowed_subcats = set()
+                for cat in categories_data:
+                    cat_name = (cat.get("category_name") or "").strip().lower()
+                    if cat_name:
+                        allowed_cats.add(cat_name)
+                    for sub in cat.get("subcategories", []):
+                        sub_name = (sub.get("subcategory_name") or "").strip().lower()
+                        if sub_name:
+                            allowed_subcats.add(sub_name)
+
+                structured = result.get("structured", {})
+                items = structured.get("items", [])
+                allowed_display = ", ".join(c.title() for c in sorted(allowed_cats)) if allowed_cats else "(none)"
+
+                for item in items:
+                    item_cat = (item.get("category") or "").strip().lower()
+                    item_subcat = (item.get("subcategory") or "").strip().lower()
+                    matches_cat = item_cat in allowed_cats
+                    matches_subcat = item_subcat in allowed_subcats if item_subcat else False
+
+                    if not (matches_cat or matches_subcat):
+                        item["is_reimbursable"] = False
+                        original_cat = item.get("category") or "Unknown"
+                        if not allowed_cats:
+                            item["rejection_reason"] = (
+                                "No reimbursement categories configured for this company. "
+                                "All items are non-reimbursable."
+                            )
+                        else:
+                            item["rejection_reason"] = (
+                                f"Category '{original_cat}' is not in the company's "
+                                f"allowed reimbursement categories: {allowed_display}"
+                            )
+
+                logger.info(
+                    "✅ Category enforcement applied: allowed=%s, items_checked=%d",
+                    allowed_display, len(items),
+                )
+            except Exception as enforce_exc:
+                logger.warning("⚠️ Category enforcement failed: %s", enforce_exc)
 
         # --- NEW: Policy Engine Checks ---
         policy_flags = []
@@ -492,6 +608,8 @@ async def create_reimbursement_endpoint(
                 "category_id": parsed_payload.category_id,
                 "subcategory_id": parsed_payload.subcategory_id,
                 "user_id": str(parsed_payload.user_id),
+                "company_id": str(parsed_payload.company_id) if parsed_payload.company_id else None,
+                "department_id": parsed_payload.department_id,
                 "amount_claimed": parsed_payload.total_amount,
                 "vendor_name": parsed_payload.vendor_name,
                 "description": parsed_payload.description,

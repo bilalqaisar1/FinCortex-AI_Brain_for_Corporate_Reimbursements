@@ -5,7 +5,7 @@ function loadEnv(fp) { try { fs.readFileSync(fp, 'utf8').split('\n').forEach(l =
 loadEnv('/home/ubuntu/Desktop/FinCortex-AI_Brain_for_Corporate_Reimbursements/fin-cortex/.env');
 
 async function test() {
-    const baseUrl = 'http://localhost:3000/api/v1/admin/budgets';
+    const baseUrl = `${process.env.NEXT_PUBLIC_API_URL || ''}/api/v1/admin/budgets`;
     console.log('Testing Budget API at', baseUrl);
 
     // 1. GET Budgets

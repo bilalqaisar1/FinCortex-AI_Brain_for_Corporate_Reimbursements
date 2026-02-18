@@ -54,24 +54,37 @@ async def check_policy(reimbursement_data: Dict[str, Any]) -> List[Dict[str, Any
     # NEW: Check Max Claims Per Day rule from policy_rules table
     await _check_max_claims_per_day(user_id, company_id, flags, supabase)
 
-    # 1. Fetch relevant rule
-    query = supabase.table("reimbursement_rules").select("*").eq("category_id", category_id)
-    if subcategory_id:
-        query = query.eq("subcategory_id", subcategory_id)
+    # 1. Fetch relevant rules (department-scoped)
+    department_id = reimbursement_data.get("department_id")
+    query = supabase.table("reimbursement_rules").select("*")
+    
+    # Filter by category if provided
+    if category_id:
+        query = query.eq("category_id", category_id)
     
     if company_id:
         # Rules can be company specific or global (if created_by is null)
-        # Try finding company specific first
         query = query.or_(f"created_by.eq.{company_id},created_by.is.null")
-        query = query.order("created_by", desc=True) # Company specific (non-null) first
+        query = query.order("created_by", desc=True)  # Company specific (non-null) first
     
     rules_resp = query.execute()
-    rule = rules_resp.data[0] if rules_resp.data else None
+    
+    # Filter rules by department scope:
+    # A rule applies if: department_id is NULL (all depts) OR matches the claim's department
+    applicable_rules = []
+    for r in (rules_resp.data or []):
+        rule_dept = r.get("department_id")
+        rule_active = r.get("is_active") if r.get("is_active") is not None else True
+        if not rule_active:
+            continue
+        if rule_dept is None or str(rule_dept) == str(department_id):
+            applicable_rules.append(r)
+    
+    rule = applicable_rules[0] if applicable_rules else None
     
     if not rule:
-        logger.warning(f"No rule found for category {category_id} and company {company_id}. Using default safety checks.")
-        # We continue to check restricted items even if no rule exists
-        rule = {} 
+        logger.warning(f"No active rule found for category {category_id}, dept {department_id}, company {company_id}. Using default safety checks.")
+        rule = {}
 
     # 2. Check Max Amount
     max_amount = Decimal(str(rule.get("max_amount", 0)))
@@ -135,15 +148,23 @@ async def check_policy(reimbursement_data: Dict[str, Any]) -> List[Dict[str, Any
 async def _check_max_claims_per_day(user_id: str, company_id: Optional[str], flags: List[Dict[str, Any]], supabase) -> None:
     """
     Check if user has exceeded the maximum claims per day limit.
-    Fetches the rule from policy_rules table if it exists.
+    Fetches the rule from reimbursement_rules table if it exists.
     """
-    if not user_id:
+    if not user_id or not company_id:
         return
     
     try:
-        # The policy_rules table doesn't exist in the current schema.
-        # This check is currently disabled until a proper table for daily limits is added.
-        return
+        # Look for max_claims_per_day rules in the reimbursement_rules table
+        query = supabase.table("reimbursement_rules").select("*").eq("created_by", company_id)
+        rules_resp = query.execute()
+        
+        max_claims_limit = 0
+        for rule in (rules_resp.data or []):
+            rule_active = rule.get("is_active") if rule.get("is_active") is not None else True
+            mcpd = rule.get("max_claims_per_day")
+            if mcpd and int(mcpd) > 0 and rule_active:
+                max_claims_limit = int(mcpd)
+                break  # Use the first active limit found
         
         if max_claims_limit <= 0:
             return

@@ -68,6 +68,11 @@ const sidebarItems: SidebarItem[] = [
     icon: DollarSign,
   },
   {
+    title: "Departments",
+    href: "/admin/departments",
+    icon: Building2,
+  },
+  {
     title: "Policy Rules",
     href: "/admin/policy-rules",
     icon: Shield,
@@ -188,7 +193,7 @@ export function AdminSidebar({
 
                   <Icon className={cn(
                     "w-5 h-5 flex-shrink-0 transition-all duration-300",
-                    isItemActive ? "text-purple-400" : "group-hover:scale-110 group-hover:text-white"
+                    isItemActive ? "text-purple-400" : "text-slate-700 dark:text-[var(--text-secondary)] group-hover:scale-110 group-hover:text-[var(--text-primary)]"
                   )} />
 
                   {!collapsed && (

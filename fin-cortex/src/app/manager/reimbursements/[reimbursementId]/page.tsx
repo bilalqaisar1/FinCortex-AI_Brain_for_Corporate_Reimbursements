@@ -11,6 +11,7 @@ import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Separator } from "@/components/ui/separator";
 import { Textarea } from "@/components/ui/textarea"; // Added
+import { BACKEND_URL } from "@/lib/config";
 import {
     ArrowLeft,
     Receipt,
@@ -29,7 +30,9 @@ import {
     Image as ImageIcon,
     Loader2,
     AlertCircle,
-    Eye
+    AlertTriangle,
+    Eye,
+    X
 } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
 import { fetchReimbursementDetail } from "@/app/api/v1/manager/fetch-reimbursements/detail";
@@ -63,6 +66,7 @@ export default function ReimbursementDetailPage({ params }: { params: Promise<{ 
     const [isDialogOpen, setIsDialogOpen] = useState(false);
     const [comment, setComment] = useState("");
     const [isProcessing, setIsProcessing] = useState(false);
+    const [budgetError, setBudgetError] = useState<string | null>(null);
 
     const loadDetail = async () => {
         if (!userProfile?.user_id || !userId) {
@@ -101,8 +105,9 @@ export default function ReimbursementDetailPage({ params }: { params: Promise<{ 
         if (decisionType === "rejected" && !comment.trim()) return;
 
         setIsProcessing(true);
+        setBudgetError(null);
         try {
-            const baseUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
+            const baseUrl = BACKEND_URL;
             const response = await fetch(`${baseUrl}/api/v1/reimbursements/${reimbursementId}/status`, {
                 method: "PUT",
                 headers: { "Content-Type": "application/json" },
@@ -113,14 +118,27 @@ export default function ReimbursementDetailPage({ params }: { params: Promise<{ 
                 })
             });
             const payload = await response.json();
+
+            if (!response.ok) {
+                const detail = payload.detail;
+                if (detail && typeof detail === 'object' && detail.error_code === 'budget_exceeded') {
+                    setBudgetError(detail.message || 'Insufficient department budget. Please contact admin to increase allocation.');
+                } else {
+                    setBudgetError(typeof detail === 'string' ? detail : 'Failed to update claim status.');
+                }
+                return;
+            }
+
             if (payload.success) {
                 setIsDialogOpen(false);
                 setComment("");
                 setDecisionType(null);
+                setBudgetError(null);
                 loadDetail(); // Refresh data to show new status
             }
         } catch (error) {
             console.error("Failed to update status:", error);
+            setBudgetError('Network error. Please try again.');
         } finally {
             setIsProcessing(false);
         }
@@ -186,10 +204,10 @@ export default function ReimbursementDetailPage({ params }: { params: Promise<{ 
                     {loading ? (
                         <div className="flex flex-col items-center justify-center py-24 space-y-4">
                             <Loader2 className="w-10 h-10 animate-spin text-purple-600" />
-                            <p className="text-slate-500">Loading details...</p>
+                            <p className="text-[var(--text-muted)]">Loading details...</p>
                         </div>
                     ) : error || !detail ? (
-                        <Card className="border-red-200 bg-red-50 dark:bg-red-900/10">
+                        <Card className="border-red-500/20 bg-red-500/5">
                             <CardContent className="flex flex-col items-center justify-center py-12 text-center text-red-600 dark:text-red-400">
                                 <AlertCircle className="w-12 h-12 mb-4" />
                                 <h3 className="text-lg font-semibold mb-2">Error Loading Details</h3>
@@ -199,12 +217,12 @@ export default function ReimbursementDetailPage({ params }: { params: Promise<{ 
                     ) : (
                         <>
                             {/* Header Card */}
-                            <Card className="border-l-4 border-l-purple-500 shadow-md">
+                            <Card className="border-l-4 border-l-purple-500 shadow-md bg-[var(--card-dark)] border-[var(--border-subtle)]">
                                 <CardHeader className="pb-4">
                                     <div className="flex flex-col md:flex-row md:items-start md:justify-between gap-4">
                                         <div className="space-y-1">
                                             <div className="flex items-center gap-2">
-                                                <CardTitle className="text-2xl font-bold text-slate-900 dark:text-slate-100">
+                                                <CardTitle className="text-2xl font-bold text-[var(--text-primary)]">
                                                     {detail.receipt_code}
                                                 </CardTitle>
                                                 <Badge className={statusColors[detail.status as keyof typeof statusColors]}>
@@ -216,8 +234,8 @@ export default function ReimbursementDetailPage({ params }: { params: Promise<{ 
                                             </CardDescription>
                                         </div>
                                         <div className="text-right">
-                                            <p className="text-sm text-slate-500 font-medium uppercase tracking-wider">Amount Claimed</p>
-                                            <p className="text-3xl font-bold text-slate-900 dark:text-slate-100">
+                                            <p className="text-sm text-[var(--text-muted)] font-medium uppercase tracking-wider">Amount Claimed</p>
+                                            <p className="text-3xl font-bold text-[var(--text-primary)]">
                                                 {formatCurrency(detail.amount_claimed, detail.currency)}
                                             </p>
                                             {detail.amount_approved && (
@@ -235,7 +253,7 @@ export default function ReimbursementDetailPage({ params }: { params: Promise<{ 
                                 <div className="lg:col-span-2 space-y-6">
                                     {/* Items Section */}
                                     {detail.items && detail.items.length > 0 && (
-                                        <Card>
+                                        <Card className="bg-[var(--card-dark)] border-[var(--border-subtle)]">
                                             <CardHeader>
                                                 <CardTitle className="text-lg flex items-center gap-2">
                                                     <Tag className="w-5 h-5 text-purple-500" />
@@ -243,30 +261,30 @@ export default function ReimbursementDetailPage({ params }: { params: Promise<{ 
                                                 </CardTitle>
                                             </CardHeader>
                                             <CardContent>
-                                                <div className="border rounded-lg overflow-hidden">
+                                                <div className="border border-[var(--border-subtle)] rounded-lg overflow-hidden">
                                                     <table className="w-full text-sm">
-                                                        <thead className="bg-slate-50 dark:bg-slate-800 text-left">
+                                                        <thead className="bg-[var(--surface-elevated)] text-left">
                                                             <tr>
-                                                                <th className="px-4 py-3 font-medium text-slate-500">Item</th>
-                                                                <th className="px-4 py-3 font-medium text-slate-500 text-center">Qty</th>
-                                                                <th className="px-4 py-3 font-medium text-slate-500 text-right">Unit Price</th>
-                                                                <th className="px-4 py-3 font-medium text-slate-500 text-right">Total</th>
+                                                                <th className="px-4 py-3 font-medium text-[var(--text-muted)]">Item</th>
+                                                                <th className="px-4 py-3 font-medium text-[var(--text-muted)] text-center">Qty</th>
+                                                                <th className="px-4 py-3 font-medium text-[var(--text-muted)] text-right">Unit Price</th>
+                                                                <th className="px-4 py-3 font-medium text-[var(--text-muted)] text-right">Total</th>
                                                             </tr>
                                                         </thead>
-                                                        <tbody className="divide-y">
+                                                        <tbody className="divide-y divide-[var(--border-subtle)]">
                                                             {detail.items.map((item) => (
                                                                 <tr key={item.item_id}>
-                                                                    <td className="px-4 py-3 text-slate-900 dark:text-slate-100">{item.item_name}</td>
-                                                                    <td className="px-4 py-3 text-center text-slate-600 dark:text-slate-400">{item.quantity}</td>
-                                                                    <td className="px-4 py-3 text-right text-slate-600 dark:text-slate-400">{formatCurrency(item.unit_price, detail.currency)}</td>
-                                                                    <td className="px-4 py-3 text-right font-medium text-slate-900 dark:text-slate-100">{formatCurrency(item.total_price, detail.currency)}</td>
+                                                                    <td className="px-4 py-3 text-[var(--text-primary)]">{item.item_name}</td>
+                                                                    <td className="px-4 py-3 text-center text-[var(--text-secondary)]">{item.quantity}</td>
+                                                                    <td className="px-4 py-3 text-right text-[var(--text-secondary)]">{formatCurrency(item.unit_price, detail.currency)}</td>
+                                                                    <td className="px-4 py-3 text-right font-medium text-[var(--text-primary)]">{formatCurrency(item.total_price, detail.currency)}</td>
                                                                 </tr>
                                                             ))}
                                                         </tbody>
-                                                        <tfoot className="bg-slate-50 dark:bg-slate-800 font-medium">
+                                                        <tfoot className="bg-[var(--surface-elevated)] font-medium">
                                                             <tr>
-                                                                <td colSpan={3} className="px-4 py-3 text-right">Total</td>
-                                                                <td className="px-4 py-3 text-right">{formatCurrency(detail.amount_claimed, detail.currency)}</td>
+                                                                <td colSpan={3} className="px-4 py-3 text-right text-[var(--text-secondary)]">Total</td>
+                                                                <td className="px-4 py-3 text-right text-[var(--text-primary)]">{formatCurrency(detail.amount_claimed, detail.currency)}</td>
                                                             </tr>
                                                         </tfoot>
                                                     </table>
@@ -277,7 +295,7 @@ export default function ReimbursementDetailPage({ params }: { params: Promise<{ 
 
                                     {/* Basic Info Cards */}
                                     <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                                        <Card>
+                                        <Card className="bg-[var(--card-dark)] border-[var(--border-subtle)]">
                                             <CardHeader>
                                                 <CardTitle className="text-lg flex items-center gap-2">
                                                     <FileText className="w-5 h-5 text-blue-500" />
@@ -286,21 +304,21 @@ export default function ReimbursementDetailPage({ params }: { params: Promise<{ 
                                             </CardHeader>
                                             <CardContent className="space-y-4">
                                                 <div className="space-y-1">
-                                                    <p className="text-xs font-medium text-slate-500 uppercase">Category</p>
+                                                    <p className="text-xs font-medium text-[var(--text-muted)] uppercase">Category</p>
                                                     <p className="text-sm font-medium">{detail.category_name} &rsaquo; {detail.subcategory_name}</p>
                                                 </div>
                                                 <div className="space-y-1">
-                                                    <p className="text-xs font-medium text-slate-500 uppercase">Description</p>
+                                                    <p className="text-xs font-medium text-[var(--text-muted)] uppercase">Description</p>
                                                     <p className="text-sm">{detail.description}</p>
                                                 </div>
                                                 <div className="space-y-1">
-                                                    <p className="text-xs font-medium text-slate-500 uppercase">Expense Date</p>
+                                                    <p className="text-xs font-medium text-[var(--text-muted)] uppercase">Expense Date</p>
                                                     <p className="text-sm">{formatDate(detail.expense_date)?.split(',')[0]}</p>
                                                 </div>
                                             </CardContent>
                                         </Card>
 
-                                        <Card>
+                                        <Card className="bg-[var(--card-dark)] border-[var(--border-subtle)]">
                                             <CardHeader>
                                                 <CardTitle className="text-lg flex items-center gap-2">
                                                     <Building2 className="w-5 h-5 text-orange-500" />
@@ -309,17 +327,17 @@ export default function ReimbursementDetailPage({ params }: { params: Promise<{ 
                                             </CardHeader>
                                             <CardContent className="space-y-4">
                                                 <div className="space-y-1">
-                                                    <p className="text-xs font-medium text-slate-500 uppercase">Vendor Name</p>
+                                                    <p className="text-xs font-medium text-[var(--text-muted)] uppercase">Vendor Name</p>
                                                     <p className="text-sm font-medium">{detail.vendor_name}</p>
                                                 </div>
                                                 <div className="space-y-1">
-                                                    <p className="text-xs font-medium text-slate-500 uppercase">Invoice #</p>
-                                                    <p className="text-sm font-mono bg-slate-100 dark:bg-slate-800 px-2 py-1 rounded inline-block">
+                                                    <p className="text-xs font-medium text-[var(--text-muted)] uppercase">Invoice #</p>
+                                                    <p className="text-sm font-mono bg-[var(--surface-elevated)] border border-[var(--border-subtle)] px-2 py-1 rounded inline-block text-[var(--text-primary)]">
                                                         {detail.invoice_number}
                                                     </p>
                                                 </div>
                                                 <div className="space-y-1">
-                                                    <p className="text-xs font-medium text-slate-500 uppercase">Payment Method</p>
+                                                    <p className="text-xs font-medium text-[var(--text-muted)] uppercase">Payment Method</p>
                                                     <p className="text-sm capitalize">{detail.payment_method}</p>
                                                 </div>
                                             </CardContent>
@@ -327,10 +345,10 @@ export default function ReimbursementDetailPage({ params }: { params: Promise<{ 
                                     </div>
 
                                     {/* Attachments Section */}
-                                    <Card>
+                                    <Card className="bg-[var(--card-dark)] border-[var(--border-subtle)]">
                                         <CardHeader>
                                             <CardTitle className="text-lg flex items-center gap-2">
-                                                <Paperclip className="w-5 h-5 text-slate-500" />
+                                                <Paperclip className="w-5 h-5 text-[var(--text-muted)]" />
                                                 <span>Attachments ({detail.attachments?.length || 0})</span>
                                             </CardTitle>
                                         </CardHeader>
@@ -340,7 +358,7 @@ export default function ReimbursementDetailPage({ params }: { params: Promise<{ 
                                                     {detail.attachments.map((file) => (
                                                         <Dialog key={file.attachment_id}>
                                                             <DialogTrigger asChild>
-                                                                <div className="group relative aspect-square bg-slate-100 dark:bg-slate-800 rounded-lg overflow-hidden border cursor-pointer hover:border-purple-500 transition-all">
+                                                                <div className="group relative aspect-square bg-[var(--surface-elevated)] rounded-lg overflow-hidden border border-[var(--border-subtle)] cursor-pointer hover:border-purple-500 transition-all">
                                                                     {file.file_type.startsWith("image/") ? (
                                                                         <div className="w-full h-full relative">
                                                                             <Image
@@ -355,8 +373,8 @@ export default function ReimbursementDetailPage({ params }: { params: Promise<{ 
                                                                         </div>
                                                                     ) : (
                                                                         <div className="w-full h-full flex flex-col items-center justify-center p-4">
-                                                                            <FileText className="w-8 h-8 text-slate-400 mb-2" />
-                                                                            <p className="text-xs text-center text-slate-500 truncate w-full">{file.file_name}</p>
+                                                                            <FileText className="w-8 h-8 text-[var(--text-muted)] mb-2" />
+                                                                            <p className="text-xs text-center text-[var(--text-secondary)] truncate w-full">{file.file_name}</p>
                                                                         </div>
                                                                     )}
                                                                 </div>
@@ -377,7 +395,7 @@ export default function ReimbursementDetailPage({ params }: { params: Promise<{ 
                                                                         </div>
                                                                     ) : (
                                                                         <div className="text-white text-center">
-                                                                            <FileText className="w-16 h-16 mx-auto mb-4 text-slate-400" />
+                                                                            <FileText className="w-16 h-16 mx-auto mb-4 text-[var(--text-muted)]" />
                                                                             <p>Preview not available for this file type.</p>
                                                                             <Button variant="secondary" className="mt-4" onClick={() => window.open(getImageUrl(file.file_path), '_blank')}>
                                                                                 Download File
@@ -390,7 +408,7 @@ export default function ReimbursementDetailPage({ params }: { params: Promise<{ 
                                                     ))}
                                                 </div>
                                             ) : (
-                                                <p className="text-slate-500 italic">No attachments found.</p>
+                                                <p className="text-[var(--text-muted)] italic">No attachments found.</p>
                                             )}
                                         </CardContent>
                                     </Card>
@@ -399,7 +417,7 @@ export default function ReimbursementDetailPage({ params }: { params: Promise<{ 
                                 {/* Sidebar - Right Column */}
                                 <div className="space-y-6">
                                     {/* User Profile Card */}
-                                    <Card>
+                                    <Card className="bg-[var(--card-dark)] border-[var(--border-subtle)]">
                                         <CardHeader>
                                             <CardTitle className="text-lg flex items-center gap-2">
                                                 <User className="w-5 h-5 text-purple-600" />
@@ -408,53 +426,53 @@ export default function ReimbursementDetailPage({ params }: { params: Promise<{ 
                                         </CardHeader>
                                         <CardContent>
                                             <div className="flex items-center gap-3 mb-4">
-                                                <div className="w-10 h-10 rounded-full bg-purple-100 dark:bg-purple-900/30 flex items-center justify-center text-purple-700 dark:text-purple-300 font-bold">
+                                                <div className="w-10 h-10 rounded-full bg-purple-500/10 flex items-center justify-center text-purple-400 font-bold">
                                                     {detail.full_name?.charAt(0) || "U"}
                                                 </div>
                                                 <div>
-                                                    <p className="font-medium text-slate-900 dark:text-slate-100">{detail.full_name}</p>
-                                                    <p className="text-xs text-slate-500">{detail.email}</p>
+                                                    <p className="font-medium text-[var(--text-primary)]">{detail.full_name}</p>
+                                                    <p className="text-xs text-[var(--text-muted)]">{detail.email}</p>
                                                 </div>
                                             </div>
                                             <Separator className="my-3" />
                                             <div className="space-y-2">
                                                 <div className="flex justify-between text-sm">
-                                                    <span className="text-slate-500">Dept</span>
-                                                    <span className="font-medium">{detail.department_name}</span>
+                                                    <span className="text-[var(--text-muted)]">Dept</span>
+                                                    <span className="font-medium text-[var(--text-primary)]">{detail.department_name}</span>
                                                 </div>
                                                 <div className="flex justify-between text-sm">
-                                                    <span className="text-slate-500">Code</span>
-                                                    <span className="font-medium">{detail.employee_code}</span>
+                                                    <span className="text-[var(--text-muted)]">Code</span>
+                                                    <span className="font-medium text-[var(--text-primary)]">{detail.employee_code}</span>
                                                 </div>
                                                 <div className="flex justify-between text-sm">
-                                                    <span className="text-slate-500">Phone</span>
-                                                    <span className="font-medium">{detail.phone_number || "N/A"}</span>
+                                                    <span className="text-[var(--text-muted)]">Phone</span>
+                                                    <span className="font-medium text-[var(--text-primary)]">{detail.phone_number || "N/A"}</span>
                                                 </div>
                                             </div>
                                         </CardContent>
                                     </Card>
 
                                     {/* Timeline / Additional Meta */}
-                                    <Card>
+                                    <Card className="bg-[var(--card-dark)] border-[var(--border-subtle)]">
                                         <CardHeader>
                                             <CardTitle className="text-lg flex items-center gap-2">
-                                                <Clock className="w-5 h-5 text-slate-500" />
+                                                <Clock className="w-5 h-5 text-[var(--text-muted)]" />
                                                 <span>Timeline</span>
                                             </CardTitle>
                                         </CardHeader>
                                         <CardContent className="space-y-4">
-                                            <div className="relative pl-4 border-l-2 border-slate-200 dark:border-slate-700 space-y-6">
+                                            <div className="relative pl-4 border-l-2 border-[var(--border-medium)] space-y-6">
                                                 <div className="relative">
-                                                    <div className="absolute -left-[21px] top-1 w-3 h-3 rounded-full bg-purple-500 ring-4 ring-white dark:ring-slate-900"></div>
-                                                    <p className="text-sm font-medium">Request Submitted</p>
-                                                    <p className="text-xs text-slate-500">{formatDate(detail.created_at)}</p>
+                                                    <div className="absolute -left-[21px] top-1 w-3 h-3 rounded-full bg-purple-500 ring-4 ring-[var(--card-dark)]"></div>
+                                                    <p className="text-sm font-medium text-[var(--text-primary)]">Request Submitted</p>
+                                                    <p className="text-xs text-[var(--text-muted)]">{formatDate(detail.created_at)}</p>
                                                 </div>
                                                 {detail.reviewed_at && (
                                                     <div className="relative">
-                                                        <div className="absolute -left-[21px] top-1 w-3 h-3 rounded-full bg-blue-500 ring-4 ring-white dark:ring-slate-900"></div>
-                                                        <p className="text-sm font-medium">Reviewed by Manager</p>
-                                                        <p className="text-xs text-slate-500">{formatDate(detail.reviewed_at)}</p>
-                                                        <p className="text-xs text-slate-500 mt-1">Reviewer: {detail.manager_name}</p>
+                                                        <div className="absolute -left-[21px] top-1 w-3 h-3 rounded-full bg-blue-500 ring-4 ring-[var(--card-dark)]"></div>
+                                                        <p className="text-sm font-medium text-[var(--text-primary)]">Reviewed by Manager</p>
+                                                        <p className="text-xs text-[var(--text-muted)]">{formatDate(detail.reviewed_at)}</p>
+                                                        <p className="text-xs text-[var(--text-muted)] mt-1">Reviewer: {detail.manager_name}</p>
                                                     </div>
                                                 )}
                                             </div>
@@ -463,20 +481,57 @@ export default function ReimbursementDetailPage({ params }: { params: Promise<{ 
 
                                     {/* OCR Score */}
                                     {detail.ocr_confidence !== null && (
-                                        <Card>
+                                        <Card className="bg-[var(--card-dark)] border-[var(--border-subtle)]">
                                             <CardContent className="pt-6">
                                                 <div className="flex flex-col items-center text-center">
-                                                    <div className="relative w-16 h-16 flex items-center justify-center rounded-full bg-slate-100 dark:bg-slate-800 mb-2">
-                                                        <Receipt className="w-8 h-8 text-slate-600 dark:text-slate-400" />
-                                                        <div className={`absolute -top-1 -right-1 w-6 h-6 rounded-full flex items-center justify-center text-[10px] font-bold text-white border-2 border-white dark:border-slate-900 ${(detail.ocr_confidence || 0) > 0.8 ? 'bg-green-500' :
+                                                    <div className="relative w-16 h-16 flex items-center justify-center rounded-full bg-[var(--surface-elevated)] border border-[var(--border-subtle)] mb-2">
+                                                        <Receipt className="w-8 h-8 text-[var(--text-secondary)]" />
+                                                        <div className={`absolute -top-1 -right-1 w-6 h-6 rounded-full flex items-center justify-center text-[10px] font-bold text-white border-2 border-[var(--card-dark)] ${(detail.ocr_confidence || 0) > 0.8 ? 'bg-green-500' :
                                                             (detail.ocr_confidence || 0) > 0.6 ? 'bg-yellow-500' : 'bg-red-500'
                                                             }`}>
                                                             {Math.round((detail.ocr_confidence || 0) * 100)}%
                                                         </div>
                                                     </div>
-                                                    <p className="font-medium text-slate-900 dark:text-slate-100">AI Confidence Score</p>
-                                                    <p className="text-xs text-slate-500">Based on receipt scan analysis</p>
+                                                    <p className="font-medium text-[var(--text-primary)]">AI Confidence Score</p>
+                                                    <p className="text-xs text-[var(--text-muted)]">Based on receipt scan analysis</p>
                                                 </div>
+                                            </CardContent>
+                                        </Card>
+                                    )}
+
+                                    {/* Policy Violation Flags */}
+                                    {detail.policy_flags && detail.policy_flags.length > 0 && (
+                                        <Card className="border-l-4 border-l-amber-500 shadow-md bg-[var(--card-dark)] border-[var(--border-subtle)]">
+                                            <CardHeader className="pb-2">
+                                                <CardTitle className="text-lg flex items-center gap-2 text-amber-600 dark:text-amber-400">
+                                                    <AlertCircle className="w-5 h-5" />
+                                                    <span>Policy Violations ({detail.policy_flags.length})</span>
+                                                </CardTitle>
+                                            </CardHeader>
+                                            <CardContent className="space-y-3">
+                                                {detail.policy_flags.map((flag, idx) => {
+                                                    const severityMap: Record<string, string> = {
+                                                        critical: "bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400 border-red-200 dark:border-red-800",
+                                                        high: "bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-400 border-orange-200 dark:border-orange-800",
+                                                        medium: "bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-400 border-yellow-200 dark:border-yellow-800",
+                                                        low: "bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400 border-blue-200 dark:border-blue-800",
+                                                    };
+                                                    const colorClass = severityMap[flag.severity] || severityMap.medium;
+                                                    return (
+                                                        <div key={idx} className={`p-3 rounded-lg border ${colorClass}`}>
+                                                            <div className="flex items-center gap-2 mb-1">
+                                                                <Badge className={colorClass}>
+                                                                    {flag.severity?.toUpperCase()}
+                                                                </Badge>
+                                                                <span className="text-xs font-mono opacity-70">{flag.code}</span>
+                                                            </div>
+                                                            <p className="text-sm">{flag.message}</p>
+                                                        </div>
+                                                    );
+                                                })}
+                                                <p className="text-xs text-[var(--text-muted)] italic mt-2">
+                                                    ⚠️ These flags are informational — review and decide accordingly.
+                                                </p>
                                             </CardContent>
                                         </Card>
                                     )}
@@ -485,11 +540,11 @@ export default function ReimbursementDetailPage({ params }: { params: Promise<{ 
 
                             {/* Bottom Action Bar */}
                             {detail.status.toLowerCase() === 'pending' && (
-                                <Card className="mt-6 border-t-4 border-t-purple-500 shadow-lg bg-slate-50 dark:bg-slate-800/50">
+                                <Card className="mt-6 border-t-4 border-t-purple-500 shadow-lg bg-[var(--card-dark)] border-[var(--border-subtle)]">
                                     <CardContent className="flex items-center justify-between p-6">
                                         <div className="space-y-1">
-                                            <h3 className="text-lg font-semibold text-slate-900 dark:text-slate-100">Review Action</h3>
-                                            <p className="text-sm text-slate-500 dark:text-slate-400">
+                                            <h3 className="text-lg font-semibold text-[var(--text-primary)]">Review Action</h3>
+                                            <p className="text-sm text-[var(--text-secondary)]">
                                                 Please review the claim details and attachments before making a decision.
                                             </p>
                                         </div>
@@ -497,7 +552,7 @@ export default function ReimbursementDetailPage({ params }: { params: Promise<{ 
                                             <Button
                                                 size="lg"
                                                 onClick={handleReject}
-                                                className="bg-red-600 hover:bg-red-700 text-white px-8 shadow-sm hover:shadow-md transition-all font-semibold"
+                                                className="bg-gradient-to-r from-red-500 to-rose-600 hover:from-red-600 hover:to-rose-700 text-white px-8 shadow-lg shadow-red-500/20 hover:shadow-red-500/30 transition-all font-bold rounded-xl"
                                             >
                                                 <XCircle className="w-5 h-5 mr-2" />
                                                 Reject Claim
@@ -505,7 +560,7 @@ export default function ReimbursementDetailPage({ params }: { params: Promise<{ 
                                             <Button
                                                 size="lg"
                                                 onClick={handleApprove}
-                                                className="bg-green-600 hover:bg-green-700 text-white px-8 shadow-sm hover:shadow-md transition-all font-semibold"
+                                                className="bg-gradient-to-r from-blue-500 to-indigo-600 hover:from-blue-600 hover:to-indigo-700 text-white px-8 shadow-lg shadow-blue-500/20 hover:shadow-blue-500/30 transition-all font-bold rounded-xl"
                                             >
                                                 <CheckCircle className="w-5 h-5 mr-2" />
                                                 Approve Claim
@@ -520,20 +575,33 @@ export default function ReimbursementDetailPage({ params }: { params: Promise<{ 
 
                 {/* Confirm Dialog */}
                 <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
-                    <DialogContent className="bg-white dark:bg-slate-900">
+                    <DialogContent className="bg-[var(--card-dark)] border border-[var(--border-subtle)] shadow-2xl rounded-2xl max-w-lg">
                         <DialogHeader>
-                            <DialogTitle>
+                            <DialogTitle className="text-lg font-black uppercase tracking-wider text-[var(--text-primary)]">
                                 {decisionType === "approved" ? "Approve" : "Reject"} Reimbursement
                             </DialogTitle>
-                            <DialogDescription>
+                            <DialogDescription className="text-sm text-[var(--text-secondary)]">
                                 {decisionType === "approved"
                                     ? "Are you sure you want to approve this reimbursement claim?"
                                     : "Are you sure you want to reject this reimbursement claim? Please provide a reason for the user."}
                             </DialogDescription>
                         </DialogHeader>
                         <div className="space-y-4 py-4">
+                            {budgetError && (
+                                <div className="p-4 bg-red-500/10 border border-red-500/30 rounded-xl flex items-start gap-3">
+                                    <AlertTriangle className="w-5 h-5 text-red-400 mt-0.5 flex-shrink-0" />
+                                    <div className="flex-1">
+                                        <p className="text-sm font-bold text-red-400 mb-1">Budget Exceeded</p>
+                                        <p className="text-xs text-red-300/80">{budgetError}</p>
+                                        <p className="text-xs text-amber-400/80 mt-2 font-medium">Please contact your admin to increase budget allocation.</p>
+                                    </div>
+                                    <button onClick={() => setBudgetError(null)} className="text-red-400/60 hover:text-red-400">
+                                        <X className="w-4 h-4" />
+                                    </button>
+                                </div>
+                            )}
                             <div>
-                                <label className="text-sm font-medium text-slate-700 dark:text-slate-300 mb-2 block">
+                                <label className="text-sm font-semibold text-[var(--text-primary)] mb-2 block">
                                     {decisionType === "approved" ? "Comments (Optional)" : "Reason for Rejection *"}
                                 </label>
                                 <Textarea
@@ -542,20 +610,22 @@ export default function ReimbursementDetailPage({ params }: { params: Promise<{ 
                                     placeholder={decisionType === "approved"
                                         ? "Add any comments..."
                                         : "Please provide a reason for rejection..."}
-                                    className="min-h-[100px] bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700"
+                                    className="min-h-[100px] bg-[var(--surface-elevated)] border-[var(--border-subtle)] text-[var(--text-primary)] placeholder-[var(--text-muted)] focus:border-purple-500/50 focus:ring-purple-500/20 rounded-xl"
                                     required={decisionType === "rejected"}
                                 />
                             </div>
                         </div>
-                        <DialogFooter>
+                        <DialogFooter className="gap-3">
                             <Button
                                 variant="outline"
                                 onClick={() => {
                                     setIsDialogOpen(false);
                                     setComment("");
                                     setDecisionType(null);
+                                    setBudgetError(null);
                                 }}
                                 disabled={isProcessing}
+                                className="border-[var(--border-subtle)] text-[var(--text-secondary)] bg-[var(--surface-elevated)] hover:bg-[var(--card-hover)] hover:text-[var(--text-primary)] rounded-xl"
                             >
                                 Cancel
                             </Button>
@@ -563,17 +633,17 @@ export default function ReimbursementDetailPage({ params }: { params: Promise<{ 
                                 onClick={confirmDecision}
                                 disabled={isProcessing || (decisionType === "rejected" && !comment.trim())}
                                 className={decisionType === "approved"
-                                    ? "bg-green-600 hover:bg-green-700"
-                                    : "bg-red-600 hover:bg-red-700"}
+                                    ? "bg-gradient-to-r from-blue-500 to-indigo-600 hover:from-blue-600 hover:to-indigo-700 text-white font-bold rounded-xl shadow-lg shadow-blue-500/20"
+                                    : "bg-gradient-to-r from-red-500 to-rose-600 hover:from-red-600 hover:to-rose-700 text-white font-bold rounded-xl shadow-lg shadow-red-500/20"}
                             >
                                 {isProcessing ? (
                                     <div className="flex items-center space-x-2">
-                                        <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                                        <Loader2 className="w-4 h-4 animate-spin" />
                                         <span>Processing...</span>
                                     </div>
                                 ) : (
                                     <>
-                                        {decisionType === "approved" ? "Approve" : "Reject"}
+                                        {decisionType === "approved" ? (<><CheckCircle className="w-4 h-4 mr-2" />Approve</>) : (<><XCircle className="w-4 h-4 mr-2" />Reject</>)}
                                     </>
                                 )}
                             </Button>

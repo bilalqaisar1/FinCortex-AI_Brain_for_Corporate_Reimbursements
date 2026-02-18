@@ -232,8 +232,8 @@ export function BudgetOverview({
 
     const totalBudget = budgets.reduce((sum, budget) => sum + budget.total_amount, 0);
     const totalUsed = budgets.reduce((sum, budget) => sum + budget.used_amount, 0);
-    const totalRemaining = totalBudget - totalUsed;
-    const overallUtilization = totalBudget > 0 ? (totalUsed / totalBudget) * 100 : 0;
+    const totalRemaining = Math.max(0, totalBudget - totalUsed);
+    const overallUtilization = totalBudget > 0 ? Math.min(100, (totalUsed / totalBudget) * 100) : 0;
 
     if (loading) {
         return (
@@ -526,7 +526,7 @@ export function BudgetOverview({
                                             <p className={cn("font-bold text-lg",
                                                 budget.remaining_amount < budget.total_amount * 0.2 ? "text-red-400" : "text-emerald-400"
                                             )}>
-                                                {formatCurrency(budget.remaining_amount)}
+                                                {formatCurrency(Math.max(0, budget.remaining_amount))}
                                             </p>
                                         </div>
                                     </div>
@@ -589,40 +589,40 @@ export function BudgetOverview({
 
             {/* Add Funds Dialog */}
             <Dialog open={isAddFundsDialogOpen} onOpenChange={setIsAddFundsDialogOpen}>
-                <DialogContent className="sm:max-w-[400px] bg-[#0A0A0B]/95 backdrop-blur-3xl border-white/10 text-white shadow-2xl p-0 overflow-hidden gap-0">
-                    <DialogHeader className="p-8 pb-4 border-b border-white/5">
-                        <div className="mx-auto w-14 h-14 bg-gradient-to-br from-emerald-500 to-green-600 rounded-2xl flex items-center justify-center shadow-lg shadow-emerald-500/20 mb-4">
+                <DialogContent className="sm:max-w-[400px] bg-[var(--card-dark)] backdrop-blur-3xl border border-[var(--border-subtle)] shadow-2xl p-0 overflow-hidden gap-0 rounded-2xl">
+                    <DialogHeader className="p-8 pb-4 border-b border-[var(--border-subtle)]">
+                        <div className="mx-auto w-14 h-14 bg-gradient-to-br from-blue-500 to-indigo-600 rounded-2xl flex items-center justify-center shadow-lg shadow-blue-500/20 mb-4">
                             <DollarSign className="w-7 h-7 text-white" />
                         </div>
-                        <DialogTitle className="text-2xl font-black text-center text-white tracking-tight">ADD FUNDS</DialogTitle>
-                        <DialogDescription className="text-center text-slate-400">
+                        <DialogTitle className="text-2xl font-black text-center text-[var(--text-primary)] tracking-tight">ADD FUNDS</DialogTitle>
+                        <DialogDescription className="text-center text-[var(--text-secondary)]">
                             Enter the amount to add to this budget
                         </DialogDescription>
                     </DialogHeader>
                     <div className="grid gap-6 p-8">
                         <div className="grid gap-2">
-                            <Label htmlFor="funds_amount" className="text-xs font-bold text-slate-400 uppercase tracking-wider">Amount</Label>
+                            <Label htmlFor="funds_amount" className="text-xs font-bold text-[var(--text-muted)] uppercase tracking-wider">Amount</Label>
                             <div className="relative">
-                                <span className="absolute left-4 top-3.5 text-xs font-bold text-slate-500">PKR</span>
+                                <span className="absolute left-4 top-3 text-sm font-black text-[var(--text-primary)] tracking-wider">PKR</span>
                                 <Input
                                     id="funds_amount"
                                     type="number"
                                     value={fundsAmount || ""}
                                     onChange={(e) => setFundsAmount(Number(e.target.value))}
                                     placeholder="e.g. 100,000"
-                                    className="pl-12 h-12 bg-white/5 border-white/10 text-white placeholder:text-slate-600 focus:border-emerald-500/40 focus:ring-emerald-500/20 rounded-xl"
+                                    className="pl-14 h-12 bg-[var(--surface-elevated)] border-[var(--border-subtle)] text-[var(--text-primary)] placeholder:text-[var(--text-muted)] focus:border-purple-500/40 focus:ring-purple-500/20 rounded-xl"
                                 />
                             </div>
                         </div>
                     </div>
                     <DialogFooter className="p-8 pt-0 gap-3">
-                        <Button variant="outline" onClick={() => setIsAddFundsDialogOpen(false)} className="flex-1 rounded-xl h-12 border-white/10 bg-transparent hover:bg-white/5 text-slate-300 hover:text-white uppercase tracking-wider text-xs font-bold">
+                        <Button variant="outline" onClick={() => setIsAddFundsDialogOpen(false)} className="flex-1 rounded-xl h-12 border-[var(--border-subtle)] bg-[var(--surface-elevated)] hover:bg-[var(--card-hover)] text-[var(--text-secondary)] hover:text-[var(--text-primary)] uppercase tracking-wider text-xs font-bold">
                             Cancel
                         </Button>
                         <Button
                             onClick={handleAddFunds}
                             disabled={isAddingFunds || fundsAmount <= 0}
-                            className="flex-1 bg-gradient-to-r from-emerald-600 to-green-600 hover:from-emerald-500 hover:to-green-500 text-white border-0 rounded-xl h-12 shadow-lg shadow-emerald-500/20 uppercase tracking-wider text-xs font-bold"
+                            className="flex-1 bg-gradient-to-r from-blue-500 to-indigo-600 hover:from-blue-600 hover:to-indigo-700 text-white border-0 rounded-xl h-12 shadow-lg shadow-blue-500/20 uppercase tracking-wider text-xs font-bold"
                         >
                             {isAddingFunds ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : null}
                             Confirm
@@ -633,34 +633,34 @@ export function BudgetOverview({
 
             {/* Top Up Account Dialog */}
             <Dialog open={isTopUpDialogOpen} onOpenChange={setIsTopUpDialogOpen}>
-                <DialogContent className="sm:max-w-[400px] bg-[#0A0A0B]/95 backdrop-blur-3xl border-white/10 text-white shadow-2xl p-0 overflow-hidden gap-0">
-                    <DialogHeader className="p-8 pb-4 border-b border-white/5">
+                <DialogContent className="sm:max-w-[400px] bg-[var(--card-dark)] backdrop-blur-3xl border border-[var(--border-subtle)] shadow-2xl p-0 overflow-hidden gap-0 rounded-2xl">
+                    <DialogHeader className="p-8 pb-4 border-b border-[var(--border-subtle)]">
                         <div className="mx-auto w-14 h-14 bg-gradient-to-br from-indigo-500 to-purple-600 rounded-2xl flex items-center justify-center shadow-lg shadow-purple-500/20 mb-4">
                             <Plus className="w-7 h-7 text-white" />
                         </div>
-                        <DialogTitle className="text-2xl font-black text-center text-white tracking-tight">TOP UP ACCOUNT</DialogTitle>
-                        <DialogDescription className="text-center text-slate-400">
+                        <DialogTitle className="text-2xl font-black text-center text-[var(--text-primary)] tracking-tight">TOP UP ACCOUNT</DialogTitle>
+                        <DialogDescription className="text-center text-[var(--text-secondary)]">
                             Add funds to your main company account.
                         </DialogDescription>
                     </DialogHeader>
                     <div className="grid gap-6 p-8">
                         <div className="grid gap-2">
-                            <Label htmlFor="topup_amount" className="text-xs font-bold text-slate-400 uppercase tracking-wider">Amount to Add</Label>
+                            <Label htmlFor="topup_amount" className="text-xs font-bold text-[var(--text-muted)] uppercase tracking-wider">Amount to Add</Label>
                             <div className="relative">
-                                <span className="absolute left-4 top-3.5 text-xs font-bold text-slate-500">PKR</span>
+                                <span className="absolute left-4 top-3 text-sm font-black text-[var(--text-primary)] tracking-wider">PKR</span>
                                 <Input
                                     id="topup_amount"
                                     type="number"
                                     value={topUpAmount || ""}
                                     onChange={(e) => setTopUpAmount(Number(e.target.value))}
                                     placeholder="e.g. 1,000,000"
-                                    className="pl-12 h-12 bg-white/5 border-white/10 text-white placeholder:text-slate-600 focus:border-purple-500/40 focus:ring-purple-500/20 rounded-xl"
+                                    className="pl-14 h-12 bg-[var(--surface-elevated)] border-[var(--border-subtle)] text-[var(--text-primary)] placeholder:text-[var(--text-muted)] focus:border-purple-500/40 focus:ring-purple-500/20 rounded-xl"
                                 />
                             </div>
                         </div>
                     </div>
                     <DialogFooter className="p-8 pt-0 gap-3">
-                        <Button variant="outline" onClick={() => setIsTopUpDialogOpen(false)} className="flex-1 rounded-xl h-12 border-white/10 bg-transparent hover:bg-white/5 text-slate-300 hover:text-white uppercase tracking-wider text-xs font-bold">
+                        <Button variant="outline" onClick={() => setIsTopUpDialogOpen(false)} className="flex-1 rounded-xl h-12 border-[var(--border-subtle)] bg-[var(--surface-elevated)] hover:bg-[var(--card-hover)] text-[var(--text-secondary)] hover:text-[var(--text-primary)] uppercase tracking-wider text-xs font-bold">
                             Cancel
                         </Button>
                         <Button

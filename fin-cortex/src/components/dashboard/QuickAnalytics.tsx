@@ -22,6 +22,7 @@ import { useAuth } from "@/context/AuthContext";
 import { BACKEND_URL } from "@/lib/config";
 
 import { UsersListModal, UserItem } from "./UsersListModal";
+import { ClaimsListModal, ClaimItem } from "./ClaimsListModal";
 
 interface AnalyticsData {
   period: string;
@@ -39,6 +40,7 @@ interface AnalyticsData {
   activeManagers?: number;
   managersList?: UserItem[];
   usersList?: UserItem[];
+  claimsList?: ClaimItem[];
 }
 
 interface QuickAnalyticsProps {
@@ -62,7 +64,8 @@ const defaultData: AnalyticsData = {
   activeUsers: 0,
   activeManagers: 0,
   managersList: [],
-  usersList: []
+  usersList: [],
+  claimsList: []
 };
 
 export function QuickAnalytics({
@@ -77,6 +80,7 @@ export function QuickAnalytics({
 
   const [modalOpen, setModalOpen] = useState(false);
   const [modalType, setModalType] = useState<'manager' | 'user'>('user');
+  const [claimsModalOpen, setClaimsModalOpen] = useState(false);
 
   const fetchAnalytics = useCallback(async () => {
     setIsLoading(true);
@@ -135,6 +139,11 @@ export function QuickAnalytics({
         type={modalType}
         data={modalType === 'manager' ? (data.managersList || []) : (data.usersList || [])}
       />
+      <ClaimsListModal
+        isOpen={claimsModalOpen}
+        onClose={() => setClaimsModalOpen(false)}
+        data={data.claimsList || []}
+      />
 
       {/* Header */}
       <Card className="bg-[var(--card-dark)] backdrop-blur-3xl border-[var(--border-subtle)] shadow-2xl">
@@ -188,7 +197,7 @@ export function QuickAnalytics({
       {/* Key Metrics */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
         {[
-          { label: "Total Claims", value: data.totalClaims.toLocaleString(), trend: data.monthlyTrend, icon: FileText, color: "blue", action: null },
+          { label: "Total Claims", value: data.totalClaims.toLocaleString(), trend: data.monthlyTrend, icon: FileText, color: "blue", action: () => setClaimsModalOpen(true) },
           { label: "Total Amount", value: formatCurrency(data.totalAmount), trend: data.weeklyTrend, icon: DollarSign, color: "green", action: null },
           { label: "Average Claim", value: formatCurrency(data.averageClaim), sub: "Per claim", icon: BarChart3, color: "purple", action: null },
           { label: "Active Users", value: (data.activeUsers || 0).toLocaleString(), sub: "Total users", icon: Users, color: "orange", action: () => openModal('user') },

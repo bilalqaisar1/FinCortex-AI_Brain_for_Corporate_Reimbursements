@@ -19,7 +19,6 @@ router = APIRouter()
 class CreateCategoryRequest(BaseModel):
     """Request to create a new category."""
     category_name: str = Field(..., min_length=1)
-    company_id: Optional[int] = Field(None, description="Company ID (optional)")
     description: Optional[str] = None
 
 
@@ -38,13 +37,12 @@ async def create_category(request: CreateCategoryRequest) -> Dict[str, Any]:
     Returns the created or existing category ID.
     """
     category_name = request.category_name.strip()
-    logger.info("📥 POST /categories - Request received: category_name='%s', company_id=%s", 
-                category_name, request.company_id)
+    logger.info("📥 POST /categories - Request received: category_name='%s'", category_name)
     
     try:
         supabase = get_supabase_client()
 
-        # Fetch all categories and filter in Python for exact case-insensitive match
+        # Fetch all categories and filter for exact case-insensitive match
         try:
             existing = (
                 supabase.table("expense_categories")
@@ -76,15 +74,13 @@ async def create_category(request: CreateCategoryRequest) -> Dict[str, Any]:
                 matched_category["category_id"],
                 matched_category["category_name"],
             )
-            logger.info("📤 POST /categories - Final response: %s", response_data)
             return response_data
 
-        insert_payload = {
+        insert_payload: Dict[str, Any] = {
             "category_name": category_name,
-            "description": request.description,
         }
-        if request.company_id:
-            insert_payload["company_id"] = request.company_id
+        if request.description:
+            insert_payload["description"] = request.description
 
         try:
             insert_result = supabase.table("expense_categories").insert(insert_payload).execute()
@@ -119,13 +115,11 @@ async def create_category(request: CreateCategoryRequest) -> Dict[str, Any]:
             inserted_category["category_id"],
             inserted_category["category_name"],
         )
-        logger.info("📤 POST /categories - Final response: %s", response_data)
         return response_data
 
     except Exception as exc:
         error_msg = f"Failed to create category: {str(exc)}"
         logger.error("❌ POST /categories - Error: %s", error_msg, exc_info=True)
-        logger.error("📤 POST /categories - Error response: status_code=500, detail='%s'", error_msg)
         raise HTTPException(status_code=500, detail=error_msg) from exc
 
 
@@ -177,7 +171,6 @@ async def create_subcategory(request: CreateSubcategoryRequest) -> Dict[str, Any
                 matched_subcat["subcategory_id"],
                 matched_subcat["subcategory_name"],
             )
-            logger.info("📤 POST /subcategories - Final response: %s", response_data)
             return response_data
 
         insert_payload = {
@@ -221,31 +214,27 @@ async def create_subcategory(request: CreateSubcategoryRequest) -> Dict[str, Any
             inserted_subcat["subcategory_id"],
             inserted_subcat["subcategory_name"],
         )
-        logger.info("📤 POST /subcategories - Final response: %s", response_data)
         return response_data
 
     except Exception as exc:
         error_msg = f"Failed to create subcategory: {str(exc)}"
         logger.error("❌ POST /subcategories - Error: %s", error_msg, exc_info=True)
-        logger.error("📤 POST /subcategories - Error response: status_code=500, detail='%s'", error_msg)
         raise HTTPException(status_code=500, detail=error_msg) from exc
 
 
 @router.get("/categories")
-async def get_categories(company_id: Optional[int] = None) -> Dict[str, Any]:
+async def get_categories() -> Dict[str, Any]:
     """
     Fetch all categories and their subcategories.
-    Optionally filter by company_id.
     """
     try:
         supabase = get_supabase_client()
         
-        query = supabase.table("expense_categories").select("*, subcategories:expense_subcategories(*)")
-        
-        if company_id:
-            query = query.eq("company_id", company_id)
-            
-        result = query.execute()
+        result = (
+            supabase.table("expense_categories")
+            .select("*, subcategories:expense_subcategories(*)")
+            .execute()
+        )
         
         return {
             "success": True,
@@ -264,15 +253,12 @@ async def delete_category(category_id: int) -> Dict[str, Any]:
     """
     try:
         supabase = get_supabase_client()
-        
+
         # 1. Nullify subcategory_id in reimbursements for all subcategories of this category
-        # First get subcategory IDs
         subcats = supabase.table("expense_subcategories").select("subcategory_id").eq("category_id", category_id).execute()
         if subcats.data:
             subcat_ids = [s['subcategory_id'] for s in subcats.data]
             supabase.table("reimbursements").update({"subcategory_id": None}).in_("subcategory_id", subcat_ids).execute()
-            
-            # Also delete rules for these subcategories
             supabase.table("reimbursement_rules").delete().in_("subcategory_id", subcat_ids).execute()
 
         # 2. Nullify category_id in reimbursements
@@ -281,12 +267,11 @@ async def delete_category(category_id: int) -> Dict[str, Any]:
         # 3. Delete rules for this category
         supabase.table("reimbursement_rules").delete().eq("category_id", category_id).execute()
 
-        # 4. Nullify category_id in company_budgets (FK: company_budgets_category_id_fkey)
+        # 4. Nullify category_id in company_budgets
         try:
             supabase.table("company_budgets").update({"category_id": None}).eq("category_id", category_id).execute()
         except Exception as budget_err:
             logger.warning(f"Could not nullify company_budgets.category_id: {budget_err}")
-            # Try deleting budget rows referencing this category as a fallback
             try:
                 supabase.table("company_budgets").delete().eq("category_id", category_id).execute()
             except Exception as budget_del_err:
@@ -308,10 +293,11 @@ async def delete_category(category_id: int) -> Dict[str, Any]:
             "success": True,
             "message": "Category deleted successfully"
         }
+    except HTTPException:
+        raise
     except Exception as e:
         error_str = str(e)
         logger.error(f"Failed to delete category: {e}")
-        # Detect foreign key violations and return a friendlier message
         if "foreign key" in error_str.lower() or "23503" in error_str:
             raise HTTPException(
                 status_code=409,

@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { ManagerLayout } from "@/components/dashboard/ManagerLayout";
 import { useAuth } from "@/context/AuthContext";
 import { RouteProtection } from "@/components/auth/RouteProtection";
+import { BACKEND_URL } from "@/lib/config";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -19,7 +20,8 @@ import {
   DollarSign,
   Calendar,
   FileText,
-  Loader2
+  Loader2,
+  X
 } from "lucide-react";
 import { PageHeader } from "@/components/dashboard";
 import {
@@ -80,13 +82,14 @@ export default function ApprovalsPage() {
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [comment, setComment] = useState("");
   const [isProcessing, setIsProcessing] = useState(false);
+  const [budgetError, setBudgetError] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
   const fetchApprovals = async () => {
     if (!userProfile?.user_id) return;
     setIsLoading(true);
     try {
-      const baseUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
+      const baseUrl = BACKEND_URL;
       const response = await fetch(`${baseUrl}/api/v1/reimbursements/manager/${userProfile.user_id}`);
       const payload = await response.json();
       if (payload.success) {
@@ -121,8 +124,9 @@ export default function ApprovalsPage() {
     if (decisionType === "rejected" && !comment.trim()) return;
 
     setIsProcessing(true);
+    setBudgetError(null);
     try {
-      const baseUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
+      const baseUrl = BACKEND_URL;
       const response = await fetch(`${baseUrl}/api/v1/reimbursements/${selectedApproval.reimbursement_id}/status`, {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
@@ -133,15 +137,28 @@ export default function ApprovalsPage() {
         })
       });
       const payload = await response.json();
+
+      if (!response.ok) {
+        const detail = payload.detail;
+        if (detail && typeof detail === 'object' && detail.error_code === 'budget_exceeded') {
+          setBudgetError(detail.message || 'Insufficient department budget. Please contact admin to increase allocation.');
+        } else {
+          setBudgetError(typeof detail === 'string' ? detail : 'Failed to update claim status.');
+        }
+        return;
+      }
+
       if (payload.success) {
         setIsDialogOpen(false);
         setComment("");
         setSelectedApproval(null);
         setDecisionType(null);
+        setBudgetError(null);
         fetchApprovals(); // Refresh data
       }
     } catch (error) {
       console.error("Failed to update status:", error);
+      setBudgetError('Network error. Please try again.');
     } finally {
       setIsProcessing(false);
     }
@@ -297,6 +314,19 @@ export default function ApprovalsPage() {
                 </DialogDescription>
               </DialogHeader>
               <div className="space-y-4 py-4">
+                {budgetError && (
+                  <div className="p-4 bg-red-500/10 border border-red-500/30 rounded-xl flex items-start gap-3">
+                    <AlertTriangle className="w-5 h-5 text-red-400 mt-0.5 flex-shrink-0" />
+                    <div className="flex-1">
+                      <p className="text-sm font-bold text-red-400 mb-1">Budget Exceeded</p>
+                      <p className="text-xs text-red-300/80">{budgetError}</p>
+                      <p className="text-xs text-amber-400/80 mt-2 font-medium">Please contact your admin to increase budget allocation.</p>
+                    </div>
+                    <button onClick={() => setBudgetError(null)} className="text-red-400/60 hover:text-red-400">
+                      <X className="w-4 h-4" />
+                    </button>
+                  </div>
+                )}
                 {selectedApproval && (
                   <div className="p-4 bg-slate-50 dark:bg-slate-800 rounded-lg">
                     <p className="font-medium text-slate-900 dark:text-slate-100 mb-2">
@@ -329,6 +359,7 @@ export default function ApprovalsPage() {
                     setIsDialogOpen(false);
                     setComment("");
                     setDecisionType(null);
+                    setBudgetError(null);
                   }}
                   disabled={isProcessing}
                 >

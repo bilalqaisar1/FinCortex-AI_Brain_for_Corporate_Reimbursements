@@ -78,9 +78,9 @@ async def update_reimbursement_status(
     supabase = get_supabase_client()
     
     try:
-        # 1. Fetch current reimbursement details
+        # 1. Fetch current reimbursement details (include company_id and department_id for budget check)
         reimb_resp = supabase.table("reimbursements").select(
-            "reimbursement_id, receipt_code, user_id, amount_claimed, vendor_id, status"
+            "reimbursement_id, receipt_code, user_id, amount_claimed, vendor_id, status, company_id, department_id"
         ).eq("reimbursement_id", reimbursement_id).single().execute()
         
         if not reimb_resp.data:
@@ -88,6 +88,60 @@ async def update_reimbursement_status(
         
         reimb = reimb_resp.data
         user_id = reimb["user_id"]
+
+        # 1b. BUDGET VALIDATION — block approval if claim exceeds available department budget
+        if payload.status == "approved":
+            claim_amount = float(reimb.get("amount_claimed", 0) or 0)
+            company_id = reimb.get("company_id")
+            department_id = reimb.get("department_id")
+
+            if company_id and department_id:
+                try:
+                    # Fetch department budget
+                    budget_resp = supabase.table("company_budgets") \
+                        .select("total_balance") \
+                        .eq("company_id", company_id) \
+                        .eq("department_id", department_id) \
+                        .limit(1) \
+                        .execute()
+
+                    if budget_resp.data:
+                        total_budget = float(budget_resp.data[0].get("total_balance", 0) or 0)
+
+                        # Calculate already-used budget (sum of approved claims in this dept)
+                        used_resp = supabase.table("reimbursements") \
+                            .select("amount_approved, amount_claimed") \
+                            .eq("company_id", company_id) \
+                            .eq("department_id", department_id) \
+                            .eq("status", "approved") \
+                            .execute()
+
+                        used_budget = 0.0
+                        for r in (used_resp.data or []):
+                            used_budget += float(r.get("amount_approved") or r.get("amount_claimed") or 0)
+
+                        available_budget = total_budget - used_budget
+
+                        if claim_amount > available_budget:
+                            logger.warning(
+                                "⚠️ Budget exceeded for dept %s: claim=%.2f, available=%.2f, total=%.2f, used=%.2f",
+                                department_id, claim_amount, available_budget, total_budget, used_budget
+                            )
+                            raise HTTPException(
+                                status_code=400,
+                                detail={
+                                    "error_code": "budget_exceeded",
+                                    "message": f"Insufficient department budget. Available: PKR {available_budget:,.0f}, Claim: PKR {claim_amount:,.0f}",
+                                    "available_budget": available_budget,
+                                    "claim_amount": claim_amount,
+                                    "total_budget": total_budget,
+                                    "used_budget": used_budget
+                                }
+                            )
+                except HTTPException:
+                    raise
+                except Exception as budget_err:
+                    logger.warning(f"⚠️ Budget check failed (non-blocking): {budget_err}")
         
         # 2. Update status in database
         update_data = {

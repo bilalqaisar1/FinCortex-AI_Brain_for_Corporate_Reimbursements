@@ -16,6 +16,7 @@ interface StatsCardProps {
   description?: string;
   className?: string;
   loading?: boolean;
+  onClick?: () => void;
 }
 
 export function StatsCard({
@@ -29,6 +30,7 @@ export function StatsCard({
   iconBgColor = "bg-blue-100 dark:bg-blue-900/30",
   className,
   loading = false,
+  onClick,
 }: StatsCardProps) {
   if (loading) {
     return (
@@ -70,10 +72,13 @@ export function StatsCard({
   };
 
   return (
-    <Card className={cn(
-      "bg-[var(--card-dark)] border border-[var(--border-subtle)] shadow-2xl transition-all duration-500 group overflow-hidden relative",
-      className
-    )}>
+    <Card
+      onClick={onClick}
+      className={cn(
+        "bg-[var(--card-dark)] border border-[var(--border-subtle)] shadow-2xl transition-all duration-500 group overflow-hidden relative",
+        onClick && "cursor-pointer hover:scale-[1.02] active:scale-[0.98]",
+        className
+      )}>
       {/* Background Accent Glow */}
       <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-transparent via-purple-500/20 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
 

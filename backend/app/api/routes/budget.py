@@ -149,11 +149,11 @@ async def get_budgets(admin_id: Optional[str] = None) -> Dict[str, Any]:
                  used = used_by_dept.get(did, 0)
                  monthly_used = monthly_used_by_dept.get(did, 0)
             
-            remaining = total - used
+            remaining = max(0, total - used)
             
             utilization = 0
             if total > 0:
-                utilization = round((used / total) * 100, 1)
+                utilization = min(100, round((used / total) * 100, 1))
             elif used > 0:
                 utilization = 100 
             
@@ -178,7 +178,7 @@ async def get_budgets(admin_id: Optional[str] = None) -> Dict[str, Any]:
                 "utilization_percentage": utilization,
                 "monthly_limit": b.get("monthly_limit", 0) or 0,
                 "monthly_used": monthly_used,
-                "status": "healthy" if remaining >= 0 else "critical",
+                "status": "healthy" if (total - used) >= 0 else "critical",
                 "currency": "PKR",
                 "last_updated": b.get("last_updated", ""),
                 "account_balance": account_balance,
@@ -456,13 +456,42 @@ async def get_categories() -> Dict[str, Any]:
 
 @router.get("/admin/departments")
 async def get_departments() -> Dict[str, Any]:
-    """Get all available departments."""
+    """Get all departments."""
     supabase = get_supabase_client()
     try:
         resp = supabase.table("departments").select("*").order("department_id").execute()
         return {"success": True, "data": resp.data or []}
     except Exception as e:
         logger.error(f"Error fetching departments: {e}")
+        return {"success": False, "error": str(e)}
+
+
+@router.post("/admin/departments")
+async def create_department(payload: Dict[str, Any] = Body(...)) -> Dict[str, Any]:
+    """Create a new department."""
+    supabase = get_supabase_client()
+    department_name = payload.get("department_name", "").strip()
+
+    if not department_name:
+        return {"success": False, "error": "Department name is required"}
+
+    try:
+        resp = supabase.table("departments").insert({"department_name": department_name}).execute()
+        return {"success": True, "data": resp.data[0] if resp.data else None}
+    except Exception as e:
+        logger.error(f"Error creating department: {e}")
+        return {"success": False, "error": str(e)}
+
+
+@router.delete("/admin/departments/{department_id}")
+async def delete_department(department_id: int) -> Dict[str, Any]:
+    """Delete a department by ID."""
+    supabase = get_supabase_client()
+    try:
+        resp = supabase.table("departments").delete().eq("department_id", department_id).execute()
+        return {"success": True, "data": resp.data}
+    except Exception as e:
+        logger.error(f"Error deleting department: {e}")
         return {"success": False, "error": str(e)}
 
 
@@ -479,14 +508,14 @@ async def get_manager_budget(manager_id: str) -> Dict[str, Any]:
         manager_resp = supabase.table("managers") \
             .select("manager_id, manager_company_id, manager_department_id, full_name, departments(department_name)") \
             .eq("manager_id", manager_id) \
-            .single() \
+            .limit(1) \
             .execute()
             
-        if not manager_resp.data:
-            # Check if manager exists but maybe company/dept is missing
+        if not manager_resp.data or len(manager_resp.data) == 0:
+            # Manager not found in managers table
             raise HTTPException(status_code=404, detail="Manager profile not found")
             
-        manager_data = manager_resp.data
+        manager_data = manager_resp.data[0]
         company_id = manager_data.get("manager_company_id")
         department_id = manager_data.get("manager_department_id")
         department_name = "Unknown Department"
@@ -617,10 +646,10 @@ async def get_manager_budget(manager_id: str) -> Dict[str, Any]:
                 "percentage": percentage
             })
             
-        remaining_budget = total_budget - used_budget
+        remaining_budget = max(0, total_budget - used_budget)
         utilization_percentage = 0
         if total_budget > 0:
-            utilization_percentage = round((used_budget / total_budget) * 100, 1)
+            utilization_percentage = min(100, round((used_budget / total_budget) * 100, 1))
         elif used_budget > 0:
             utilization_percentage = 100 # Over budget effectively if 0 allocated
 

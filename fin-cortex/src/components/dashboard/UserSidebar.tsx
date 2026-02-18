@@ -134,7 +134,7 @@ export function UserSidebar({
             )}
 
             {/* Navigation */}
-            <ScrollArea className="flex-1 px-4 py-4 relative z-10">
+            <ScrollArea className="flex-1 min-h-0 px-4 py-4 relative z-10">
                 <nav className="space-y-1.5">
                     {sidebarItems.map((item) => {
                         const isItemActive = isActive(item.href);

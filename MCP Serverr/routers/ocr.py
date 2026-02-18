@@ -130,7 +130,52 @@ async def process_receipt_end_to_end(receipt: ReceiptUpload):
         logger.warning(f"🤖 Agent Reasoning: Data missing required fields: {missing}")
         await logging_and_audit_tool(user_id, "validation_warning", {"missing_fields": missing})
 
-    # 6. Final Audit & Success
+    # 6. Category Enforcement: Server-side validation (never trust GPT alone)
+    categories = getattr(receipt, 'categories', None)
+    if categories is not None:
+        try:
+            allowed_cats = set()
+            allowed_subcats = set()
+            for cat in (categories or []):
+                cat_name = (cat.get("category_name") or "").strip().lower()
+                if cat_name:
+                    allowed_cats.add(cat_name)
+                for sub in cat.get("subcategories", []):
+                    sub_name = (sub.get("subcategory_name") or "").strip().lower()
+                    if sub_name:
+                        allowed_subcats.add(sub_name)
+
+            items = structured_data.get("items", [])
+            allowed_display = ", ".join(c.title() for c in sorted(allowed_cats)) if allowed_cats else "(none)"
+
+            for item in items:
+                item_cat = (item.get("category") or "").strip().lower()
+                item_subcat = (item.get("subcategory") or "").strip().lower()
+                matches_cat = item_cat in allowed_cats
+                matches_subcat = item_subcat in allowed_subcats if item_subcat else False
+
+                if not (matches_cat or matches_subcat):
+                    item["is_reimbursable"] = False
+                    original_cat = item.get("category") or "Unknown"
+                    if not allowed_cats:
+                        item["rejection_reason"] = (
+                            "No reimbursement categories configured for this company. "
+                            "All items are non-reimbursable."
+                        )
+                    else:
+                        item["rejection_reason"] = (
+                            f"Category '{original_cat}' is not in the company's "
+                            f"allowed reimbursement categories: {allowed_display}"
+                        )
+
+            logger.info(
+                "🛡️ MCP Category enforcement applied: allowed=%s, items_checked=%d",
+                allowed_display, len(items),
+            )
+        except Exception as enforce_exc:
+            logger.warning("⚠️ MCP Category enforcement failed: %s", enforce_exc)
+
+    # 7. Final Audit & Success
     await logging_and_audit_tool(user_id, "receipt_processing_complete", {
         "source": source,
         "validation": validation_status,

@@ -40,7 +40,7 @@ export async function GET(request: Request) {
         // 2. Fetch approved reimbursements for THIS company only
         const { data: reimbursements, error: reimbError } = await supabaseAdmin
             .from("reimbursements")
-            .select("amount_approved, amount_claimed, created_at, category_id")
+            .select("amount_approved, amount_claimed, created_at, category_id, department_id")
             .eq("company_id", companyId)
             .eq("status", "approved");
 
@@ -91,39 +91,34 @@ export async function GET(request: Request) {
         // 4. Calculate total allocated
         const totalAllocated = (budgetsData || []).reduce((sum, b) => sum + (b.total_balance || 0), 0);
 
-        // 5. Construct response with category-specific usage if possible
+        // 5. Construct response with category/department-specific usage
         const budgets = (budgetsData || []).map((b: any) => {
             const total = b.total_balance || 0;
             const categoryId = b.category_id;
+            const departmentId = b.department_id;
 
-            // Calculate usage for THIS specific category
+            // Calculate usage for THIS specific budget
             let catTotalUsed = 0;
             let catMonthlyUsed = 0;
 
             if (reimbursements) {
                 reimbursements.forEach((r: any) => {
-                    // Match by category_id if budget has one. 
-                    // If budget is "Global" (null category), we might still want to show company total or just global ones.
-                    // For now, let's assume if category matches, it counts.
+                    const amount = r.amount_approved || r.amount_claimed || 0;
+                    const rDate = new Date(r.created_at);
+                    const isCurrentMonth = rDate.getMonth() === currentMonth && rDate.getFullYear() === currentYear;
+
                     if (categoryId && r.category_id === categoryId) {
-                        const amount = r.amount_approved || r.amount_claimed || 0;
+                        // Match by category_id
                         catTotalUsed += amount;
-
-                        const rDate = new Date(r.created_at);
-                        if (rDate.getMonth() === currentMonth && rDate.getFullYear() === currentYear) {
-                            catMonthlyUsed += amount;
-                        }
-                    } else if (!categoryId && !b.department_id) {
-                        // For general budget (no category AND no department), we might show everything? 
-                        // Or only those missing category?
-                        // Let's stick to showing everything for general budget as a fallback.
-                        const amount = r.amount_approved || r.amount_claimed || 0;
+                        if (isCurrentMonth) catMonthlyUsed += amount;
+                    } else if (!categoryId && departmentId && r.department_id === departmentId) {
+                        // Match by department_id (department-specific budget without category)
                         catTotalUsed += amount;
-
-                        const rDate = new Date(r.created_at);
-                        if (rDate.getMonth() === currentMonth && rDate.getFullYear() === currentYear) {
-                            catMonthlyUsed += amount;
-                        }
+                        if (isCurrentMonth) catMonthlyUsed += amount;
+                    } else if (!categoryId && !departmentId) {
+                        // General budget (no category AND no department) — shows company-wide total
+                        catTotalUsed += amount;
+                        if (isCurrentMonth) catMonthlyUsed += amount;
                     }
                 });
             }

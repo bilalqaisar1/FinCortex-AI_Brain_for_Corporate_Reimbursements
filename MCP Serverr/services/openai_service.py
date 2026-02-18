@@ -34,18 +34,38 @@ class OpenAIService:
                 categories_str = "\n".join(cat_list)
 
             # Build the reimbursability rules based on whether admin categories exist
-            if has_admin_categories:
-                reimbursability_rules = """
-            STRICT REIMBURSABILITY RULES (COMPANY POLICY — THESE ARE ABSOLUTE):
-            - The ALLOWED CATEGORIES list below is the ONLY way an item can be reimbursable.
-            - An item is reimbursable (is_reimbursable: true) ONLY IF its category or subcategory
-              EXACTLY matches one of the ALLOWED CATEGORIES.
+            if has_admin_categories and categories_str != "No specific categories provided. Infer standard business categories.":
+                reimbursability_rules = f"""
+            STRICT REIMBURSABILITY RULES (COMPANY POLICY — THESE ARE ABSOLUTE AND MUST NOT BE IGNORED):
+            - The ALLOWED CATEGORIES list below is the COMPLETE, EXHAUSTIVE list of reimbursable categories.
+            - An item is reimbursable (is_reimbursable: true) ONLY IF its natural category or subcategory
+              EXACTLY matches one of the ALLOWED CATEGORIES listed below.
             - IF AN ITEM DOES NOT FIT ANY ALLOWED CATEGORY, IT MUST BE MARKED is_reimbursable: false.
-            - DO NOT invent categories. DO NOT use "Uncategorized" as a way to make an item reimbursable.
-            - If "MEDICAL" is the only category provided, and an item is "FOOD", it is NOT reimbursable.
-            - You MUST provide a clear 'rejection_reason' for every non-reimbursable item
-              (e.g., "Category 'Groceries' is not in the company's allowed reimbursement categories").
+              NO EXCEPTIONS. This is the most important rule.
+            - DO NOT invent categories. DO NOT use "Uncategorized", "General", or "Other".
+            - DO NOT assume any category is allowed unless it appears in the ALLOWED CATEGORIES list.
+
+            EXAMPLES OF CORRECT BEHAVIOR:
+            - If ALLOWED CATEGORIES are "Medical" and "Travel":
+              * "Bananas" (Grocery) → is_reimbursable: false, rejection_reason: "Category 'Grocery' is not in allowed categories: Medical, Travel"
+              * "Bluetooth Care" (Electronics) → is_reimbursable: false, rejection_reason: "Category 'Electronics' is not in allowed categories: Medical, Travel"
+              * "Dining Table" (Furniture) → is_reimbursable: false, rejection_reason: "Category 'Furniture' is not in allowed categories: Medical, Travel"
+              * "Prescription Medicine" (Medical) → is_reimbursable: true, rejection_reason: null
+              * "Flight Ticket" (Travel) → is_reimbursable: true, rejection_reason: null
+              * "Wine Bottle" (Alcohol) → is_reimbursable: false, rejection_reason: "Category 'Alcohol' is not in allowed categories: Medical, Travel"
             - For reimbursable items, set rejection_reason to null.
+
+            CURRENT ALLOWED CATEGORIES:
+            {categories_str}
+            """
+            elif categories is not None and len(categories) == 0:
+                # Admin exists but has defined ZERO categories → nothing is reimbursable
+                reimbursability_rules = """
+            STRICT REIMBURSABILITY RULES (COMPANY POLICY — NO CATEGORIES CONFIGURED):
+            - The company administrator has NOT configured any reimbursement categories.
+            - Therefore, ALL items must be marked is_reimbursable: false.
+            - Set rejection_reason to: "No reimbursement categories configured for this company. All items are non-reimbursable."
+            - NO EXCEPTIONS. Every single item must be non-reimbursable.
             """
             else:
                 reimbursability_rules = """
@@ -86,9 +106,6 @@ class OpenAIService:
             - Currency should be inferred where possible.
             - Output must follow the exact JSON structure.
 
-            ALLOWED CATEGORIES:
-            {categories_str}
-
             Receipt Text:
             {extracted_text}
 
@@ -123,7 +140,7 @@ class OpenAIService:
                     {"role": "user", "content": prompt}
                 ],
                 temperature=0.1,
-                max_tokens=1000
+                max_tokens=2000
             )
             
             # Extract JSON from response
