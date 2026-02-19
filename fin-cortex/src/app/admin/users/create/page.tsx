@@ -38,7 +38,11 @@ export default function CreateManagerPage() {
     useEffect(() => {
         const fetchDepartments = async () => {
             try {
-                const resp = await fetch('/api/v1/admin/departments');
+                const adminId = userProfile?.user_id;
+                const url = adminId
+                    ? `/api/v1/admin/departments?admin_id=${encodeURIComponent(adminId)}`
+                    : '/api/v1/admin/departments';
+                const resp = await fetch(url);
                 const result = await resp.json();
                 if (result.success && result.data) {
                     setDepartments(result.data);
@@ -49,7 +53,7 @@ export default function CreateManagerPage() {
         };
 
         fetchDepartments();
-    }, []);
+    }, [userProfile?.user_id]);
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();

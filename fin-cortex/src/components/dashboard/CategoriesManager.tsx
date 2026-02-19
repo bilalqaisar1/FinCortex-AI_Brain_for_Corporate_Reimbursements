@@ -35,7 +35,7 @@ import {
     type CreateSubcategoryInput
 } from "@/app/api/v1/admin/categories-api";
 
-export function CategoriesManager({ companyId }: { companyId: number | null }) {
+export function CategoriesManager({ companyId, adminId }: { companyId: string | null; adminId?: string }) {
     const [categories, setCategories] = useState<Category[]>([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
@@ -73,7 +73,7 @@ export function CategoriesManager({ companyId }: { companyId: number | null }) {
         try {
             setLoading(true);
             setError(null);
-            const data = await fetchCategories();
+            const data = await fetchCategories(adminId);
             setCategories(data);
         } catch (err) {
             console.error("Failed to load categories:", err);
@@ -87,7 +87,7 @@ export function CategoriesManager({ companyId }: { companyId: number | null }) {
         if (!catForm.category_name) return;
         try {
             setIsSaving(true);
-            await createCategory(catForm);
+            await createCategory({ ...catForm, admin_id: adminId });
             setIsAddCatOpen(false);
             setCatForm({ category_name: "", description: "" });
             await loadData();
@@ -123,7 +123,7 @@ export function CategoriesManager({ companyId }: { companyId: number | null }) {
         if (!selectedCategory) return;
         try {
             setIsSaving(true);
-            await deleteCategory(selectedCategory.category_id);
+            await deleteCategory(selectedCategory.category_id, adminId);
             setIsDeleteCatOpen(false);
             setSelectedCategory(null);
             await loadData();

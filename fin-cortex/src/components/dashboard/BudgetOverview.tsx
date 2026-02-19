@@ -99,7 +99,7 @@ export function BudgetOverview({
 
     const loadDepartments = async () => {
         try {
-            const depts = await fetchDepartments();
+            const depts = await fetchDepartments(userProfile?.user_id);
             setDepartments(depts);
         } catch (err) {
             console.error("Failed to load departments:", err);

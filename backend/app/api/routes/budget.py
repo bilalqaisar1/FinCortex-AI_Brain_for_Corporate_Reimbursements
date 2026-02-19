@@ -443,11 +443,22 @@ async def delete_budget(budget_id: str) -> Dict[str, Any]:
 
 
 @router.get("/admin/categories")
-async def get_categories() -> Dict[str, Any]:
-    """Get all available expense categories."""
+async def get_categories(admin_id: Optional[str] = None) -> Dict[str, Any]:
+    """Get expense categories scoped to admin's company."""
     supabase = get_supabase_client()
     try:
-        resp = supabase.table("expense_categories").select("*").order("category_id").execute()
+        query = supabase.table("expense_categories").select("*").order("category_id")
+
+        # Scope by company_id if admin_id is provided
+        if admin_id:
+            comp_resp = supabase.table("companies").select("company_id").eq("admin_id", admin_id).limit(1).execute()
+            if comp_resp.data:
+                company_id = comp_resp.data[0].get("company_id")
+                if company_id:
+                    query = query.eq("company_id", company_id)
+                    logger.info(f"GET /admin/categories scoped to company_id={company_id}")
+
+        resp = query.execute()
         return {"success": True, "data": resp.data or []}
     except Exception as e:
         logger.error(f"Error fetching categories: {e}")
@@ -455,11 +466,22 @@ async def get_categories() -> Dict[str, Any]:
 
 
 @router.get("/admin/departments")
-async def get_departments() -> Dict[str, Any]:
-    """Get all departments."""
+async def get_departments(admin_id: Optional[str] = None) -> Dict[str, Any]:
+    """Get departments scoped to admin's company."""
     supabase = get_supabase_client()
     try:
-        resp = supabase.table("departments").select("*").order("department_id").execute()
+        query = supabase.table("departments").select("*").order("department_id")
+
+        # Scope by company_id if admin_id is provided
+        if admin_id:
+            comp_resp = supabase.table("companies").select("company_id").eq("admin_id", admin_id).limit(1).execute()
+            if comp_resp.data:
+                company_id = comp_resp.data[0].get("company_id")
+                if company_id:
+                    query = query.eq("company_id", company_id)
+                    logger.info(f"GET /admin/departments scoped to company_id={company_id}")
+
+        resp = query.execute()
         return {"success": True, "data": resp.data or []}
     except Exception as e:
         logger.error(f"Error fetching departments: {e}")
@@ -468,15 +490,27 @@ async def get_departments() -> Dict[str, Any]:
 
 @router.post("/admin/departments")
 async def create_department(payload: Dict[str, Any] = Body(...)) -> Dict[str, Any]:
-    """Create a new department."""
+    """Create a new department scoped to admin's company."""
     supabase = get_supabase_client()
     department_name = payload.get("department_name", "").strip()
+    admin_id = payload.get("admin_id")
 
     if not department_name:
         return {"success": False, "error": "Department name is required"}
 
     try:
-        resp = supabase.table("departments").insert({"department_name": department_name}).execute()
+        insert_data: Dict[str, Any] = {"department_name": department_name}
+
+        # Resolve and attach company_id
+        if admin_id:
+            comp_resp = supabase.table("companies").select("company_id").eq("admin_id", admin_id).limit(1).execute()
+            if comp_resp.data:
+                company_id = comp_resp.data[0].get("company_id")
+                if company_id:
+                    insert_data["company_id"] = company_id
+                    logger.info(f"POST /admin/departments: creating dept '{department_name}' for company_id={company_id}")
+
+        resp = supabase.table("departments").insert(insert_data).execute()
         return {"success": True, "data": resp.data[0] if resp.data else None}
     except Exception as e:
         logger.error(f"Error creating department: {e}")
@@ -484,10 +518,22 @@ async def create_department(payload: Dict[str, Any] = Body(...)) -> Dict[str, An
 
 
 @router.delete("/admin/departments/{department_id}")
-async def delete_department(department_id: int) -> Dict[str, Any]:
-    """Delete a department by ID."""
+async def delete_department(department_id: int, admin_id: Optional[str] = None) -> Dict[str, Any]:
+    """Delete a department by ID. Verifies company ownership if admin_id provided."""
     supabase = get_supabase_client()
     try:
+        # Verify ownership before deleting
+        if admin_id:
+            comp_resp = supabase.table("companies").select("company_id").eq("admin_id", admin_id).limit(1).execute()
+            if comp_resp.data:
+                company_id = comp_resp.data[0].get("company_id")
+                if company_id:
+                    dept_check = supabase.table("departments").select("company_id").eq("department_id", department_id).limit(1).execute()
+                    if dept_check.data:
+                        dept_company = dept_check.data[0].get("company_id")
+                        if dept_company and dept_company != company_id:
+                            return {"success": False, "error": "Access denied: Department does not belong to your company"}
+
         resp = supabase.table("departments").delete().eq("department_id", department_id).execute()
         return {"success": True, "data": resp.data}
     except Exception as e:

@@ -243,6 +243,31 @@ export async function DELETE(
             );
         }
 
+        // Verify company ownership before deleting
+        const adminId = await resolveAdminId(request);
+        if (adminId) {
+            const { data: company } = await supabaseAdmin
+                .from("companies")
+                .select("company_id")
+                .eq("admin_id", adminId)
+                .maybeSingle();
+
+            if (company?.company_id) {
+                const { data: dept } = await supabaseAdmin
+                    .from("departments")
+                    .select("company_id")
+                    .eq("department_id", departmentId)
+                    .maybeSingle();
+
+                if (dept?.company_id && dept.company_id !== company.company_id) {
+                    return NextResponse.json(
+                        { success: false, error: "Access denied: Department does not belong to your company" },
+                        { status: 403 }
+                    );
+                }
+            }
+        }
+
         const { data: usersWithDept } = await supabaseAdmin
             .from("users")
             .select("user_id")

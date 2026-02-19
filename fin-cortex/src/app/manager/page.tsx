@@ -323,9 +323,9 @@ export default function ManagerDashboard() {
             icon={Activity}
           />
 
-          {/* Manager KPIs */}
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {managerStats.map((stat, index) => (
+          {/* Manager KPIs - Primary Row */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+            {managerStats.slice(0, 4).map((stat, index) => (
               <StatsCard
                 key={index}
                 title={stat.title}
@@ -339,6 +339,23 @@ export default function ManagerDashboard() {
                   () => setShowPendingPopup(true),
                   () => setShowBudgetPopup(true),
                   () => setShowBudgetPopup(true),
+                ][index]}
+              />
+            ))}
+          </div>
+
+          {/* Manager KPIs - Secondary Row */}
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-6">
+            {managerStats.slice(4).map((stat, index) => (
+              <StatsCard
+                key={index + 4}
+                title={stat.title}
+                value={stat.value}
+                change={stat.change}
+                changeType={stat.changeType}
+                icon={stat.icon}
+                className="animate-fade-in-up"
+                onClick={[
                   () => setShowTeamMembers(true),
                   () => setShowAcceptedPopup(true),
                   () => setShowRejectedPopup(true),

@@ -350,17 +350,65 @@ async def get_user_dashboard_stats(user_id: str) -> Dict[str, Any]:
                 })
         
         # 5. Budget Overview (Progress bars)
-        # We can use some static limits for categories if not defined in DB
-        category_limits = {
-            "Travel": 50000,
-            "Meals & Entertainment": 20000,
-            "Office Supplies": 15000,
-            "Communication": 10000,
-            "Medical": 30000,
-            "Training & Development": 25000,
-            "Utilities": 5000,
-            "Other": 10000
-        }
+        # Use expense_categories (admin-defined) as the primary source of categories,
+        # augmented with limits from reimbursement_rules where available.
+        category_limits = {}
+        try:
+            # Resolve user → admin_id → company_id
+            user_admin_resp = supabase.table("users").select("admin_id").eq("user_id", user_id).single().execute()
+            rule_admin_id = user_admin_resp.data.get("admin_id") if user_admin_resp.data else None
+            
+            company_id_for_cats = None
+            if rule_admin_id:
+                comp_resp = supabase.table("companies").select("company_id").eq("admin_id", rule_admin_id).limit(1).execute()
+                if comp_resp.data:
+                    company_id_for_cats = comp_resp.data[0].get("company_id")
+            
+            if company_id_for_cats:
+                # Fetch ALL company categories from expense_categories
+                cats_resp = supabase.table("expense_categories") \
+                    .select("category_id, category_name") \
+                    .eq("company_id", company_id_for_cats) \
+                    .execute()
+                
+                # Build category_id → name mapping
+                cat_id_to_name = {}
+                for cat_row in (cats_resp.data or []):
+                    cat_id = cat_row.get("category_id")
+                    cat_name = cat_row.get("category_name", "Unknown")
+                    cat_id_to_name[cat_id] = cat_name
+                    # Default limit; will be overridden by rules if available
+                    category_limits[cat_name] = 0
+                
+                # Fetch limits from reimbursement_rules where available
+                if rule_admin_id:
+                    rules_resp = supabase.table("reimbursement_rules") \
+                        .select("category_id, max_amount, monthly_limit") \
+                        .eq("created_by", rule_admin_id) \
+                        .eq("is_active", True) \
+                        .execute()
+                    
+                    for r in (rules_resp.data or []):
+                        cid = r.get("category_id")
+                        limit_val = float(r.get("monthly_limit") or r.get("max_amount") or 0)
+                        cat_name = cat_id_to_name.get(cid)
+                        if cat_name and limit_val > 0:
+                            category_limits[cat_name] = limit_val
+        except Exception as cat_err:
+            logger.warning(f"Could not fetch dynamic category limits: {cat_err}")
+        
+        # Fallback: use hardcoded limits only if no company categories found at all
+        if not category_limits:
+            category_limits = {
+                "Travel": 50000,
+                "Meals & Entertainment": 20000,
+                "Office Supplies": 15000,
+                "Communication": 10000,
+                "Medical": 30000,
+                "Training & Development": 25000,
+                "Utilities": 5000,
+                "Other": 10000
+            }
         
         budget_overview = []
         for cat, limit in category_limits.items():
@@ -378,14 +426,14 @@ async def get_user_dashboard_stats(user_id: str) -> Dict[str, Any]:
                 "kpis": [
                     {
                         "label": "Total Reimbursed (YTD)",
-                        "value": f"₹{total_reimbursed_ytd:,.2f}",
+                        "value": f"PKR {total_reimbursed_ytd:,.2f}",
                         "sub": "+0% vs last month", # Placeholder
                         "subClass": "text-emerald-400"
                     },
                     {
                         "label": "Allowed Reimbursement",
-                        "value": f"₹{allowed_reimbursement:,.2f}",
-                        "sub": f"Remaining: ₹{remaining_reimbursement:,.2f}",
+                        "value": f"PKR {allowed_reimbursement:,.2f}",
+                        "sub": f"Remaining: PKR {remaining_reimbursement:,.2f}",
                         "subClass": "text-muted-foreground"
                     },
                     {

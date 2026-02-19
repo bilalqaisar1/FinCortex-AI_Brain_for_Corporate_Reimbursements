@@ -16,10 +16,31 @@ logger = logging.getLogger(__name__)
 router = APIRouter()
 
 
+# ---------------------------------------------------------------------------
+# Helper: resolve company_id from admin_id
+# ---------------------------------------------------------------------------
+def _resolve_company_id(supabase, admin_id: str) -> Optional[str]:
+    """Look up the company_id for the given admin_id."""
+    try:
+        resp = (
+            supabase.table("companies")
+            .select("company_id")
+            .eq("admin_id", admin_id)
+            .limit(1)
+            .execute()
+        )
+        if resp.data:
+            return resp.data[0].get("company_id")
+    except Exception as e:
+        logger.warning("Failed to resolve company_id for admin %s: %s", admin_id, e)
+    return None
+
+
 class CreateCategoryRequest(BaseModel):
     """Request to create a new category."""
     category_name: str = Field(..., min_length=1)
     description: Optional[str] = None
+    admin_id: Optional[str] = None
 
 
 class CreateSubcategoryRequest(BaseModel):
@@ -33,22 +54,27 @@ class CreateSubcategoryRequest(BaseModel):
 async def create_category(request: CreateCategoryRequest) -> Dict[str, Any]:
     """
     Create a new expense category if it doesn't exist.
-    
-    Returns the created or existing category ID.
+    Scoped to the admin's company via company_id.
     """
     category_name = request.category_name.strip()
-    logger.info("📥 POST /categories - Request received: category_name='%s'", category_name)
-    
+    logger.info("📥 POST /categories - Request received: category_name='%s', admin_id='%s'",
+                category_name, request.admin_id)
+
     try:
         supabase = get_supabase_client()
 
-        # Fetch all categories and filter for exact case-insensitive match
+        # Resolve company_id for scoping
+        company_id = None
+        if request.admin_id:
+            company_id = _resolve_company_id(supabase, request.admin_id)
+            logger.info("Resolved company_id=%s for admin_id=%s", company_id, request.admin_id)
+
+        # Check for existing category (scoped to company if available)
         try:
-            existing = (
-                supabase.table("expense_categories")
-                .select("category_id, category_name")
-                .execute()
-            )
+            query = supabase.table("expense_categories").select("category_id, category_name, company_id")
+            if company_id:
+                query = query.eq("company_id", company_id)
+            existing = query.execute()
         except Exception as query_exc:
             logger.warning("Failed to fetch existing categories, proceeding with creation: %s", query_exc)
             existing = type("obj", (object,), {"data": []})()
@@ -81,6 +107,10 @@ async def create_category(request: CreateCategoryRequest) -> Dict[str, Any]:
         }
         if request.description:
             insert_payload["description"] = request.description
+        if company_id:
+            insert_payload["company_id"] = company_id
+        if request.admin_id:
+            insert_payload["admin_uuid"] = request.admin_id
 
         try:
             insert_result = supabase.table("expense_categories").insert(insert_payload).execute()
@@ -88,13 +118,14 @@ async def create_category(request: CreateCategoryRequest) -> Dict[str, Any]:
             if insert_result.data and len(insert_result.data) > 0:
                 inserted_category = insert_result.data[0]
             else:
-                query_result = (
+                query = (
                     supabase.table("expense_categories")
                     .select("category_id, category_name")
                     .eq("category_name", category_name)
-                    .limit(1)
-                    .execute()
                 )
+                if company_id:
+                    query = query.eq("company_id", company_id)
+                query_result = query.limit(1).execute()
                 if not query_result.data:
                     raise Exception("Failed to retrieve inserted category")
                 inserted_category = query_result.data[0]
@@ -127,13 +158,13 @@ async def create_category(request: CreateCategoryRequest) -> Dict[str, Any]:
 async def create_subcategory(request: CreateSubcategoryRequest) -> Dict[str, Any]:
     """
     Create a new expense subcategory if it doesn't exist.
-    
+
     Returns the created or existing subcategory ID.
     """
     subcategory_name = request.subcategory_name.strip()
-    logger.info("📥 POST /subcategories - Request received: subcategory_name='%s', category_id=%s", 
+    logger.info("📥 POST /subcategories - Request received: subcategory_name='%s', category_id=%s",
                 subcategory_name, request.category_id)
-    
+
     try:
         supabase = get_supabase_client()
 
@@ -223,19 +254,27 @@ async def create_subcategory(request: CreateSubcategoryRequest) -> Dict[str, Any
 
 
 @router.get("/categories")
-async def get_categories() -> Dict[str, Any]:
+async def get_categories(admin_id: Optional[str] = None) -> Dict[str, Any]:
     """
-    Fetch all categories and their subcategories.
+    Fetch categories and their subcategories.
+    Scoped by admin's company_id when admin_id is provided.
     """
     try:
         supabase = get_supabase_client()
-        
-        result = (
-            supabase.table("expense_categories")
-            .select("*, subcategories:expense_subcategories(*)")
-            .execute()
+
+        query = supabase.table("expense_categories").select(
+            "*, subcategories:expense_subcategories(*)"
         )
-        
+
+        # Apply company-scoping if admin_id is provided
+        if admin_id:
+            company_id = _resolve_company_id(supabase, admin_id)
+            if company_id:
+                query = query.eq("company_id", company_id)
+                logger.info("GET /categories scoped to company_id=%s", company_id)
+
+        result = query.execute()
+
         return {
             "success": True,
             "data": result.data
@@ -246,13 +285,33 @@ async def get_categories() -> Dict[str, Any]:
 
 
 @router.delete("/categories/{category_id}")
-async def delete_category(category_id: int) -> Dict[str, Any]:
+async def delete_category(category_id: int, admin_id: Optional[str] = None) -> Dict[str, Any]:
     """
     Delete a category by ID.
+    Verifies company ownership if admin_id is provided.
     Cleans up all referencing tables before deleting.
     """
     try:
         supabase = get_supabase_client()
+
+        # Verify ownership: category must belong to admin's company
+        if admin_id:
+            company_id = _resolve_company_id(supabase, admin_id)
+            if company_id:
+                cat_check = (
+                    supabase.table("expense_categories")
+                    .select("category_id, company_id")
+                    .eq("category_id", category_id)
+                    .limit(1)
+                    .execute()
+                )
+                if cat_check.data:
+                    cat_company = cat_check.data[0].get("company_id")
+                    if cat_company and cat_company != company_id:
+                        raise HTTPException(
+                            status_code=403,
+                            detail="Access denied: Category does not belong to your company"
+                        )
 
         # 1. Nullify subcategory_id in reimbursements for all subcategories of this category
         subcats = supabase.table("expense_subcategories").select("subcategory_id").eq("category_id", category_id).execute()
@@ -279,10 +338,10 @@ async def delete_category(category_id: int) -> Dict[str, Any]:
 
         # 5. Delete subcategories
         supabase.table("expense_subcategories").delete().eq("category_id", category_id).execute()
-        
+
         # 6. Delete the category
         result = supabase.table("expense_categories").delete().eq("category_id", category_id).execute()
-        
+
         if not result.data:
              return {
                 "success": False,
@@ -322,7 +381,7 @@ async def delete_subcategory(subcategory_id: int) -> Dict[str, Any]:
 
         # 3. Delete subcategory
         result = supabase.table("expense_subcategories").delete().eq("subcategory_id", subcategory_id).execute()
-        
+
         if not result.data:
              raise HTTPException(status_code=404, detail="Subcategory not found")
 

@@ -17,6 +17,7 @@ export interface Category {
 export interface CreateCategoryInput {
     category_name: string;
     description?: string;
+    admin_id?: string;
 }
 
 export interface CreateSubcategoryInput {
@@ -32,9 +33,12 @@ const getBaseUrl = () => {
     return BACKEND_URL.endsWith("/api/v1") ? BACKEND_URL : `${BACKEND_URL}/api/v1`;
 };
 
-export async function fetchCategories(): Promise<Category[]> {
+export async function fetchCategories(adminId?: string): Promise<Category[]> {
     try {
-        const url = `${getBaseUrl()}/categories`;
+        let url = `${getBaseUrl()}/categories`;
+        if (adminId) {
+            url += `?admin_id=${encodeURIComponent(adminId)}`;
+        }
         const response = await fetch(url);
         if (!response.ok) {
             console.warn(`Categories fetch returned ${response.status}: ${response.statusText}`);
@@ -92,9 +96,12 @@ export async function createSubcategory(input: CreateSubcategoryInput): Promise<
     }
 }
 
-export async function deleteCategory(categoryId: number): Promise<void> {
+export async function deleteCategory(categoryId: number, adminId?: string): Promise<void> {
     try {
-        const url = `${getBaseUrl()}/categories/${categoryId}`;
+        let url = `${getBaseUrl()}/categories/${categoryId}`;
+        if (adminId) {
+            url += `?admin_id=${encodeURIComponent(adminId)}`;
+        }
         const response = await fetch(url, {
             method: "DELETE",
         });

@@ -27,7 +27,7 @@ from app.services.reimbursement_service import (
     ReimbursementServiceError,
     create_reimbursement,
 )
-from app.services.policy_service import check_policy
+from app.services.policy_service import check_policy, save_policy_violations
 from app.services.storage_service import StorageUploadError, upload_receipt_to_bucket
 from app.services.remote_receipt_service import process_remote_receipt
 from app.services.supabase_rpc_service import get_expense_categories_with_subcategories, get_categories_direct, SupabaseRPCError
@@ -305,10 +305,22 @@ async def upload_receipt(
         policy_flags = []
         try:
             structured = result.get("structured", {})
+            # Resolve company_id from admin_uuid for policy scoping
+            upload_company_id = None
+            if admin_uuid:
+                try:
+                    supabase_client = get_supabase_client()
+                    comp_resp = supabase_client.table("companies").select("company_id").eq("admin_id", admin_uuid).single().execute()
+                    if comp_resp.data:
+                        upload_company_id = comp_resp.data.get("company_id")
+                except Exception:
+                    pass
+
             policy_flags = await check_policy({
                 "category_id": structured.get("category_id"),
                 "subcategory_id": structured.get("subcategory_id"),
-                "user_id": None, # Instant feedback doesn't have user_id context yet normally
+                "user_id": user_id,
+                "company_id": upload_company_id,
                 "amount_claimed": structured.get("Total Amount") or structured.get("total_amount"),
                 "vendor_name": structured.get("Vendor Name") or structured.get("vendor_name"),
                 "description": "",
@@ -546,6 +558,49 @@ async def create_reimbursement_endpoint(
         ocr_structured=ocr_structured_dict,
     )
 
+    # --- Enforce admin category allow-list on submitted items ---
+    # This catches manually added items that bypassed OCR classification.
+    submission_admin_uuid = str(admin_uuid) if admin_uuid else None
+    if not submission_admin_uuid:
+        submission_admin_uuid = _resolve_admin_uuid_from_user(user_id)
+
+    manual_item_flags = []
+    if submission_admin_uuid:
+        try:
+            cats_data = get_categories_direct(submission_admin_uuid)
+            if cats_data is not None:
+                allowed_cats = set()
+                for cat in cats_data:
+                    cat_name = (cat.get("category_name") or "").strip().lower()
+                    if cat_name:
+                        allowed_cats.add(cat_name)
+
+                allowed_display = ", ".join(c.title() for c in sorted(allowed_cats)) if allowed_cats else "(none)"
+
+                for item in parsed_items:
+                    # Items from OCR already have category set; manual items have empty category.
+                    # For items without a category, we flag them as needing review.
+                    item_name_lower = (item.item or "").strip().lower()
+                    if not item_name_lower:
+                        continue
+
+                    # Check if the item name itself matches any allowed category keyword
+                    item_matches = any(cat in item_name_lower or item_name_lower in cat for cat in allowed_cats)
+
+                    if not item_matches and allowed_cats:
+                        manual_item_flags.append({
+                            "code": "MANUAL_ITEM_UNCLASSIFIED",
+                            "message": f"Manually added item '{item.item}' could not be matched to allowed categories: {allowed_display}",
+                            "severity": "medium"
+                        })
+
+                logger.info(
+                    "✅ Submission category enforcement: allowed=%s, items_checked=%d, flags=%d",
+                    allowed_display, len(parsed_items), len(manual_item_flags),
+                )
+        except Exception as cat_err:
+            logger.warning("Could not enforce categories on submitted items: %s", cat_err)
+
     temp_dir = os.path.abspath(settings.temp_dir)
     os.makedirs(temp_dir, exist_ok=True)
     temp_filename = _generate_temp_filename(receipt_file.filename)
@@ -618,14 +673,28 @@ async def create_reimbursement_endpoint(
             
             if policy_flags:
                 logger.info(f"🚩 Policy flags detected for claim {reimbursement_id}: {policy_flags}")
-                # Update reimbursement with policy flags if column exists
+            
+            # Merge manual item classification flags
+            if manual_item_flags:
+                policy_flags.extend(manual_item_flags)
+                logger.info(f"🚩 Manual item flags added for claim {reimbursement_id}: {manual_item_flags}")
+            
+            if policy_flags:
+                # 1. Update reimbursements.flags JSONB column (for quick reads)
                 try:
                     supabase = get_supabase_client()
                     supabase.table("reimbursements").update({
-                        "policy_flags": policy_flags
+                        "flags": policy_flags
                     }).eq("reimbursement_id", reimbursement_id).execute()
                 except Exception as p_err:
                     logger.warning(f"Failed to save policy flags to DB: {p_err}")
+
+                # 2. Persist violations to policy_violations table (for admin reporting)
+                try:
+                    supabase = get_supabase_client()
+                    await save_policy_violations(reimbursement_id, policy_flags, supabase)
+                except Exception as pv_err:
+                    logger.warning(f"Failed to save to policy_violations table: {pv_err}")
         except Exception as policy_exc:
             logger.error(f"Policy engine execution failed: {policy_exc}")
 

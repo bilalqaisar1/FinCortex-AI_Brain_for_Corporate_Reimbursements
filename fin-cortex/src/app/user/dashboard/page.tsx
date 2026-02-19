@@ -5,7 +5,6 @@ import { Button } from "@/components/ui/button";
 import {
   Card,
   CardContent,
-  CardDescription,
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
@@ -25,7 +24,7 @@ import { NotificationCenter } from "@/components/NotificationCenter";
 import { UserLayout } from "@/components/dashboard/UserLayout";
 import { cn } from "@/lib/utils";
 import {
-  Sparkles,
+
   RotateCcw,
   MessageSquare,
   ShieldCheck,
@@ -107,8 +106,8 @@ export default function UserDashboardPage() {
   }, []);
 
   const kpis = dashboardData?.kpis || [
-    { label: "Total Reimbursed (YTD)", value: "₹0.00", sub: "Loading...", subClass: "text-muted-foreground" },
-    { label: "Allowed Reimbursement", value: "₹0.00", sub: "Loading...", subClass: "text-muted-foreground" },
+    { label: "Total Reimbursed (YTD)", value: "PKR 0.00", sub: "Loading...", subClass: "text-muted-foreground" },
+    { label: "Allowed Reimbursement", value: "PKR 0.00", sub: "Loading...", subClass: "text-muted-foreground" },
     { label: "Pending Claims", value: "0", sub: "Loading...", subClass: "text-muted-foreground" },
     { label: "Approval Rate", value: "0%", sub: "Loading...", subClass: "text-muted-foreground" },
   ];
@@ -117,7 +116,7 @@ export default function UserDashboardPage() {
     id: c.receipt_code || `#C-${c.reimbursement_id.slice(0, 5)}`,
     category: c.categories?.category_name || "Other",
     date: new Date(c.created_at).toLocaleDateString(),
-    amount: `₹${parseFloat(c.amount_claimed || 0).toLocaleString()}`,
+    amount: `PKR ${parseFloat(c.amount_claimed || 0).toLocaleString()}`,
     status: {
       label: c.status.charAt(0).toUpperCase() + c.status.slice(1),
       color: c.status === 'approved' ? "text-emerald-400/90" : c.status === 'pending' ? "text-amber-400/90" : "text-red-500/90",
@@ -125,11 +124,6 @@ export default function UserDashboardPage() {
     }
   })) || [];
 
-  const budgetOverview = dashboardData?.budget_overview || [
-    { category: "Travel", used: 0, limit: 1, percentage: 0 },
-    { category: "Meals & Entertainment", used: 0, limit: 1, percentage: 0 },
-    { category: "Office Supplies", used: 0, limit: 1, percentage: 0 },
-  ];
 
   return (
     <RouteProtection allowedRoles={['user']}>
@@ -172,99 +166,63 @@ export default function UserDashboardPage() {
             ))}
           </div>
 
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-            {/* Budget Overview (2/3 width) */}
-            <Card className="lg:col-span-2 border-[var(--border-subtle)] bg-[var(--card-dark)]">
-              <CardHeader className="p-8">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <CardTitle className="text-xl font-black text-[var(--text-primary)] uppercase tracking-tight">Budget Utilization</CardTitle>
-                    <CardDescription className="text-slate-500 font-medium">Real-time spend tracking by category</CardDescription>
+          {/* Quick Actions + Metrics Section */}
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            {/* Quick Action - Submit Claim */}
+            <Card className="border-[var(--border-subtle)] bg-gradient-to-br from-indigo-600/20 to-purple-600/20 shadow-xl border-indigo-500/20 overflow-hidden relative group">
+              <div className="absolute inset-0 bg-grid-white/[0.02] bg-[length:20px_20px]" />
+              <CardContent className="p-8 flex flex-col gap-6 relative z-10 h-full justify-between">
+                <div>
+                  <div className="h-12 w-12 rounded-2xl bg-white/10 flex items-center justify-center mb-4">
+                    <RotateCcw className="w-6 h-6 text-white" />
                   </div>
-                  <Sparkles className="w-5 h-5 text-purple-500" />
+                  <h3 className="text-xl font-black text-white uppercase tracking-tight">Need a Refund?</h3>
+                  <p className="text-indigo-200/60 text-sm mt-1 font-medium italic">Fast AI-powered processing</p>
                 </div>
-              </CardHeader>
-              <CardContent className="px-8 pb-8 flex flex-col gap-8">
-                {budgetOverview.map((item: any, idx: number) => (
-                  <div key={idx} className="group">
-                    <div className="flex items-center justify-between mb-3">
-                      <span className="text-sm font-black text-[var(--text-primary)] uppercase tracking-wider">{item.category}</span>
-                      <div className="text-right">
-                        <span className="text-sm font-black text-[var(--text-primary)]">₹{item.used?.toLocaleString()}</span>
-                        <span className="text-xs font-bold text-slate-500 ml-1">/ ₹{item.limit?.toLocaleString()}</span>
-                      </div>
-                    </div>
-                    <div className="h-2 w-full bg-[var(--background-dark)] rounded-full overflow-hidden border border-[var(--border-subtle)]">
-                      <div
-                        className={cn(
-                          "h-full rounded-full transition-all duration-1000 ease-out",
-                          item.percentage > 90 ? "bg-red-500 shadow-[0_0_10px_rgba(239,68,68,0.3)]" :
-                            item.percentage > 70 ? "bg-amber-500 shadow-[0_0_10px_rgba(245,158,11,0.3)]" :
-                              "bg-gradient-to-r from-[#6366f1] to-[#a855f7] shadow-[0_0_10px_rgba(99,102,241,0.3)]"
-                        )}
-                        style={{ width: `${Math.min(item.percentage, 100)}%` }}
-                      />
-                    </div>
-                    <div className="flex justify-between mt-2">
-                      <span className={cn(
-                        "text-[10px] font-black uppercase tracking-widest",
-                        item.percentage > 90 ? "text-red-400" : item.percentage > 70 ? "text-amber-400" : "text-slate-500"
-                      )}>
-                        {item.percentage}% CONFIGURED
-                      </span>
-                      <span className="text-[10px] font-black uppercase tracking-widest text-slate-500">
-                        ₹{(item.limit - item.used).toLocaleString()} REMAINING
-                      </span>
-                    </div>
-                  </div>
-                ))}
+                <Link href="/user/claims/new">
+                  <Button variant="brand" className="w-full">Submit New Claim</Button>
+                </Link>
               </CardContent>
             </Card>
 
-            {/* Quick Actions (1/3 width) */}
-            <div className="flex flex-col gap-6">
-              <Card className="border-[var(--border-subtle)] bg-gradient-to-br from-indigo-600/20 to-purple-600/20 shadow-xl border-indigo-500/20 overflow-hidden relative group">
-                <div className="absolute inset-0 bg-grid-white/[0.02] bg-[length:20px_20px]" />
-                <CardContent className="p-8 flex flex-col gap-6 relative z-10">
-                  <div className="h-12 w-12 rounded-2xl bg-white/10 flex items-center justify-center">
-                    <RotateCcw className="w-6 h-6 text-white" />
+            {/* Support Access */}
+            <Card className="border-[var(--border-subtle)] bg-[var(--card-dark)]">
+              <CardHeader className="px-8 pt-8">
+                <CardTitle className="text-sm font-black text-[var(--text-primary)] uppercase tracking-widest">Support Access</CardTitle>
+              </CardHeader>
+              <CardContent className="p-8 pt-4 flex flex-col gap-4">
+                <div className="flex items-center gap-4 p-3 rounded-2xl bg-[var(--surface-elevated)] border border-[var(--border-subtle)] hover:bg-[var(--card-hover)] transition-colors cursor-pointer group">
+                  <div className="h-10 w-10 rounded-xl bg-purple-500/20 flex items-center justify-center text-purple-400 group-hover:scale-110 transition-transform">
+                    <MessageSquare className="w-5 h-5" />
                   </div>
                   <div>
-                    <h3 className="text-xl font-black text-white uppercase tracking-tight">Need a Refund?</h3>
-                    <p className="text-indigo-200/60 text-sm mt-1 font-medium italic">Fast AI-powered processing</p>
+                    <p className="text-xs font-black text-[var(--text-primary)] uppercase tracking-wider">AI Assistant</p>
+                    <p className="text-[10px] text-slate-500 font-bold uppercase">24/7 Support</p>
                   </div>
-                  <Link href="/user/claims/new">
-                    <Button variant="brand" className="w-full">Submit New Claim</Button>
-                  </Link>
-                </CardContent>
-              </Card>
+                </div>
+                <div className="flex items-center gap-4 p-3 rounded-2xl bg-[var(--surface-elevated)] border border-[var(--border-subtle)] hover:bg-[var(--card-hover)] transition-colors cursor-pointer group">
+                  <div className="h-10 w-10 rounded-xl bg-blue-500/20 flex items-center justify-center text-blue-400 group-hover:scale-110 transition-transform">
+                    <ShieldCheck className="w-5 h-5" />
+                  </div>
+                  <div>
+                    <p className="text-xs font-black text-[var(--text-primary)] uppercase tracking-wider">Policy Guide</p>
+                    <p className="text-[10px] text-slate-500 font-bold uppercase">Read Terms</p>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
 
-              <Card className="border-[var(--border-subtle)] bg-[var(--card-dark)] flex-1">
-                <CardHeader className="px-8 pt-8">
-                  <CardTitle className="text-sm font-black text-[var(--text-primary)] uppercase tracking-widest">Support Access</CardTitle>
-                </CardHeader>
-                <CardContent className="p-8 pt-4 flex flex-col gap-4">
-                  <div className="flex items-center gap-4 p-3 rounded-2xl bg-[var(--surface-elevated)] border border-[var(--border-subtle)] hover:bg-[var(--card-hover)] transition-colors cursor-pointer group">
-                    <div className="h-10 w-10 rounded-xl bg-purple-500/20 flex items-center justify-center text-purple-400 group-hover:scale-110 transition-transform">
-                      <MessageSquare className="w-5 h-5" />
-                    </div>
-                    <div>
-                      <p className="text-xs font-black text-[var(--text-primary)] uppercase tracking-wider">AI Assistant</p>
-                      <p className="text-[10px] text-slate-500 font-bold uppercase">24/7 Support</p>
-                    </div>
-                  </div>
-                  <div className="flex items-center gap-4 p-3 rounded-2xl bg-[var(--surface-elevated)] border border-[var(--border-subtle)] hover:bg-[var(--card-hover)] transition-colors cursor-pointer group">
-                    <div className="h-10 w-10 rounded-xl bg-blue-500/20 flex items-center justify-center text-blue-400 group-hover:scale-110 transition-transform">
-                      <ShieldCheck className="w-5 h-5" />
-                    </div>
-                    <div>
-                      <p className="text-xs font-black text-[var(--text-primary)] uppercase tracking-wider">Policy Guide</p>
-                      <p className="text-[10px] text-slate-500 font-bold uppercase">Read Terms</p>
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
-            </div>
+            {/* Avg Claim Metric */}
+            <Card className="border-[var(--border-subtle)] bg-[var(--card-dark)] p-8 group hover:bg-[var(--card-hover)] transition-all">
+              <div className="flex items-center gap-4 mb-4">
+                <div className="h-10 w-10 rounded-xl bg-indigo-500/20 flex items-center justify-center text-indigo-400">
+                  <TrendingUp className="w-5 h-5" />
+                </div>
+                <p className="text-xs font-black uppercase tracking-widest text-slate-500">Avg Claim</p>
+              </div>
+              <p className="text-3xl font-black text-[var(--text-primary)]">PKR {dashboardData?.avg_claim_amount?.toLocaleString() || "0"}</p>
+              <p className="text-[10px] font-bold text-slate-500 uppercase mt-2">Annualized average</p>
+            </Card>
           </div>
 
           {/* Recent Activity Table */}
@@ -321,19 +279,8 @@ export default function UserDashboardPage() {
             </Card>
           </div>
 
-          {/* Additional Metrics Grid */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
-            <Card className="border-[var(--border-subtle)] bg-[var(--card-dark)] p-8 group hover:bg-[var(--card-hover)] transition-all">
-              <div className="flex items-center gap-4 mb-4">
-                <div className="h-10 w-10 rounded-xl bg-indigo-500/20 flex items-center justify-center text-indigo-400">
-                  <TrendingUp className="w-5 h-5" />
-                </div>
-                <p className="text-xs font-black uppercase tracking-widest text-slate-500">Avg Claim</p>
-              </div>
-              <p className="text-3xl font-black text-[var(--text-primary)]">₹{dashboardData?.avg_claim_amount?.toLocaleString() || "0"}</p>
-              <p className="text-[10px] font-bold text-slate-500 uppercase mt-2">Annualized average</p>
-            </Card>
-
+          {/* Additional Metrics Row */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
             <Card className="border-[var(--border-subtle)] bg-[var(--card-dark)] p-8 group hover:bg-[var(--card-hover)] transition-all">
               <div className="flex items-center gap-4 mb-4">
                 <div className="h-10 w-10 rounded-xl bg-emerald-500/20 flex items-center justify-center text-emerald-400">

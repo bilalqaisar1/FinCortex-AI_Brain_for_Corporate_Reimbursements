@@ -20,7 +20,7 @@ const supabaseAdmin = createClient(
 export default function BudgetPage() {
   const router = useRouter();
   const { userProfile } = useAuth();
-  const [companyId, setCompanyId] = useState<number | null>(null);
+  const [companyId, setCompanyId] = useState<string | null>(null);
 
   // Resolve company_id from admin profile
   useEffect(() => {
@@ -100,7 +100,7 @@ export default function BudgetPage() {
         </TabsContent>
 
         <TabsContent value="categories" className="mt-0 outline-none animate-in fade-in duration-500">
-          <CategoriesManager companyId={companyId} />
+          <CategoriesManager companyId={companyId} adminId={userProfile?.admin_id || userProfile?.user_id} />
         </TabsContent>
       </Tabs>
     </div>

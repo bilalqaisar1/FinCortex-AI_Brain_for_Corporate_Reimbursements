@@ -403,15 +403,16 @@ async def get_policy_violations(
         
         logger.info("DEBUG: Fetching reimbursements...")
         # Select specific columns to reduce risk of issues with * or hidden cols
+        # NOTE: Filter policy_flags != null in Python to avoid Supabase client JSONB filter issues
         query = supabase.table("reimbursements") \
             .select("reimbursement_id, user_id, receipt_code, amount_claimed, flags, status, created_at, category_id") \
             .eq("company_id", company_id) \
-            .not_.is_("flags", "null") \
             .gte("created_at", start_date) \
             .order("created_at", desc=True)
             
         resp = query.execute()
-        reimbursements = resp.data or []
+        # Filter out reimbursements without policy flags in Python
+        reimbursements = [r for r in (resp.data or []) if r.get("flags")]
         logger.info(f"DEBUG: Fetched {len(reimbursements)} flagged reimbursements")
         
         # 3. Batch Fetch Users (Manual Join)

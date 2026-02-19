@@ -525,8 +525,10 @@ async def get_admin_analytics(admin_id: Optional[str] = None, period: str = "30d
         mgr_id_name_map = {}  # manager_id -> manager_name
         
         try:
-            # Fetch departments for mapping (departments table has no company_id column)
+            # Fetch departments for mapping (scoped to company_id)
             d_query = supabase.table("departments").select("department_id, department_name")
+            if company_id:
+                d_query = d_query.eq("company_id", company_id)
             dept_resp = d_query.execute()
             dept_map = {d["department_id"]: d["department_name"] for d in (dept_resp.data or [])}
             

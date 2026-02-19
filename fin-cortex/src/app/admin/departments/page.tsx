@@ -82,7 +82,11 @@ export default function DepartmentsPage() {
         try {
             setLoading(true);
             setError(null);
-            const resp = await fetch("/api/v1/admin/departments");
+            const adminId = userProfile?.user_id;
+            const url = adminId
+                ? `/api/v1/admin/departments?admin_id=${encodeURIComponent(adminId)}`
+                : "/api/v1/admin/departments";
+            const resp = await fetch(url);
             const data = await resp.json();
             if (data.success) {
                 setDepartments(data.data || []);
@@ -104,7 +108,7 @@ export default function DepartmentsPage() {
             const resp = await fetch("/api/v1/admin/departments", {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ department_name: deptName.trim() }),
+                body: JSON.stringify({ department_name: deptName.trim(), admin_id: userProfile?.user_id }),
             });
             const data = await resp.json();
             if (!data.success) {
@@ -125,7 +129,11 @@ export default function DepartmentsPage() {
         if (!selectedDept) return;
         try {
             setIsSaving(true);
-            const resp = await fetch(`/api/v1/admin/departments/${selectedDept.department_id}`, {
+            const adminId = userProfile?.user_id;
+            const deleteUrl = adminId
+                ? `/api/v1/admin/departments/${selectedDept.department_id}?admin_id=${encodeURIComponent(adminId)}`
+                : `/api/v1/admin/departments/${selectedDept.department_id}`;
+            const resp = await fetch(deleteUrl, {
                 method: "DELETE",
             });
             const data = await resp.json();

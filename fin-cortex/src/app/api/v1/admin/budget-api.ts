@@ -130,8 +130,12 @@ export interface Category {
     description: string;
 }
 
-export async function fetchCategories(): Promise<Category[]> {
-    const response = await fetch('/api/v1/admin/categories');
+export async function fetchCategories(adminId?: string): Promise<Category[]> {
+    let url = '/api/v1/admin/categories';
+    if (adminId) {
+        url += `?admin_id=${encodeURIComponent(adminId)}`;
+    }
+    const response = await fetch(url);
     if (!response.ok) {
         throw new Error('Failed to fetch categories');
     }
@@ -144,8 +148,12 @@ export interface Department {
     department_name: string;
 }
 
-export async function fetchDepartments(): Promise<Department[]> {
-    const response = await fetch('/api/v1/admin/departments'); // We need to proxy this in Next.js too!
+export async function fetchDepartments(adminId?: string): Promise<Department[]> {
+    let url = '/api/v1/admin/departments';
+    if (adminId) {
+        url += `?admin_id=${encodeURIComponent(adminId)}`;
+    }
+    const response = await fetch(url);
     if (!response.ok) {
         throw new Error('Failed to fetch departments');
     }

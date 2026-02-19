@@ -131,7 +131,11 @@ export default function PolicyRulesPage() {
 
             // Load departments
             try {
-                const deptResp = await fetch('/api/v1/admin/departments');
+                const adminId = userProfile?.user_id;
+                const deptUrl = adminId
+                    ? `/api/v1/admin/departments?admin_id=${encodeURIComponent(adminId)}`
+                    : '/api/v1/admin/departments';
+                const deptResp = await fetch(deptUrl);
                 const deptJson = await deptResp.json();
                 if (deptJson.success) setDepartments(deptJson.data || []);
             } catch (e) {
