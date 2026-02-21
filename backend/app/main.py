@@ -1,6 +1,10 @@
 """
 FastAPI application entry point.
 """
+import sys
+import os
+sys.path.append(os.path.join(os.getcwd(), "venv", "Lib", "site-packages"))
+
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 

@@ -337,7 +337,7 @@ export default function LoginPage() {
               )}
 
               <Button type="submit" disabled={isLoading} variant="brand" className="w-full h-16 text-[11px] font-black uppercase tracking-[0.3em] shadow-2xl shadow-purple-500/10">
-                {isLoading ? <Loader2 className="w-5 h-5 animate-spin" /> : "INITIALIZE SESSION"}
+                {isLoading ? <Loader2 className="w-5 h-5 animate-spin" /> : "Login"}
               </Button>
             </form>
 
