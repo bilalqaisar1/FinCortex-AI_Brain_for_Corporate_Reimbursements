@@ -54,14 +54,17 @@ async def extract_receipt_data_fallback(image_bytes: bytes, claim_config: Option
        {{
            "vendor_name": "Name of the merchant or company",
            "date": "Date of transaction strictly in YYYY-MM-DD format",
-           "total_amount": "Final sum of the receipt (numeric string, e.g. '150.00')",
+           "total_amount": "Final sum of the receipt (numeric string, e.g. '3009.50')",
            "currency_iso": "The 3-letter ISO code for the currency (e.g. USD, EUR, PKR). Infer from symbols.",
            "invoice_number": "Invoice or receipt identifier, if present",
            "address": "Full physical address, if present",
+           "category": "Main category of the overall receipt (choose ONLY from ADMIN CONFIG).",
+           "subcategory": "More specific subcategory if identifiable (choose ONLY from ADMIN CONFIG).",
+           "tax_amount": "Full tax amount applied if visible (numeric string)",
            "items": [
                {{
-                   "item": "Name of purchased product or service",
-                   "price": "Cost of line item as numeric string (e.g. '5.99')",
+                   "item": "Name of purchased product or service (DO NOT list taxes as separate items)",
+                   "price": "Cost of line item as numeric string (e.g. '3009.50'). If GST or Tax was applied, the item price MUST BE GST-INCLUSIVE.",
                    "quantity": "Quantity purchased as numeric string (e.g. '1')",
                    "is_reimbursable": true or false. Return true ONLY if it cleanly matches an allowed category and is NOT restricted.,
                    "category": "The exact name of the matched category from the allowed config. If unclassifiable or restricted, return 'UNCLASSIFIED'",
@@ -73,6 +76,7 @@ async def extract_receipt_data_fallback(image_bytes: bytes, claim_config: Option
     3. BEHAVIOR:
        - Do not invent data. If a field is wholly missing, omit it from the JSON.
        - Ensure floating point amounts exclude currency symbols.
+       - CRITICAL MATH RULE: DO NOT list GST or Tax as separate line items. Instead, natively distribute and add the tax into the respective product `price` so each item's price is strictly GST-inclusive. The sum of item `price` * `quantity` MUST cleanly equal the `total_amount`.
        - If an item matches a string logically in `restricted_items`, set `is_reimbursable` to false.
     """
 

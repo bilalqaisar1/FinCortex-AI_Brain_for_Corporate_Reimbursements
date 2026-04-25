@@ -71,10 +71,10 @@ class OpenAIService:
             3. time: Transaction time in HH:MM format (or null if missing)
             4. category: Main category of the purchase (choose ONLY from ALLOWED CATEGORIES if provided, else infer)
             5. sub_category: More specific category if identifiable
-            6. items: List of purchased items. For EACH item return:
-                - item_name: Full description
+            6. items: List of purchased items (Taxes must NOT be separate items). For EACH item return:
+                - item_name: Full description of product/service
                 - quantity: Default 1 if not shown
-                - price: Total price for this item
+                - price: Total price for this item. MUST BE GST-INCLUSIVE! Add prorated or actual tax to the product base amount so the total items sum strictly equals total_bill.
                 - category: Assign from ALLOWED CATEGORIES if possible, else item's natural category
                 - subcategory: Assign from ALLOWED subcategories if possible, else null
                 - is_reimbursable: Boolean — see STRICT REIMBURSABILITY RULES below
