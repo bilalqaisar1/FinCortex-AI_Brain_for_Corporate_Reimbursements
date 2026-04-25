@@ -233,52 +233,7 @@ async def upload_receipt(
             claim_config=claim_config,
         )
 
-        # --- Enforce admin category allow-list on items (deterministic) ---
-        # This runs if categories_data was fetched (even if empty).
-        # categories_data is a list: [] means admin has zero categories → all non-reimbursable.
-        if categories_data is not None:
-            try:
-                allowed_cats = set()
-                allowed_subcats = set()
-                for cat in categories_data:
-                    cat_name = (cat.get("category_name") or "").strip().lower()
-                    if cat_name:
-                        allowed_cats.add(cat_name)
-                    for sub in cat.get("subcategories", []):
-                        sub_name = (sub.get("subcategory_name") or "").strip().lower()
-                        if sub_name:
-                            allowed_subcats.add(sub_name)
-
-                structured = result.get("structured", {})
-                items = structured.get("items", [])
-                allowed_display = ", ".join(c.title() for c in sorted(allowed_cats)) if allowed_cats else "(none)"
-
-                for item in items:
-                    item_cat = (item.get("category") or "").strip().lower()
-                    item_subcat = (item.get("subcategory") or "").strip().lower()
-                    matches_cat = item_cat in allowed_cats
-                    matches_subcat = item_subcat in allowed_subcats if item_subcat else False
-
-                    if not (matches_cat or matches_subcat):
-                        item["is_reimbursable"] = False
-                        original_cat = item.get("category") or "Unknown"
-                        if not allowed_cats:
-                            item["rejection_reason"] = (
-                                "No reimbursement categories configured for this company. "
-                                "All items are non-reimbursable."
-                            )
-                        else:
-                            item["rejection_reason"] = (
-                                f"Category '{original_cat}' is not in the company's "
-                                f"allowed reimbursement categories: {allowed_display}"
-                            )
-
-                logger.info(
-                    "✅ Category enforcement applied: allowed=%s, items_checked=%d",
-                    allowed_display, len(items),
-                )
-            except Exception as enforce_exc:
-                logger.warning("⚠️ Category enforcement failed: %s", enforce_exc)
+        # Legacy category enforcement logic removed. Handled cleanly by Ollama AI via claim_config.
 
         # --- NEW: Policy Engine Checks ---
         policy_flags = []
