@@ -12,9 +12,9 @@ from app.config.ollama import get_ollama_openai_client, get_vision_model_name
 
 logger = logging.getLogger(__name__)
 
-async def extract_receipt_data_fallback(image_bytes: bytes, mime_type: str = "image/jpeg") -> Optional[Dict[str, Any]]:
+async def extract_receipt_data_fallback(image_bytes: bytes, claim_config: Optional[Dict[str, Any]] = None, mime_type: str = "image/jpeg") -> Optional[Dict[str, Any]]:
     """
-    Takes raw image bytes, encodes them to base64, and prompts the Ollama vision model
+    Takes raw image bytes and the company's master claim_config, and prompts the Ollama vision model
     to extract standard receipt fields in a pure JSON format.
     
     Operates in O(1) architectural flow stringing network I/O as non-blocking async,
@@ -37,34 +37,43 @@ async def extract_receipt_data_fallback(image_bytes: bytes, mime_type: str = "im
         client = get_ollama_openai_client()
         model = get_vision_model_name()
 
+        config_str = json.dumps(claim_config, indent=2) if claim_config else "[]"
         # Step 2: Prompt engineering for deterministic 1-pass extraction
-        prompt_instructions = """You are an ELITE SOTA FINANCIAL DATA EXTRACTION AI.
+        prompt_instructions = f"""You are an ELITE SOTA FINANCIAL DATA EXTRACTION AI.
     Your sole purpose is to analyze the provided receipt or invoice image and extract structured data logically and accurately.
+    
+    ## CORPORATE POLICIES (STRICT EVALUATION):
+    You must enforce strict accounting rules based on this exact Company Database Configuration:
+    {config_str}
     
     STRICT RULES (Adhere or Fail):
     1. OUTPUT FORMAT:
        You must return a raw, syntactically perfect JSON object. ABSOLUTELY NO MARKDOWN FORMATTING, NO '```json' BLOCKS, AND NO EXPLANATIONS.
     
     2. JSON SCHEMA:
-       {
+       {{
            "vendor_name": "Name of the merchant or company",
            "date": "Date of transaction strictly in YYYY-MM-DD format",
            "total_amount": "Final sum of the receipt (numeric string, e.g. '150.00')",
+           "currency_iso": "The 3-letter ISO code for the currency (e.g. USD, EUR, PKR). Infer from symbols.",
            "invoice_number": "Invoice or receipt identifier, if present",
            "address": "Full physical address, if present",
            "items": [
-               {
+               {{
                    "item": "Name of purchased product or service",
                    "price": "Cost of line item as numeric string (e.g. '5.99')",
-                   "quantity": "Quantity purchased as numeric string (e.g. '1')"
-               }
+                   "quantity": "Quantity purchased as numeric string (e.g. '1')",
+                   "is_reimbursable": true or false. Return true ONLY if it cleanly matches an allowed category and is NOT restricted.,
+                   "category": "The exact name of the matched category from the allowed config. If unclassifiable or restricted, return 'UNCLASSIFIED'",
+                   "rejection_reason": "If is_reimbursable is false, explain why (e.g., 'Item matches restricted company rules'). Otherwise null."
+               }}
            ]
-       }
+       }}
        
     3. BEHAVIOR:
-       - Do not invent data. If a field is wholly missing from the image, omit it from the JSON.
-       - Ensure floating point amounts exclude currency symbols (e.g. return "50.00" not "$50.00").
-       - Maintain maximum OCR fidelity for item names.
+       - Do not invent data. If a field is wholly missing, omit it from the JSON.
+       - Ensure floating point amounts exclude currency symbols.
+       - If an item matches a string logically in `restricted_items`, set `is_reimbursable` to false.
     """
 
         logger.info(f"Initiating Ollama vision fallback using model {model}")
@@ -116,3 +125,39 @@ async def extract_receipt_data_fallback(image_bytes: bytes, mime_type: str = "im
         # SOTA Rule 7 Enforcement ("The Black Box Rule"): 
         # NEVER bubble connection errors to the frontend. Suppress exception and return None.
         return None
+
+async def evaluate_item_manual(item_name: str, claim_config: Dict[str, Any]) -> str:
+    """
+    SOTA Semantic Validator: Replaces primitive string-matching. 
+    Evaluates manual items against the multi-tenant Database Configuration logically.
+    """
+    try:
+        client = get_ollama_openai_client()
+        model = get_vision_model_name()  # Re-use loaded model to prevent VRAM hot-swap delays
+        
+        config_str = json.dumps(claim_config, indent=2)
+        
+        prompt = f"""You are an elite corporate financial routing AI.
+Your purpose is to logically categorize the manually entered line-item: '{item_name}'.
+
+Here is the exact Corporate Database Config for this user's company:
+{config_str}
+
+RULES (Strict sequential logic):
+1. Does this item logically match anything in the `restricted_items` array? If YES, reply ONLY with the exact word: "RESTRICTED"
+2. If safe, does it logically map to any category inside the `categories` array? If YES, reply ONLY with the exact `name` of that category.
+3. If it absolutely does not fit any allowed category, reply ONLY with the exact word: "UNCLASSIFIED"
+
+Return NO code blocks, NO markdown, NO explanations. Just the single string result.
+"""
+        response = await client.chat.completions.create(
+            model=model,
+            messages=[{"role": "user", "content": prompt}],
+            temperature=0.0
+        )
+        
+        return response.choices[0].message.content.strip()
+        
+    except Exception as e:
+        logger.warning(f"Semantic Validation bypassed (Fallback to rejection). Reason: {str(e)}")
+        return "UNCLASSIFIED"

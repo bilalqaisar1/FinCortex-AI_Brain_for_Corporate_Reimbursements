@@ -13,7 +13,7 @@ class ReceiptUpload(BaseModel):
     user_id: str
     file_name: str
     file_content: str  # base64 encoded
-    categories: Optional[List[Dict[str, Any]]] = None
+    claim_config: Optional[Dict[str, Any]] = None
 
 class ExtractedReceiptData(BaseModel):
     merchant_name: Optional[str] = None

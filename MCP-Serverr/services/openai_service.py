@@ -9,13 +9,16 @@ class OpenAIService:
         self.client = openai.OpenAI(api_key=settings.OPENAI_API_KEY)
         self.model = settings.OPENAI_MODEL
     
-    def extract_receipt_fields(self, extracted_text: str, categories: List[Dict[str, Any]] = None) -> Dict[str, Any]:
+    def extract_receipt_fields(self, extracted_text: str, claim_config: Dict[str, Any] = None) -> Dict[str, Any]:
         """
         Use OpenAI to extract structured data from receipt text.
-        When admin-defined categories are provided, uses strict allow-list logic
-        for reimbursability decisions.
+        Applies claim_config strict limits (categories and restricted items).
         """
         try:
+            claim_config = claim_config or {}
+            categories = claim_config.get('categories', [])
+            restricted_items = claim_config.get('restricted_items', [])
+            
             has_admin_categories = bool(categories)
             categories_str = "No specific categories provided. Infer standard business categories."
             if categories:
@@ -32,48 +35,31 @@ class OpenAIService:
                         cat_info += f" [Subcategories: {', '.join(sub_entries)}]"
                     cat_list.append(cat_info)
                 categories_str = "\n".join(cat_list)
+                
+            restricted_items_str = ", ".join([f"'{r}'" for r in restricted_items]) if restricted_items else ""
 
-            # Build the reimbursability rules based on whether admin categories exist
+            # Build the reimbursability rules
             if has_admin_categories and categories_str != "No specific categories provided. Infer standard business categories.":
                 reimbursability_rules = f"""
-            STRICT REIMBURSABILITY RULES (COMPANY POLICY — THESE ARE ABSOLUTE AND MUST NOT BE IGNORED):
+            STRICT REIMBURSABILITY RULES (COMPANY POLICY — THESE ARE ABSOLUTE):
             - The ALLOWED CATEGORIES list below is the COMPLETE, EXHAUSTIVE list of reimbursable categories.
-            - An item is reimbursable (is_reimbursable: true) ONLY IF its natural category or subcategory
-              EXACTLY matches one of the ALLOWED CATEGORIES listed below.
-            - IF AN ITEM DOES NOT FIT ANY ALLOWED CATEGORY, IT MUST BE MARKED is_reimbursable: false.
-              NO EXCEPTIONS. This is the most important rule.
-            - DO NOT invent categories. DO NOT use "Uncategorized", "General", or "Other".
-            - DO NOT assume any category is allowed unless it appears in the ALLOWED CATEGORIES list.
-
-            EXAMPLES OF CORRECT BEHAVIOR:
-            - If ALLOWED CATEGORIES are "Medical" and "Travel":
-              * "Bananas" (Grocery) → is_reimbursable: false, rejection_reason: "Category 'Grocery' is not in allowed categories: Medical, Travel"
-              * "Bluetooth Care" (Electronics) → is_reimbursable: false, rejection_reason: "Category 'Electronics' is not in allowed categories: Medical, Travel"
-              * "Dining Table" (Furniture) → is_reimbursable: false, rejection_reason: "Category 'Furniture' is not in allowed categories: Medical, Travel"
-              * "Prescription Medicine" (Medical) → is_reimbursable: true, rejection_reason: null
-              * "Flight Ticket" (Travel) → is_reimbursable: true, rejection_reason: null
-              * "Wine Bottle" (Alcohol) → is_reimbursable: false, rejection_reason: "Category 'Alcohol' is not in allowed categories: Medical, Travel"
-            - For reimbursable items, set rejection_reason to null.
-
-            CURRENT ALLOWED CATEGORIES:
+            - If RESTRICTED ITEMS are defined, any item matching them MUST be marked is_reimbursable: false.
+            - If an item does not fit any allowed category, it MUST be marked is_reimbursable: false. No exceptions.
+            
+            RESTRICTED ITEMS: {restricted_items_str}
+            ALLOWED CATEGORIES:
             {categories_str}
             """
             elif categories is not None and len(categories) == 0:
-                # Admin exists but has defined ZERO categories → nothing is reimbursable
                 reimbursability_rules = """
             STRICT REIMBURSABILITY RULES (COMPANY POLICY — NO CATEGORIES CONFIGURED):
-            - The company administrator has NOT configured any reimbursement categories.
-            - Therefore, ALL items must be marked is_reimbursable: false.
-            - Set rejection_reason to: "No reimbursement categories configured for this company. All items are non-reimbursable."
-            - NO EXCEPTIONS. Every single item must be non-reimbursable.
+            - ALL items must be marked is_reimbursable: false.
             """
             else:
                 reimbursability_rules = """
-            REIMBURSABILITY RULES (DEFAULT — NO COMPANY CATEGORIES DEFINED):
-            - Mark is_reimbursable: false for alcohol, tobacco, personal entertainment,
-              or obvious non-business items.
+            REIMBURSABILITY RULES (DEFAULT):
+            - Mark is_reimbursable: false for alcohol, tobacco, personal entertainment.
             - All other items default to is_reimbursable: true.
-            - Set rejection_reason to a short explanation for non-reimbursable items, null otherwise.
             """
 
             prompt = f"""
@@ -84,27 +70,20 @@ class OpenAIService:
             2. date: Transaction date in YYYY-MM-DD format
             3. time: Transaction time in HH:MM format (or null if missing)
             4. category: Main category of the purchase (choose ONLY from ALLOWED CATEGORIES if provided, else infer)
-            5. sub_category: More specific category if identifiable (choose ONLY from ALLOWED CATEGORIES if provided)
+            5. sub_category: More specific category if identifiable
             6. items: List of purchased items. For EACH item return:
                 - item_name: Full description
                 - quantity: Default 1 if not shown
                 - price: Total price for this item
                 - category: Assign from ALLOWED CATEGORIES if possible, else item's natural category
-                - subcategory: Assign from ALLOWED CATEGORIES subcategories if possible, else null
+                - subcategory: Assign from ALLOWED subcategories if possible, else null
                 - is_reimbursable: Boolean — see STRICT REIMBURSABILITY RULES below
                 - rejection_reason: String explanation if not reimbursable, null if reimbursable
             7. total_bill: Final total amount of the receipt
             8. tax: Full tax amount applied
+            9. currency_iso: The 3-letter ISO code for the currency (e.g. USD, EUR, PKR)
+            
             {reimbursability_rules}
-
-            EXTRACTION RULES:
-            - Capture ALL items exactly as they appear.
-            - If quantity is written like "2x" or "x2", parse correctly.
-            - If total item price is given but quantity is >1, calculate unit price internally if needed.
-            - If date format is ambiguous, assume MM/DD/YYYY (US style).
-            - Infer missing data logically but mark uncertainty.
-            - Currency should be inferred where possible.
-            - Output must follow the exact JSON structure.
 
             Receipt Text:
             {extracted_text}
@@ -114,16 +93,17 @@ class OpenAIService:
                 "vendor_name": "string",
                 "date": "YYYY-MM-DD",
                 "time": "HH:MM or null",
-                "category": "string (Must be one of the allowed categories or 'Uncategorized')",
-                "sub_category": "string (Must be one of the allowed subcategories or null)",
-                "category_id": number (ID of the matched category or null),
-                "subcategory_id": number (ID of the matched subcategory or null),
+                "category": "string",
+                "sub_category": "string or null",
+                "category_id": number or null,
+                "subcategory_id": number or null,
+                "currency_iso": "string",
                 "items": [
                     {{
                         "item_name": "string",
                         "quantity": number,
                         "price": number,
-                        "category": "string (Item-level category)",
+                        "category": "string",
                         "subcategory": "string or null",
                         "is_reimbursable": boolean,
                         "rejection_reason": "string or null"

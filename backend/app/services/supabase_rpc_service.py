@@ -589,4 +589,48 @@ def get_managers_by_admin(admin_id: str) -> List[Dict[str, Any]]:
         logger.error("❌ Supabase: Unexpected error - %s", error_msg)
         raise SupabaseRPCError(error_msg) from e
 
+def check_reimbursement_limit(user_id: str, category_id: int, subcategory_id: Optional[int] = None) -> Dict[str, Any]:
+    """
+    Calls the get_allowed_reimbursement_amount RPC to determine if
+    a user's submission breaks their current monthly allowance.
+    """
+    try:
+        supabase = get_supabase_client()
+        payload = {
+            "p_user_id": user_id,
+            "p_category_id": category_id,
+        }
+        if subcategory_id is not None:
+            payload["p_subcategory_id"] = subcategory_id
+
+        response = supabase.rpc("get_allowed_reimbursement_amount", payload).execute()
+        result = response.data if hasattr(response, "data") else response
+        
+        if result and isinstance(result, list):
+            result = result[0]
+            
+        return result or {}
+    except Exception as e:
+        logger.warning(f"Could not check reimbursement limit via RPC: {e}")
+        return {}
+
+
+def get_user_claim_config_rpc(user_id: str) -> Dict[str, Any]:
+    """
+    Calls the highly-optimized get_user_claim_config RPC to pull the unified JSON tree 
+    of categories, subcategories, and restricted items cleanly bounded by the user's company_id.
+    """
+    try:
+        supabase = get_supabase_client()
+        response = supabase.rpc("get_user_claim_config", {"p_user_id": user_id}).execute()
+        result = response.data if hasattr(response, "data") else response
+        
+        if result and isinstance(result, list):
+            return result[0]
+            
+        return result or {}
+    except Exception as e:
+        logger.warning(f"Could not fetch unified user claim config via RPC: {e}")
+        return {}
+
 

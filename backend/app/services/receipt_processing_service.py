@@ -10,7 +10,7 @@ import os
 import asyncio
 from typing import Dict, Any, List, Optional
 from app.config.settings import settings
-from app.services.ollama.fallback_service import extract_receipt_data_fallback
+from app.services.ollama.ollama_vl_model_service import extract_receipt_data_fallback
 
 logger = logging.getLogger(__name__)
 
@@ -36,6 +36,7 @@ def process_receipt(
     image_path: str,
     *,
     admin_uuid: Optional[str] = None,
+    claim_config: Optional[Dict[str, Any]] = None,
     categories_data: Optional[List[Dict[str, Any]]] = None,
 ) -> Dict[str, Any]:
     """
@@ -53,61 +54,58 @@ def process_receipt(
             "user_id": admin_uuid or "unknown_user",
             "file_name": os.path.basename(image_path),
             "file_content": image_content,
-            "categories": categories_data
+            "claim_config": claim_config
         }
         
+        # Architectural Inversion: Try Local Ollama (Zero-Trust) FIRST
         try:
-            logger.info("🤖 Calling MCP Agentic Orchestrator [DISABLED FOR TESTING - FORCING FALLBACK]")
-            # mcp_response = _call_mcp_tool("/ocr/process-receipt-end-to-end", payload)
+            logger.info("🤖 Querying Local Async Ollama Core First...")
+            import concurrent.futures
             
-            # Artificially trigger the circuit breaker for testing
-            raise ReceiptProcessingError("Simulated MCP API Failure to test Local Ollama circuit breaker")
-            
-            if not mcp_response.get("success"):
-                error = mcp_response.get("error", "Unknown MCP error")
-                logger.error(f"❌ MCP Processing failed: {error}")
-                raise ReceiptProcessingError(error)
-            
-            data = mcp_response.get("data", {})
-            return {
-                "raw_text": data.get("extracted_text", ""),
-                "structured": data.get("structured_data", {}),
-                "ocr_source": data.get("ocr_source", "unknown")
-            }
-        except ReceiptProcessingError as rpe:
-            logger.warning(f"Cloud Agent/MCP offline or failed: {str(rpe)}. Tripping Circuit Breaker -> Local Ollama Fallback.")
-            
-            # Fire Async Ollama Fallback safely escaping the active event loop
-            try:
-                logger.warning("using ollama model for receipt processing")
-                import concurrent.futures
-                
-                def run_fallback_safely():
-                    new_loop = asyncio.new_event_loop()
-                    asyncio.set_event_loop(new_loop)
-                    try:
-                        return new_loop.run_until_complete(extract_receipt_data_fallback(image_bytes))
-                    finally:
-                        new_loop.close()
+            def run_local_core():
+                new_loop = asyncio.new_event_loop()
+                asyncio.set_event_loop(new_loop)
+                try:
+                    return new_loop.run_until_complete(extract_receipt_data_fallback(image_bytes, claim_config))
+                finally:
+                    new_loop.close()
 
-                with concurrent.futures.ThreadPoolExecutor(max_workers=1) as pool:
-                    ocr_structured = pool.submit(run_fallback_safely).result()
+            with concurrent.futures.ThreadPoolExecutor(max_workers=1) as pool:
+                ocr_structured = pool.submit(run_local_core).result()
+            
+            if not ocr_structured:
+                raise ReceiptProcessingError("Local Ollama refused or failed parsing.")
                 
-                if not ocr_structured:
-                    logger.info("receipt processing fail by ollama model")
-                    raise ReceiptProcessingError("Ollama fallback returned None or failed to parse.")
-                    
-                logger.warning("receipt processing  by ollama model")
-                logger.warning("✅ Ollama Fallback succeeded gracefully.")
+            logger.info("✅ Primary Local Ollama extraction succeeded.")
+            return {
+                "raw_text": "Extracted via Primary Local Ollama directly from image.",
+                "structured": ocr_structured,
+                "ocr_source": "ollama_local"
+            }
+            
+        except Exception as local_e:
+            logger.warning(f"Local Ollama Core failed ({str(local_e)}). Tripping Backup Circuit to Cloud MCP Orchestrator...")
+            
+            # Fire sync Cloud MCP Fallback
+            try:
+                mcp_response = _call_mcp_tool("/ocr/process-receipt-end-to-end", payload)
+                
+                if not mcp_response.get("success"):
+                    error = mcp_response.get("error", "Unknown Cloud MCP error")
+                    logger.error(f"❌ Cloud Backup Processing failed: {error}")
+                    raise ReceiptProcessingError(error)
+                
+                data = mcp_response.get("data", {})
+                logger.info("✅ Cloud Backup extraction succeeded gracefully.")
                 return {
-                    "raw_text": "Extracted via Local Ollama Fallback directly from image.",
-                    "structured": ocr_structured,
-                    "ocr_source": "ollama_fallback"
+                    "raw_text": data.get("extracted_text", ""),
+                    "structured": data.get("structured_data", {}),
+                    "ocr_source": data.get("ocr_source", "cloud_mcp")
                 }
-            except Exception as inner_e:
-                logger.info(f"receipt processing fail ({str(inner_e)}) by ollama model")
-                logger.error(f"❌ Ollama Fallback also failed: {str(inner_e)}")
-                raise ReceiptProcessingError(f"Complete systemic failure (Cloud MCP + Local Ollama): {str(inner_e)}")
+            except Exception as mcp_e:
+                error_chain = f"Complete systemic failure.\nLocal: {str(local_e)}\nCloud Backup: {str(mcp_e)}"
+                logger.error(f"❌ {error_chain}")
+                raise ReceiptProcessingError(error_chain)
                 
     except Exception as e:
         if isinstance(e, ReceiptProcessingError):
