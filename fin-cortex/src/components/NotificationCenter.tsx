@@ -60,8 +60,12 @@ export function NotificationCenter() {
 
         // Subscribe to real-time updates
         if (user?.id) {
+            // SOTA Fix for React StrictMode: Ensure the channel name is 100% unique per-mount
+            // to prevent pulling an already-subscribed channel from the Supabase client cache.
+            const channelName = `notifications-${user.id}-${Date.now()}`;
+            
             const channel = supabase
-                .channel("notifications")
+                .channel(channelName)
                 .on(
                     "postgres_changes",
                     {
