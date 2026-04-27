@@ -37,9 +37,9 @@ async def receipt_text_extraction_openai(receipt: ReceiptUpload):
         raise HTTPException(status_code=500, detail=str(e))
 
 @router.post("/receipt-structuring-tool", response_model=ToolResponse)
-async def receipt_structuring_tool(extracted_text: str, categories: list = None, admin_id: str = None):
+async def receipt_structuring_tool(extracted_text: str, claim_config: dict = None, admin_id: str = None):
     try:
-        result = openai_service.extract_receipt_fields(extracted_text, categories=categories)
+        result = openai_service.extract_receipt_fields(extracted_text, claim_config=claim_config)
         if result["success"]:
             return ToolResponse(success=True, data=result["extracted_data"])
         else:
@@ -110,7 +110,7 @@ async def process_receipt_end_to_end(receipt: ReceiptUpload):
     
     # 4. Structuring: Convert text to JSON
     logger.info(f"🤖 Agent Decision: Structuring text using OpenAI (Source: {source})")
-    struct_result = await receipt_structuring_tool(extracted_text, categories=receipt.categories)
+    struct_result = await receipt_structuring_tool(extracted_text, claim_config=receipt.claim_config)
     
     if not struct_result.success:
         logger.error(f"❌ Structuring failed.")
@@ -131,12 +131,13 @@ async def process_receipt_end_to_end(receipt: ReceiptUpload):
         await logging_and_audit_tool(user_id, "validation_warning", {"missing_fields": missing})
 
     # 6. Category Enforcement: Server-side validation (never trust GPT alone)
-    categories = getattr(receipt, 'categories', None)
-    if categories is not None:
+    claim_config = getattr(receipt, 'claim_config', None) or {}
+    categories = claim_config.get('categories', [])
+    if categories:
         try:
             allowed_cats = set()
             allowed_subcats = set()
-            for cat in (categories or []):
+            for cat in categories:
                 cat_name = (cat.get("category_name") or "").strip().lower()
                 if cat_name:
                     allowed_cats.add(cat_name)

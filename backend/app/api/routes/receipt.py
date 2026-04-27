@@ -218,88 +218,22 @@ async def upload_receipt(
 
         logger.info("✅ POST /receipt/upload - Image successfully saved: %s", temp_filename)
 
-        categories_data = None
-        if admin_uuid:
+        claim_config = {}
+        if user_id:
             try:
-                # Use direct-query approach (mirrors the admin dashboard).
-                # This also falls back to ALL categories when admin_uuid-scoped
-                # query finds nothing (because category creation may not populate
-                # the admin_uuid column in expense_categories).
-                categories_data = get_categories_direct(admin_uuid)
-                logger.info(
-                    "📂 Fetched %d categories for admin %s via direct query",
-                    len(categories_data) if categories_data else 0,
-                    admin_uuid,
-                )
-            except SupabaseRPCError as rpc_exc:
-                logger.warning(
-                    "⚠️ Direct category fetch failed for admin %s, trying RPC: %s",
-                    admin_uuid,
-                    rpc_exc,
-                )
-                try:
-                    categories_data = get_expense_categories_with_subcategories(admin_uuid)
-                except Exception:
-                    logger.warning("⚠️ RPC fallback also failed for admin %s", admin_uuid)
+                from app.services.supabase_rpc_service import get_user_claim_config_rpc
+                claim_config = get_user_claim_config_rpc(user_id)
+                logger.info(f"📂 Fetched Unified Claim Config for user {user_id}")
             except Exception as exc:
-                logger.warning(
-                    "⚠️ Unexpected error fetching categories for admin %s: %s",
-                    admin_uuid,
-                    exc,
-                )
+                logger.warning(f"⚠️ Error fetching unified claim config: {exc}")
 
         result = process_receipt(
             saved_path,
             admin_uuid=admin_uuid,
-            categories_data=categories_data,
+            claim_config=claim_config,
         )
 
-        # --- Enforce admin category allow-list on items (deterministic) ---
-        # This runs if categories_data was fetched (even if empty).
-        # categories_data is a list: [] means admin has zero categories → all non-reimbursable.
-        if categories_data is not None:
-            try:
-                allowed_cats = set()
-                allowed_subcats = set()
-                for cat in categories_data:
-                    cat_name = (cat.get("category_name") or "").strip().lower()
-                    if cat_name:
-                        allowed_cats.add(cat_name)
-                    for sub in cat.get("subcategories", []):
-                        sub_name = (sub.get("subcategory_name") or "").strip().lower()
-                        if sub_name:
-                            allowed_subcats.add(sub_name)
-
-                structured = result.get("structured", {})
-                items = structured.get("items", [])
-                allowed_display = ", ".join(c.title() for c in sorted(allowed_cats)) if allowed_cats else "(none)"
-
-                for item in items:
-                    item_cat = (item.get("category") or "").strip().lower()
-                    item_subcat = (item.get("subcategory") or "").strip().lower()
-                    matches_cat = item_cat in allowed_cats
-                    matches_subcat = item_subcat in allowed_subcats if item_subcat else False
-
-                    if not (matches_cat or matches_subcat):
-                        item["is_reimbursable"] = False
-                        original_cat = item.get("category") or "Unknown"
-                        if not allowed_cats:
-                            item["rejection_reason"] = (
-                                "No reimbursement categories configured for this company. "
-                                "All items are non-reimbursable."
-                            )
-                        else:
-                            item["rejection_reason"] = (
-                                f"Category '{original_cat}' is not in the company's "
-                                f"allowed reimbursement categories: {allowed_display}"
-                            )
-
-                logger.info(
-                    "✅ Category enforcement applied: allowed=%s, items_checked=%d",
-                    allowed_display, len(items),
-                )
-            except Exception as enforce_exc:
-                logger.warning("⚠️ Category enforcement failed: %s", enforce_exc)
+        # Legacy category enforcement logic removed. Handled cleanly by Ollama AI via claim_config.
 
         # --- NEW: Policy Engine Checks ---
         policy_flags = []
@@ -558,48 +492,43 @@ async def create_reimbursement_endpoint(
         ocr_structured=ocr_structured_dict,
     )
 
-    # --- Enforce admin category allow-list on submitted items ---
+    # --- Enforce strict rule-list on submitted items ---
     # This catches manually added items that bypassed OCR classification.
-    submission_admin_uuid = str(admin_uuid) if admin_uuid else None
-    if not submission_admin_uuid:
-        submission_admin_uuid = _resolve_admin_uuid_from_user(user_id)
-
     manual_item_flags = []
-    if submission_admin_uuid:
+    if parsed_items:
         try:
-            cats_data = get_categories_direct(submission_admin_uuid)
-            if cats_data is not None:
-                allowed_cats = set()
-                for cat in cats_data:
-                    cat_name = (cat.get("category_name") or "").strip().lower()
-                    if cat_name:
-                        allowed_cats.add(cat_name)
+            # SOTA Semantic Enforcement: Evaluate manual item vs Database Policy Config
+            from app.services.ollama.ollama_vl_model_service import evaluate_item_manual
+            from fastapi import HTTPException
+            from app.services.supabase_rpc_service import get_user_claim_config_rpc
+            
+            # Load Unified Database Rules strictly
+            claim_config = get_user_claim_config_rpc(str(user_id)) if user_id else {}
+            
+            for item in parsed_items:
+                item_name_lower = (item.item or "").strip().lower()
+                if not item_name_lower:
+                    continue
+                    
+                matched_result = await evaluate_item_manual(item_name_lower, claim_config)
+                
+                if matched_result == "RESTRICTED":
+                    raise HTTPException(
+                        status_code=400,
+                        detail=f"Cannot submit claim. The item '{item.item}' is explicitly restricted by company policy."
+                    )
+                elif matched_result == "UNCLASSIFIED":
+                    manual_item_flags.append({
+                        "code": "MANUAL_ITEM_UNCLASSIFIED",
+                        "severity": "medium",
+                        "message": f"Manually added item '{item.item}' could not be matched to allowed corporate categories."
+                    })
 
-                allowed_display = ", ".join(c.title() for c in sorted(allowed_cats)) if allowed_cats else "(none)"
-
-                for item in parsed_items:
-                    # Items from OCR already have category set; manual items have empty category.
-                    # For items without a category, we flag them as needing review.
-                    item_name_lower = (item.item or "").strip().lower()
-                    if not item_name_lower:
-                        continue
-
-                    # Check if the item name itself matches any allowed category keyword
-                    item_matches = any(cat in item_name_lower or item_name_lower in cat for cat in allowed_cats)
-
-                    if not item_matches and allowed_cats:
-                        manual_item_flags.append({
-                            "code": "MANUAL_ITEM_UNCLASSIFIED",
-                            "message": f"Manually added item '{item.item}' could not be matched to allowed categories: {allowed_display}",
-                            "severity": "medium"
-                        })
-
-                logger.info(
-                    "✅ Submission category enforcement: allowed=%s, items_checked=%d, flags=%d",
-                    allowed_display, len(parsed_items), len(manual_item_flags),
-                )
+            logger.info("✅ Submission manual items enforcement finished with %d flags", len(manual_item_flags))
+        except HTTPException:
+            raise
         except Exception as cat_err:
-            logger.warning("Could not enforce categories on submitted items: %s", cat_err)
+            logger.warning(f"Could not enforce categories on submitted items: {cat_err}")
 
     temp_dir = os.path.abspath(settings.temp_dir)
     os.makedirs(temp_dir, exist_ok=True)
@@ -670,6 +599,30 @@ async def create_reimbursement_endpoint(
                 "description": parsed_payload.description,
                 "items": [{"item_name": item.item} for item in parsed_payload.items]
             })
+            
+            # --- NEW: Check Dynamic RPC Limit ---
+            from app.services.supabase_rpc_service import check_reimbursement_limit
+            from fastapi import HTTPException
+            
+            if parsed_payload.category_id:
+                limit_data = check_reimbursement_limit(
+                    user_id=str(parsed_payload.user_id),
+                    category_id=parsed_payload.category_id,
+                    subcategory_id=parsed_payload.subcategory_id
+                )
+                
+                allowed_amount = limit_data.get('allowed_amount')
+                if allowed_amount is not None:
+                    try:
+                        claimed_amt = float(parsed_payload.total_amount)
+                        if claimed_amt > float(allowed_amount):
+                            # Strict UX Enforcement: Raise empathetic client-friendly error for frontend Toast
+                            raise HTTPException(
+                                status_code=400,
+                                detail=f"It looks like this claim exceeds your remaining budget of {float(allowed_amount):,.2f} for this category. Could you please review the total or coordinate with your manager?"
+                            )
+                    except (ValueError, TypeError):
+                        pass
             
             if policy_flags:
                 logger.info(f"🚩 Policy flags detected for claim {reimbursement_id}: {policy_flags}")

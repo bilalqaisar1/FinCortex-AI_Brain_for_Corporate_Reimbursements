@@ -26,6 +26,10 @@ class Settings(BaseSettings):
     openai_api_key: Optional[str] = None
     openai_model: str = "gpt-4o-mini"
     
+    # Ollama Configuration
+    ollama_url: str = "http://127.0.0.1:11434"
+    ollama_vision_model: str = "qwen3-vl:235b-instruct-cloud"
+    
     # Azure Document Intelligence Configuration
     azure_endpoint: Optional[str] = None
     azure_key: Optional[str] = None
@@ -55,7 +59,7 @@ class Settings(BaseSettings):
     def vision_api_url_full(self) -> str:
         """Construct the full Vision API URL if not explicitly provided."""
         if self.vision_api_url:
-            return self.vision_api_url
+            return str(self.vision_api_url)
         if self.google_vision_api_key:
             return f"https://vision.googleapis.com/v1/images:annotate?key={self.google_vision_api_key}"
         return ""

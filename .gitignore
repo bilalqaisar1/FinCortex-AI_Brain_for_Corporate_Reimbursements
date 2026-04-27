@@ -110,4 +110,5 @@ Thumbs.db
 
 # Alembic cache
 migrations/versions/__pycache__/
+pyrightconfig.json
 
