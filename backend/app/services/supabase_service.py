@@ -31,7 +31,7 @@ def get_supabase_client() -> Client:
     
     if _supabase_client is None:
         if not settings.supabase_url or not settings.supabase_service_role_key:
-            error_msg = "❌ Supabase configuration missing: URL or service role key not set"
+            error_msg = "Supabase configuration missing: URL or service role key not set"
             logger.error(error_msg)
             print(error_msg, file=sys.stderr)
             raise RuntimeError(error_msg)
@@ -43,10 +43,10 @@ def get_supabase_client() -> Client:
             )
             # Test connection by making a simple query
             _supabase_client.table("users").select("user_id").limit(1).execute()
-            logger.info("✅ Supabase connection established successfully")
-            print("✅ Supabase connection established successfully", file=sys.stdout)
+            logger.info("Supabase connection established successfully")
+            print("Supabase connection established successfully", file=sys.stdout)
         except Exception as exc:
-            error_msg = f"❌ Supabase connection failed: {exc}"
+            error_msg = f"Supabase connection failed: {exc}"
             logger.error(error_msg)
             print(error_msg, file=sys.stderr)
             raise RuntimeError(error_msg) from exc

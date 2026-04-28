@@ -1,0 +1,37 @@
+================================================================================
+  FinCortex — Commands to Start Backend and Frontend
+================================================================================
+
+Use TWO separate terminals (e.g. two PowerShell or CMD windows).
+
+--------------------------------------------------------------------------------
+  TERMINAL 1 — BACKEND (FastAPI)
+--------------------------------------------------------------------------------
+
+cd C:\Users\Hashiir\Desktop\FinCortex-AI_Brain_for_Corporate_Reimbursements\backend
+.\venv\Scripts\Activate.ps1
+python -m uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
+
+Backend will be available at:
+  - API:        http://localhost:8000
+  - Swagger:    http://localhost:8000/docs
+  - ReDoc:      http://localhost:8000/redoc
+
+--------------------------------------------------------------------------------
+  TERMINAL 2 — FRONTEND (Next.js)
+--------------------------------------------------------------------------------
+
+cd C:\Users\Hashiir\Desktop\FinCortex-AI_Brain_for_Corporate_Reimbursements\fin-cortex
+npm run dev
+
+Frontend will be available at:
+  - App:        http://localhost:3000
+
+--------------------------------------------------------------------------------
+  NOTES
+--------------------------------------------------------------------------------
+- Start the BACKEND first (Terminal 1), then the FRONTEND (Terminal 2).
+- Ensure backend/.env and fin-cortex/.env.local exist with your Supabase/API keys.
+- On Windows CMD (instead of PowerShell), use: venv\Scripts\activate.bat
+
+================================================================================

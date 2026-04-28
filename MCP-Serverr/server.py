@@ -1,3 +1,7 @@
+import sys
+import os
+sys.path.append(os.path.join(os.getcwd(), "venv", "Lib", "site-packages"))
+
 from fastapi import FastAPI, Depends, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from contextlib import asynccontextmanager
