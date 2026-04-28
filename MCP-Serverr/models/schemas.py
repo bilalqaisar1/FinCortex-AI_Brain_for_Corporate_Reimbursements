@@ -23,6 +23,7 @@ class ExtractedReceiptData(BaseModel):
     items: List[Dict[str, Any]] = []
     currency: Optional[str] = "USD"
     category: Optional[str] = None
+    ml_model_confidence_score: Optional[float] = None
 
 class ReimbursementRequest(BaseModel):
     user_id: str

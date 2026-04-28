@@ -83,25 +83,28 @@ async def extract_receipt_data_fallback(image_bytes: bytes, claim_config: Option
         logger.info(f"Initiating Ollama vision fallback using model {model}")
 
         # Step 3: Fast async I/O network call to local/remote Ollama cluster
-        response = await client.chat.completions.create(
-            model=model,
-            messages=[
-                {
-                    "role": "user",
-                    "content": [
-                        {"type": "text", "text": prompt_instructions},
-                        {
-                            "type": "image_url",
-                            "image_url": {
-                                "url": data_uri
+        try:
+            response = await client.chat.completions.create(
+                model=model,
+                messages=[
+                    {
+                        "role": "user",
+                        "content": [
+                            {"type": "text", "text": prompt_instructions},
+                            {
+                                "type": "image_url",
+                                "image_url": {
+                                    "url": data_uri
+                                }
                             }
-                        }
-                    ]
-                }
-            ],
-            response_format={"type": "json_object"},
-            temperature=0.0, # Complete deterministic behavior
-        )
+                        ]
+                    }
+                ],
+                response_format={"type": "json_object"},
+                temperature=0.0, # Complete deterministic behavior
+            )
+        finally:
+            await client.close()
 
         raw_content = response.choices[0].message.content
         if not raw_content:
@@ -154,11 +157,14 @@ RULES (Strict sequential logic):
 
 Return NO code blocks, NO markdown, NO explanations. Just the single string result.
 """
-        response = await client.chat.completions.create(
-            model=model,
-            messages=[{"role": "user", "content": prompt}],
-            temperature=0.0
-        )
+        try:
+            response = await client.chat.completions.create(
+                model=model,
+                messages=[{"role": "user", "content": prompt}],
+                temperature=0.0
+            )
+        finally:
+            await client.close()
         
         return response.choices[0].message.content.strip()
         

@@ -148,7 +148,7 @@ export default function UserDashboardPage() {
             </div>
             <div className="text-right">
               <p className="text-xs font-bold uppercase tracking-widest text-slate-500 mb-1">Current Date</p>
-              <p className="text-sm font-bold text-[var(--text-primary)] uppercase">{today}</p>
+              <p suppressHydrationWarning className="text-sm font-bold text-[var(--text-primary)] uppercase">{today}</p>
             </div>
           </div>
 

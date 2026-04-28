@@ -168,7 +168,14 @@ export default function ManagerDashboard() {
   }, [fetchDashboardData]);
 
   // Derived state
-  const pendingApprovals = claims.filter(c => c.status.toLowerCase() === 'pending');
+  const pendingApprovals = claims
+    .filter(c => c.status.toLowerCase() === 'pending')
+    .sort((a, b) => {
+      // Sort ascending (low score / high risk first)
+      const scoreA = a.ml_model_confidence_score !== null && a.ml_model_confidence_score !== undefined ? a.ml_model_confidence_score : 1;
+      const scoreB = b.ml_model_confidence_score !== null && b.ml_model_confidence_score !== undefined ? b.ml_model_confidence_score : 1;
+      return scoreA - scoreB;
+    });
   const acceptedClaims = claims.filter(c => c.status.toLowerCase() === 'approved');
   const rejectedClaims = claims.filter(c => c.status.toLowerCase() === 'rejected');
   const historyClaims = claims.filter(c => c.status.toLowerCase() !== 'pending');
@@ -406,6 +413,16 @@ export default function ManagerDashboard() {
                               )}>
                                 {(claim.priority || 'medium')} PRIORITY
                               </span>
+                              {claim.ml_model_confidence_score !== undefined && claim.ml_model_confidence_score !== null && (
+                                <span className={cn(
+                                  "text-[10px] font-black uppercase tracking-[0.2em] px-3 py-1.5 rounded-xl border-2",
+                                  claim.ml_model_confidence_score < 0.5 ? "bg-red-500/10 text-red-400 border-red-500/20" :
+                                    claim.ml_model_confidence_score < 0.8 ? "bg-amber-500/10 text-amber-400 border-amber-500/20" :
+                                      "bg-emerald-500/10 text-emerald-400 border-emerald-500/20"
+                                )}>
+                                  AI TRUST: {(claim.ml_model_confidence_score * 100).toFixed(1)}%
+                                </span>
+                              )}
                             </div>
 
                             <div className="grid grid-cols-2 lg:grid-cols-4 gap-8">

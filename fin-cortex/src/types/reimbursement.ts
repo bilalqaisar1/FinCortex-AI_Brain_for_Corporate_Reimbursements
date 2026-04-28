@@ -19,6 +19,7 @@ export interface Reimbursement {
         message: string;
         severity: string;
     }> | null;
+    ml_model_confidence_score?: number | null;
 }
 
 export interface ManagerReimbursementsResponse {

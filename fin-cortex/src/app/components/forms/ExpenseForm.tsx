@@ -539,6 +539,7 @@ const ExpenseForm: React.FC<ExpenseFormProps> = ({ isDarkTheme }) => {
         receipt_type: receiptTypeOptions.find(r => r.id === formData.receiptType)?.label || "",
         vendor_type: vendorTypeOptions.find(v => v.id === formData.vendorType)?.label || "",
         policy_flags: policyFlags,
+        ml_model_confidence_score: payload.data?.ml_model_confidence_score,
       };
 
       // Store invoice data in sessionStorage for the invoice page

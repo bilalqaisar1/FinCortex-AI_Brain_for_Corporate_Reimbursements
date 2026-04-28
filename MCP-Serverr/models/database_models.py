@@ -26,6 +26,7 @@ class Reimbursement(Base):
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
     items = Column(JSON)  # Store items as JSON
+    ml_model_confidence_score = Column(Float, nullable=True)
 
 class Conversation(Base):
     __tablename__ = "conversations"

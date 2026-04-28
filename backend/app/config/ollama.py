@@ -34,6 +34,7 @@ def get_ollama_openai_client() -> AsyncOpenAI:
     return AsyncOpenAI(
         base_url=f"{OLLAMA_BASE_URL}/v1",
         api_key="ollama", # Dummy key required by the OpenAI client specification
+        http_client=get_ollama_http_client()
     )
 
 def get_vision_model_name() -> str:

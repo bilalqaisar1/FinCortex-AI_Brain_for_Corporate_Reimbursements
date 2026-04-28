@@ -686,6 +686,29 @@ async def create_reimbursement_endpoint(
         except Exception as fraud_exc:
             logger.error(f"Fraud detection integration failed: {fraud_exc}")
 
+        # --- NEW: ML Probability Prediction Service ---
+        ml_score = None
+        try:
+            from app.services.ml_prob_prediction_service import RealTimeScoringPipeline
+            supabase = get_supabase_client()
+            ml_pipeline = RealTimeScoringPipeline(supabase_client=supabase)
+            idempotency_key = str(uuid.uuid4())
+            
+            ml_result = await ml_pipeline.evaluate_fraud_risk(
+                receipt_code=reimbursement["receipt_code"],
+                idempotency_key=idempotency_key
+            )
+            
+            ml_score = ml_result.get("probability", -1.0)
+            
+            # Save it to the DB
+            supabase.table("reimbursements").update({
+                "ml_model_confidence_score": ml_score
+            }).eq("reimbursement_id", reimbursement_id).execute()
+            
+        except Exception as ml_exc:
+            logger.error(f"ML probability prediction failed: {ml_exc}")
+
         # --- NEW: Email Notification (User Story 5.1) ---
         try:
             # Fetch user email for notification
@@ -735,7 +758,8 @@ async def create_reimbursement_endpoint(
                 "receipt_code": reimbursement["receipt_code"],
                 "attachment_url": storage_result.public_url,
                 "auto_upload": attachment_upload,
-                "policy_flags": policy_flags
+                "policy_flags": policy_flags,
+                "ml_model_confidence_score": ml_score
             },
         }
         logger.info("✅ POST /reimbursements - Reimbursement created successfully: reimbursement_id=%s, receipt_code='%s'", 

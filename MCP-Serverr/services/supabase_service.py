@@ -43,7 +43,8 @@ class SupabaseService:
                     "project_code": reimbursement.project_code,
                     "status": reimbursement.status,
                     "created_at": reimbursement.created_at.isoformat() if reimbursement.created_at else None,
-                    "items": reimbursement.items or []
+                    "items": reimbursement.items or [],
+                    "ml_model_confidence_score": getattr(reimbursement, 'ml_model_confidence_score', None)
                 })
             
             return result
