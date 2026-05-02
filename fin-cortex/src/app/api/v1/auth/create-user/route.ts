@@ -72,6 +72,7 @@ export async function POST(request: Request) {
             employee_code,
             phone_number,
             department_id,
+            user_reimbursment_limit,
             role_id,
             manager_id,
             status
@@ -103,6 +104,12 @@ export async function POST(request: Request) {
         const employeeCodeRegex = /^[a-zA-Z0-9-]{3,50}$/
         if (!employee_code || !employeeCodeRegex.test(employee_code)) {
             return NextResponse.json({ detail: 'Employee code must be 3-50 alphanumeric characters' }, { status: 400 })
+        }
+
+        // Reimbursement Limit Validation
+        const parsedLimit = parseFloat(user_reimbursment_limit)
+        if (isNaN(parsedLimit) || parsedLimit < 0) {
+            return NextResponse.json({ detail: 'Reimbursement limit must be a valid positive number' }, { status: 400 })
         }
 
         // Role Validation: Manager can ONLY create 'User' (Employee)
@@ -182,6 +189,7 @@ export async function POST(request: Request) {
                 email: email,
                 password_hash: 'managed_by_auth',
                 phone_number: phone_number || null,
+                user_reimbursment_limit: parsedLimit,
                 role_id: finalRoleId,
                 status: status || 'active'
             })

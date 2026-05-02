@@ -611,7 +611,13 @@ async def create_reimbursement_endpoint(
                     subcategory_id=parsed_payload.subcategory_id
                 )
                 
+                status = limit_data.get('status')
+                rpc_message = limit_data.get('message')
                 allowed_amount = limit_data.get('allowed_amount')
+
+                if status == 'restricted' and rpc_message:
+                    raise HTTPException(status_code=400, detail=rpc_message)
+
                 if allowed_amount is not None:
                     try:
                         claimed_amt = float(parsed_payload.total_amount)
@@ -619,10 +625,19 @@ async def create_reimbursement_endpoint(
                             # Strict UX Enforcement: Raise empathetic client-friendly error for frontend Toast
                             raise HTTPException(
                                 status_code=400,
-                                detail=f"It looks like this claim exceeds your remaining budget of {float(allowed_amount):,.2f} for this category. Could you please review the total or coordinate with your manager?"
+                                detail=f"It looks like this claim exceeds your remaining budget of {float(allowed_amount):,.2f}. Could you please review the total or coordinate with your manager?"
+                            )
+                        elif status == 'restricted':
+                            raise HTTPException(
+                                status_code=400,
+                                detail="Your reimbursement limit is restricted. Please coordinate with your manager."
                             )
                     except (ValueError, TypeError):
-                        pass
+                        if status == 'restricted':
+                            raise HTTPException(
+                                status_code=400,
+                                detail="Your reimbursement limit is restricted. Please coordinate with your manager."
+                            )
             
             if policy_flags:
                 logger.info(f"🚩 Policy flags detected for claim {reimbursement_id}: {policy_flags}")

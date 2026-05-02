@@ -129,7 +129,7 @@ export async function POST(request: Request) {
                 password_hash: 'legacy_auth_handled_by_supabase', // Required field
                 phone_number: phone_number || null,
                 manager_department_id: department_id || null, // Note the different field name from users table
-                role_id: 2, // Manager role ID
+                role_id: 5, // Manager role ID
             })
 
         if (dbError) {

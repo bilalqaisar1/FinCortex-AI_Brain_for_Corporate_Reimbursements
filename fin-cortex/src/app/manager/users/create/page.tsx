@@ -33,6 +33,7 @@ export default function CreateUserPage() {
     employee_code: "",
     phone_number: "",
     department_id: "",
+    user_reimbursment_limit: "0",
     role_id: "", // Will be auto-set
     status: "active",
   });
@@ -125,6 +126,7 @@ export default function CreateUserPage() {
           employee_code: formData.employee_code,
           phone_number: formData.phone_number || null,
           department_id: formData.department_id ? parseInt(formData.department_id) : null,
+          user_reimbursment_limit: parseFloat(formData.user_reimbursment_limit) || 0,
           role_id: parseInt(formData.role_id),
           manager_id: userProfile?.user_id,
           status: formData.status
@@ -148,6 +150,7 @@ export default function CreateUserPage() {
         employee_code: "",
         phone_number: "",
         department_id: "",
+        user_reimbursment_limit: "0",
         role_id: formData.role_id, // Keep Role ID
         status: "active",
       });
@@ -303,6 +306,30 @@ export default function CreateUserPage() {
                         onChange={handleChange}
                         className="pl-12 h-14 glass-effect border-[var(--border-subtle)] text-[var(--text-primary)] placeholder:text-[var(--text-muted)] focus:ring-2 focus:ring-purple-500/20 focus:border-purple-500 transition-all rounded-2xl font-medium"
                         placeholder="Enter phone number"
+                      />
+                    </div>
+                  </div>
+
+                  {/* Reimbursement Limit */}
+                  <div className="space-y-2.5">
+                    <Label htmlFor="user_reimbursment_limit" className="text-[10px] font-black uppercase tracking-widest text-[var(--text-secondary)] ml-1">
+                      Monthly Reimbursement Limit ($) <span className="text-red-500">*</span>
+                    </Label>
+                    <div className="relative group">
+                      <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none z-10">
+                        <span className="text-[var(--text-muted)] group-focus-within:text-purple-400 transition-colors font-bold text-lg">$</span>
+                      </div>
+                      <Input
+                        id="user_reimbursment_limit"
+                        name="user_reimbursment_limit"
+                        type="number"
+                        min="0"
+                        step="0.01"
+                        value={formData.user_reimbursment_limit}
+                        onChange={handleChange}
+                        className="pl-12 h-14 glass-effect border-[var(--border-subtle)] text-[var(--text-primary)] placeholder:text-[var(--text-muted)] focus:ring-2 focus:ring-purple-500/20 focus:border-purple-500 transition-all rounded-2xl font-medium"
+                        placeholder="e.g. 1000.00"
+                        required
                       />
                     </div>
                   </div>
