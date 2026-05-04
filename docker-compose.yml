@@ -44,6 +44,11 @@ services:
   frontend:
     build:
       context: ./fin-cortex
+      args:
+        - NEXT_PUBLIC_SUPABASE_URL=${NEXT_PUBLIC_SUPABASE_URL}
+        - NEXT_PUBLIC_SUPABASE_ANON_KEY=${NEXT_PUBLIC_SUPABASE_ANON_KEY}
+        - NEXT_PUBLIC_API_URL=http://65.109.29.54:8000
+        - NEXT_PUBLIC_BACKEND_URL=http://65.109.29.54:8000
     container_name: fincortex-frontend
     restart: always
     ports:
