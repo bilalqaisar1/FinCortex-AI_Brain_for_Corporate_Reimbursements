@@ -6,7 +6,8 @@ from config.settings import settings
 
 class OpenAIService:
     def __init__(self):
-        self.client = openai.OpenAI(api_key=settings.OPENAI_API_KEY)
+        self.api_key = settings.OPENAI_API_KEY
+        self.client = openai.OpenAI(api_key=self.api_key) if self.api_key else None
         self.model = settings.OPENAI_MODEL
     
     def extract_receipt_fields(self, extracted_text: str, claim_config: Dict[str, Any] = None) -> Dict[str, Any]:
@@ -15,6 +16,11 @@ class OpenAIService:
         Applies claim_config strict limits (categories and restricted items).
         """
         try:
+            if not self.client:
+                return {
+                    "success": False,
+                    "error": "OpenAI API key is not configured. This service is unavailable."
+                }
             claim_config = claim_config or {}
             categories = claim_config.get('categories', [])
             restricted_items = claim_config.get('restricted_items', [])
@@ -155,6 +161,11 @@ class OpenAIService:
         Process natural language queries for reimbursement system
         """
         try:
+            if not self.client:
+                return {
+                    "success": False,
+                    "error": "OpenAI API key is not configured. This service is unavailable."
+                }
             context_str = json.dumps(context, indent=2) if context else "No additional context"
             
             prompt = f"""
@@ -220,6 +231,11 @@ class OpenAIService:
             Extracted raw text from the image
         """
         try:
+            if not self.client:
+                return {
+                    "success": False,
+                    "error": "OpenAI API key is not configured. Vision service is unavailable."
+                }
             response = self.client.chat.completions.create(
                 model="gpt-4o-mini",
                 messages=[
@@ -259,6 +275,11 @@ class OpenAIService:
         Generate SQL query from natural language
         """
         try:
+            if not self.client:
+                return {
+                    "success": False,
+                    "error": "OpenAI API key is not configured. SQL generation is unavailable."
+                }
             prompt = f"""
             Database Schema Information:
             {schema_info}

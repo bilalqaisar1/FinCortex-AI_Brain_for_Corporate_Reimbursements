@@ -79,20 +79,22 @@ class MLFeatureDTO(BaseModel):
 # ---------------------------------------------------------
 # PHASE 4 & 5: Circuit Breaker & Distributed State
 # ---------------------------------------------------------
+# GLOBAL SINGLETON MODEL (O(1) Memory Load)
+# ---------------------------------------------------------
+_GLOBAL_MODEL = None
+if catboost is not None:
+    try:
+        _GLOBAL_MODEL = catboost.CatBoostClassifier().load_model('models/reimbursement_scorer.cbm')
+    except Exception as e:
+        logger.warning(f"Failed to load CatBoost model globally. SOTA ML will gracefully fallback. Error: {e}")
+
 class RealTimeScoringPipeline:
     def __init__(self, supabase_client):
         # DI: Inject database client for testability
         self.supabase = supabase_client
         
-        # O(1) Memory load: No IO blocking during Inference
-        if catboost is not None:
-            try:
-                self.model = catboost.CatBoostClassifier().load_model('models/reimbursement_scorer.cbm')
-            except Exception as e:
-                logger.warning(f"Failed to load CatBoost model. SOTA ML will gracefully fallback. Error: {e}")
-                self.model = None
-        else:
-            self.model = None
+        # O(1) Memory load: Reuse globally loaded model (Singleton Pattern)
+        self.model = _GLOBAL_MODEL
 
     @tracer.start_as_current_span("ml_pipeline_execution")
     async def evaluate_fraud_risk(self, receipt_code: str, idempotency_key: str) -> Dict[str, Any]:

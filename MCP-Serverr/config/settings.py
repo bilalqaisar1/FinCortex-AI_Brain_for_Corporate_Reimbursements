@@ -18,7 +18,7 @@ class Settings(BaseSettings):
     GOOGLE_APPLICATION_CREDENTIALS: Optional[str] = None
     
     # OpenAI Configuration
-    OPENAI_API_KEY: str
+    OPENAI_API_KEY: Optional[str] = None
     OPENAI_MODEL: str = "gpt-4o-mini"
     
     # Database

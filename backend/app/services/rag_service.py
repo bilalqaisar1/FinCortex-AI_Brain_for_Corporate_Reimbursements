@@ -9,7 +9,7 @@ from app.config.settings import settings
 logger = logging.getLogger(__name__)
 
 # Initialize OpenAI Client
-client = OpenAI(api_key=settings.openai_api_key)
+client = OpenAI(api_key=settings.openai_api_key) if settings.openai_api_key else None
 
 # Initialize Database Engine
 DATABASE_URL = settings.database_url
@@ -71,6 +71,8 @@ class RAGService:
 
     def _generate_sql(self, message: str) -> str:
         """Uses OpenAI to convert text to SQL."""
+        if not client:
+            raise ValueError("OpenAI API key is not configured. SQL generation is unavailable.")
         try:
             response = client.chat.completions.create(
                 model=settings.openai_model,
@@ -171,6 +173,9 @@ class RAGService:
         if not data:
             return "I couldn't find any relevant data matching your request."
             
+        if not client:
+            return "I found the data, but cannot synthesize a response because the AI service is unavailable: " + str(data[:2])
+            
         try:
             # Summarize large datasets
             data_preview = str(data[:10]) 
@@ -191,6 +196,8 @@ class RAGService:
     # REVISED PRIMARY METHOD
     # REVISED PRIMARY METHOD
     def query(self, user_id: str, message: str, role: str, department_id: Optional[int] = None, company_id: Optional[str] = None) -> Dict[str, Any]:
+        if not client:
+            return {"response": "The AI service is currently unavailable as the API key is not configured.", "sources": []}
         
         # 1. Construct Role-Specific Prompt
         rbac_instruction = f"Context: User Role is '{role}'."

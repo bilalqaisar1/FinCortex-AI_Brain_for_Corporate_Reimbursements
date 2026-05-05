@@ -36,10 +36,12 @@ import {
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { RouteProtection } from "@/components/auth/RouteProtection";
 import { useAuth } from "@/context/AuthContext";
+import { useToastNotification } from "@/hooks/useToastNotification";
 import {
   fetchAdminStats,
   fetchPendingApprovals,
   fetchRecentActivity,
+  updateAdminThreshold,
   type AdminStats,
   type PendingApproval,
   type RecentActivity
@@ -102,6 +104,10 @@ export default function AdminDashboard() {
   const [error, setError] = useState<string | null>(null);
   const [companyName, setCompanyName] = useState<string>("Executive Console");
   const [auditApproval, setAuditApproval] = useState<PendingApproval | null>(null);
+  
+  const [threshold, setThreshold] = useState<number>(100);
+  const [isUpdatingThreshold, setIsUpdatingThreshold] = useState(false);
+  const { showToast } = useToastNotification();
 
   useEffect(() => {
     const loadData = async () => {
@@ -122,6 +128,9 @@ export default function AdminDashboard() {
         if (statsData?.company_name) {
           setCompanyName(statsData.company_name);
         }
+        if (statsData?.auto_claim_acceptance_threshold !== undefined) {
+          setThreshold(statsData.auto_claim_acceptance_threshold);
+        }
         setPendingApprovals(approvalsData || []);
         setRecentActivity(activityData || []);
       } catch (err) {
@@ -134,6 +143,20 @@ export default function AdminDashboard() {
 
     loadData();
   }, [userProfile?.user_id]);
+
+  const handleUpdateThreshold = async () => {
+    if (!userProfile?.user_id) return;
+    try {
+      setIsUpdatingThreshold(true);
+      await updateAdminThreshold(userProfile.user_id, threshold);
+      showToast("success", "Success", "Threshold updated successfully.");
+    } catch (err) {
+      console.error("Failed to update threshold", err);
+      showToast("error", "Error", "Failed to update threshold.");
+    } finally {
+      setIsUpdatingThreshold(false);
+    }
+  };
 
   // Map stats to card format
   const essentialStats = stats ? [
@@ -318,6 +341,41 @@ export default function AdminDashboard() {
                         </Card>
                       ))}
                     </div>
+                  </div>
+
+                  {/* ML Threshold Control */}
+                  <div className="flex flex-col gap-6">
+                    <h3 className="text-[10px] font-black text-[var(--text-muted)] uppercase tracking-[0.3em] px-2 text-center">AI Auto-Acceptance</h3>
+                    <Card className="border-[var(--border-subtle)] bg-[var(--card-dark)]">
+                      <CardContent className="p-8 flex flex-col gap-4">
+                        <div className="flex items-center justify-between">
+                          <div className="flex items-center gap-3">
+                            <Shield className="w-5 h-5 text-purple-500" />
+                            <div>
+                              <p className="text-sm font-black text-[var(--text-primary)] uppercase tracking-tight">Confidence Threshold</p>
+                              <p className="text-[10px] font-bold text-[var(--text-muted)] uppercase">Claims with true confidence {">="} threshold are auto-approved</p>
+                            </div>
+                          </div>
+                          <span className="text-2xl font-black text-purple-400">{threshold}%</span>
+                        </div>
+                        <div className="flex items-center gap-4 mt-2">
+                          <input 
+                            type="range" 
+                            min="0" max="100" 
+                            value={threshold} 
+                            onChange={(e) => setThreshold(Number(e.target.value))}
+                            className="flex-1 accent-purple-500"
+                          />
+                          <Button 
+                            onClick={handleUpdateThreshold} 
+                            disabled={isUpdatingThreshold}
+                            className="bg-purple-600 hover:bg-purple-700 text-white text-[10px] font-black uppercase tracking-widest"
+                          >
+                            {isUpdatingThreshold ? <Loader2 className="w-4 h-4 animate-spin" /> : "Save"}
+                          </Button>
+                        </div>
+                      </CardContent>
+                    </Card>
                   </div>
                 </div>
 

@@ -13,7 +13,7 @@ from datetime import datetime
 from typing import Any, Dict, List, Optional
 from uuid import UUID
 
-from fastapi import APIRouter, UploadFile, File, Form, HTTPException
+from fastapi import APIRouter, UploadFile, File, Form, HTTPException, BackgroundTasks
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel, Field, ValidationError
 
@@ -321,6 +321,7 @@ async def create_reimbursement_endpoint(
     ocr_raw_text: Optional[str] = Form(None),
     ocr_structured: Optional[str] = Form(None),  # JSON string
     receipt_file: UploadFile = File(...),
+    background_tasks: BackgroundTasks = BackgroundTasks(),
 ) -> Dict[str, Any]:
     """
     Persist reimbursement details, upload receipt to Supabase Storage,
@@ -530,6 +531,28 @@ async def create_reimbursement_endpoint(
         except Exception as cat_err:
             logger.warning(f"Could not enforce categories on submitted items: {cat_err}")
 
+    # --- NEW: Strict Duplicate Prevention ---
+    try:
+        duplicate_check = await fraud_detection_service.check_for_duplicates(
+            user_id=str(parsed_payload.user_id),
+            receipt_data={
+                "total_amount": parsed_payload.total_amount,
+                "vendor_name": parsed_payload.vendor_name,
+                "purchase_date": parsed_payload.expense_date
+            }
+        )
+        
+        # Block exact or near-exact duplicates immediately
+        if duplicate_check.is_duplicate and duplicate_check.similarity_score >= 0.95:
+            raise HTTPException(
+                status_code=400,
+                detail=f"Oops! It looks like you've already submitted a receipt from {parsed_payload.vendor_name} for {parsed_payload.total_amount}. We blocked this to prevent a duplicate charge."
+            )
+    except HTTPException:
+        raise
+    except Exception as dup_err:
+        logger.warning(f"Could not perform upfront duplicate check: {dup_err}")
+
     temp_dir = os.path.abspath(settings.temp_dir)
     os.makedirs(temp_dir, exist_ok=True)
     temp_filename = _generate_temp_filename(receipt_file.filename)
@@ -585,22 +608,65 @@ async def create_reimbursement_endpoint(
         
         reimbursement_id = reimbursement["reimbursement_id"]
 
-        # --- NEW: Policy Engine Checks ---
-        policy_flags = []
-        try:
-            policy_flags = await check_policy({
-                "category_id": parsed_payload.category_id,
-                "subcategory_id": parsed_payload.subcategory_id,
-                "user_id": str(parsed_payload.user_id),
-                "company_id": str(parsed_payload.company_id) if parsed_payload.company_id else None,
-                "department_id": parsed_payload.department_id,
-                "amount_claimed": parsed_payload.total_amount,
+        # --- NEW: PARALLEL EXECUTION (Optimization 4) ---
+        # Execute independent external DB/ML calls concurrently
+        import asyncio
+        from app.services.ml_prob_prediction_service import RealTimeScoringPipeline
+        
+        supabase = get_supabase_client()
+        ml_pipeline = RealTimeScoringPipeline(supabase_client=supabase)
+        idempotency_key = str(uuid.uuid4())
+        
+        policy_task = check_policy({
+            "category_id": parsed_payload.category_id,
+            "subcategory_id": parsed_payload.subcategory_id,
+            "user_id": str(parsed_payload.user_id),
+            "company_id": str(parsed_payload.company_id) if parsed_payload.company_id else None,
+            "department_id": parsed_payload.department_id,
+            "amount_claimed": parsed_payload.total_amount,
+            "vendor_name": parsed_payload.vendor_name,
+            "description": parsed_payload.description,
+            "items": [{"item_name": item.item} for item in parsed_payload.items]
+        })
+        
+        fraud_task = fraud_detection_service.check_for_fraud(
+            user_id=str(parsed_payload.user_id),
+            receipt_data={
+                "total_amount": parsed_payload.total_amount,
                 "vendor_name": parsed_payload.vendor_name,
-                "description": parsed_payload.description,
-                "items": [{"item_name": item.item} for item in parsed_payload.items]
-            })
+                "purchase_date": parsed_payload.expense_date
+            },
+            claim_amount=float(parsed_payload.total_amount)
+        )
+        
+        ml_task = ml_pipeline.evaluate_fraud_risk(
+            receipt_code=reimbursement["receipt_code"],
+            idempotency_key=idempotency_key
+        )
+        
+        # Wait for all independent tasks simultaneously
+        try:
+            results = await asyncio.gather(policy_task, fraud_task, ml_task, return_exceptions=True)
             
-            # --- NEW: Check Dynamic RPC Limit ---
+            # Unpack results with safe defaults
+            policy_flags = results[0] if not isinstance(results[0], Exception) else []
+            if isinstance(results[0], Exception):
+                logger.error(f"Policy engine execution failed in parallel: {results[0]}")
+                
+            fraud_result = results[1] if not isinstance(results[1], Exception) else None
+            if isinstance(results[1], Exception):
+                logger.error(f"Fraud detection failed in parallel: {results[1]}")
+                
+            ml_result = results[2] if not isinstance(results[2], Exception) else {"probability": -1.0}
+            if isinstance(results[2], Exception):
+                logger.error(f"ML prediction failed in parallel: {results[2]}")
+                
+        except Exception as parallel_exc:
+            logger.error(f"Parallel execution orchestrator failed: {parallel_exc}")
+            policy_flags, fraud_result, ml_result = [], None, {"probability": -1.0}
+
+        # --- Post-Parallel Process: Dynamic RPC Limit Check ---
+        try:
             from app.services.supabase_rpc_service import check_reimbursement_limit
             from fastapi import HTTPException
             
@@ -622,73 +688,40 @@ async def create_reimbursement_endpoint(
                     try:
                         claimed_amt = float(parsed_payload.total_amount)
                         if claimed_amt > float(allowed_amount):
-                            # Strict UX Enforcement: Raise empathetic client-friendly error for frontend Toast
                             raise HTTPException(
                                 status_code=400,
                                 detail=f"It looks like this claim exceeds your remaining budget of {float(allowed_amount):,.2f}. Could you please review the total or coordinate with your manager?"
                             )
                         elif status == 'restricted':
-                            raise HTTPException(
-                                status_code=400,
-                                detail="Your reimbursement limit is restricted. Please coordinate with your manager."
-                            )
+                            raise HTTPException(status_code=400, detail="Your reimbursement limit is restricted. Please coordinate with your manager.")
                     except (ValueError, TypeError):
                         if status == 'restricted':
-                            raise HTTPException(
-                                status_code=400,
-                                detail="Your reimbursement limit is restricted. Please coordinate with your manager."
-                            )
-            
-            if policy_flags:
-                logger.info(f"🚩 Policy flags detected for claim {reimbursement_id}: {policy_flags}")
-            
-            # Merge manual item classification flags
-            if manual_item_flags:
-                policy_flags.extend(manual_item_flags)
-                logger.info(f"🚩 Manual item flags added for claim {reimbursement_id}: {manual_item_flags}")
-            
-            if policy_flags:
-                # 1. Update reimbursements.flags JSONB column (for quick reads)
-                try:
-                    supabase = get_supabase_client()
-                    supabase.table("reimbursements").update({
-                        "flags": policy_flags
-                    }).eq("reimbursement_id", reimbursement_id).execute()
-                except Exception as p_err:
-                    logger.warning(f"Failed to save policy flags to DB: {p_err}")
+                            raise HTTPException(status_code=400, detail="Your reimbursement limit is restricted. Please coordinate with your manager.")
+        except HTTPException:
+            raise
+        except Exception as limit_exc:
+            logger.error(f"Limit check failed post-parallel: {limit_exc}")
 
-                # 2. Persist violations to policy_violations table (for admin reporting)
-                try:
-                    supabase = get_supabase_client()
-                    await save_policy_violations(reimbursement_id, policy_flags, supabase)
-                except Exception as pv_err:
-                    logger.warning(f"Failed to save to policy_violations table: {pv_err}")
-        except Exception as policy_exc:
-            logger.error(f"Policy engine execution failed: {policy_exc}")
-
-        # --- NEW: Fraud Detection (User Story 3.2, 2.2.2) ---
-        try:
-            fraud_result = await fraud_detection_service.check_for_fraud(
-                user_id=str(parsed_payload.user_id),
-                receipt_data={
-                    "total_amount": parsed_payload.total_amount,
-                    "vendor_name": parsed_payload.vendor_name,
-                    "purchase_date": parsed_payload.expense_date
-                },
-                claim_amount=float(parsed_payload.total_amount)
-            )
+        # --- Post-Parallel Process: Policy Flags Saving ---
+        if manual_item_flags:
+            policy_flags.extend(manual_item_flags)
             
-            if fraud_result.is_suspicious:
-                logger.warning(f"🚩 Claim {reimbursement_id} flagged as suspicious: {fraud_result.flags}")
+        if policy_flags:
+            try:
+                supabase.table("reimbursements").update({"flags": policy_flags}).eq("reimbursement_id", reimbursement_id).execute()
+                await save_policy_violations(reimbursement_id, policy_flags, supabase)
+            except Exception as db_exc:
+                logger.warning(f"Failed to save policy flags to DB: {db_exc}")
+
+        # --- Post-Parallel Process: Fraud Flags Saving ---
+        if fraud_result and fraud_result.is_suspicious:
+            try:
                 await fraud_detection_service.flag_suspicious_claim(
                     reimbursement_id=reimbursement_id,
                     flags=fraud_result.flags,
                     risk_score=fraud_result.risk_score,
                     details=fraud_result.details
                 )
-                
-                # Create in-app notification for admin/manager about flagged claim
-                supabase = get_supabase_client()
                 if submission.manager_id:
                     supabase.table("in_app_notifications").insert({
                         "user_id": str(submission.manager_id),
@@ -698,58 +731,76 @@ async def create_reimbursement_endpoint(
                         "category": "claim",
                         "related_id": reimbursement_id
                     }).execute()
-        except Exception as fraud_exc:
-            logger.error(f"Fraud detection integration failed: {fraud_exc}")
+            except Exception as fraud_exc:
+                logger.error(f"Failed to save fraud flags: {fraud_exc}")
 
-        # --- NEW: ML Probability Prediction Service ---
-        ml_score = None
-        try:
-            from app.services.ml_prob_prediction_service import RealTimeScoringPipeline
-            supabase = get_supabase_client()
-            ml_pipeline = RealTimeScoringPipeline(supabase_client=supabase)
-            idempotency_key = str(uuid.uuid4())
-            
-            ml_result = await ml_pipeline.evaluate_fraud_risk(
-                receipt_code=reimbursement["receipt_code"],
-                idempotency_key=idempotency_key
-            )
-            
-            ml_score = ml_result.get("probability", -1.0)
-            
-            # Save it to the DB
-            supabase.table("reimbursements").update({
-                "ml_model_confidence_score": ml_score
-            }).eq("reimbursement_id", reimbursement_id).execute()
-            
-        except Exception as ml_exc:
-            logger.error(f"ML probability prediction failed: {ml_exc}")
-
-        # --- NEW: Email Notification (User Story 5.1) ---
-        try:
-            # Fetch user email for notification
-            supabase = get_supabase_client()
-            user_resp = supabase.table("users").select("full_name, email").eq("user_id", str(parsed_payload.user_id)).single().execute()
-            if user_resp.data:
-                user_data = user_resp.data
-                await email_service.notify_claim_submitted(
-                    to_email=user_data["email"],
-                    user_name=user_data["full_name"],
-                    receipt_code=reimbursement["receipt_code"],
-                    amount=parsed_payload.total_amount,
-                    category=str(parsed_payload.category_id)
-                )
+        # --- Post-Parallel Process: ML Auto-Approval Logic ---
+        ml_score = ml_result.get("probability", -1.0)
+        auto_approved = False
+        
+        # Calculate True Confidence (100% - Fraud Probability%)
+        # This is what gets displayed in the frontend UI
+        confidence_percent = (1.0 - ml_score) * 100 if ml_score >= 0 else -1.0
+        
+        update_data = {"ml_model_confidence_score": confidence_percent}
+        
+        if parsed_payload.admin_id and ml_score >= 0:
+            try:
+                admin_resp = supabase.table("admins").select("auto_claim_acceptance_threshold").eq("admin_id", str(parsed_payload.admin_id)).single().execute()
+                threshold_val = admin_resp.data.get("auto_claim_acceptance_threshold", 100) if admin_resp.data else 100
                 
-                # Also create in-app notification for user
-                supabase.table("in_app_notifications").insert({
-                    "user_id": str(parsed_payload.user_id),
-                    "title": "🧾 Claim Submitted",
-                    "message": f"Your claim for ${parsed_payload.total_amount} at {parsed_payload.vendor_name} has been submitted.",
-                    "type": "success",
-                    "category": "claim",
-                    "related_id": reimbursement_id
-                }).execute()
-        except Exception as email_exc:
-            logger.error(f"Notification integration failed: {email_exc}")
+                is_suspicious = fraud_result.is_suspicious if fraud_result else False
+                
+                if confidence_percent >= threshold_val and not is_suspicious and not policy_flags:
+                    update_data["status"] = "approved"
+                    update_data["reviewed_at"] = "now()"
+                    update_data["amount_approved"] = parsed_payload.total_amount
+                    auto_approved = True
+            except Exception as auth_exc:
+                logger.error(f"Failed auto-approval threshold evaluation: {auth_exc}")
+        
+        try:
+            supabase.table("reimbursements").update(update_data).eq("reimbursement_id", reimbursement_id).execute()
+        except Exception as db_update_exc:
+            logger.error(f"Failed to update ML score in DB: {db_update_exc}")
+
+        # --- NEW: Email Notification (User Story 5.1) - Background Optimized ---
+        async def send_notifications_background(user_id: str, vendor_name: str, total_amount: str, receipt_code_str: str, category_id: str, reimb_id: str):
+            try:
+                # Fetch user email for notification
+                supa = get_supabase_client()
+                user_res = supa.table("users").select("full_name, email").eq("user_id", user_id).single().execute()
+                if user_res.data:
+                    u_data = user_res.data
+                    await email_service.notify_claim_submitted(
+                        to_email=u_data["email"],
+                        user_name=u_data["full_name"],
+                        receipt_code=receipt_code_str,
+                        amount=total_amount,
+                        category=category_id
+                    )
+                    
+                    # Also create in-app notification for user
+                    supa.table("in_app_notifications").insert({
+                        "user_id": user_id,
+                        "title": "🧾 Claim Submitted",
+                        "message": f"Your claim for ${total_amount} at {vendor_name} has been submitted.",
+                        "type": "success",
+                        "category": "claim",
+                        "related_id": reimb_id
+                    }).execute()
+            except Exception as email_exc:
+                logger.error(f"Background notification integration failed: {email_exc}")
+        
+        background_tasks.add_task(
+            send_notifications_background,
+            str(parsed_payload.user_id),
+            parsed_payload.vendor_name,
+            parsed_payload.total_amount,
+            reimbursement["receipt_code"],
+            str(parsed_payload.category_id),
+            reimbursement_id
+        )
 
         # Auto-upload compressed copy to storage bucket (test mode)
         attachment_upload = None

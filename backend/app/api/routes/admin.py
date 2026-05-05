@@ -6,7 +6,7 @@ import logging
 from typing import Any, Dict, List, Optional
 from datetime import datetime, timedelta
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, Body
 
 from app.services.supabase_service import get_supabase_client
 
@@ -46,7 +46,11 @@ async def get_admin_stats(admin_id: Optional[str] = None) -> Dict[str, Any]:
             company_id = comp_resp.data[0].get("company_id")
             company_name = comp_resp.data[0].get("company_name", "Your Company")
             logger.info(f"Resolved company_id: {company_id}, company_name: {company_name}")
-        else:
+            
+        admin_resp = supabase.table("admins").select("auto_claim_acceptance_threshold").eq("admin_id", admin_id).single().execute()
+        threshold_val = admin_resp.data.get("auto_claim_acceptance_threshold", 100) if admin_resp.data else 100
+        
+        if not company_id:
             # Check users table as fallback
             user_resp = supabase.table("users").select("company_id").eq("user_id", admin_id).execute()
             if user_resp.data and len(user_resp.data) > 0:
@@ -188,6 +192,7 @@ async def get_admin_stats(admin_id: Optional[str] = None) -> Dict[str, Any]:
             "success": True,
             "data": {
                 "company_name": company_name,
+                "auto_claim_acceptance_threshold": threshold_val,
                 "total_claims": {
                     "value": this_month_count,
                     "change": change_str,
@@ -715,3 +720,16 @@ def _get_empty_stats_data(company_name: str = "New Account") -> Dict[str, Any]:
         "budget_utilization": {"value": 0, "change": "0%", "description": "New account"},
         "policy_violations": {"value": 0, "change": "0 resolved", "description": "This week"}
     }
+
+
+@router.put("/admin/threshold")
+async def update_admin_threshold(admin_id: str = Body(...), threshold: float = Body(...)) -> Dict[str, Any]:
+    """Update auto-claim acceptance threshold."""
+    logger.info(f"📥 PUT /admin/threshold (admin_id: {admin_id}, threshold: {threshold})")
+    try:
+        supabase = get_supabase_client()
+        supabase.table("admins").update({"auto_claim_acceptance_threshold": threshold}).eq("admin_id", admin_id).execute()
+        return {"success": True}
+    except Exception as e:
+        logger.error(f"Error updating admin threshold: {e}")
+        raise HTTPException(status_code=500, detail=str(e))

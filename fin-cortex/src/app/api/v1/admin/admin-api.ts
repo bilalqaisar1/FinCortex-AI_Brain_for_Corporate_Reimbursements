@@ -2,6 +2,7 @@ import { BACKEND_URL } from '@/lib/config';
 
 export interface AdminStats {
     company_name?: string;
+    auto_claim_acceptance_threshold?: number;
     total_claims: {
         value: number;
         change: string;
@@ -77,4 +78,16 @@ export async function fetchRecentActivity(adminId?: string): Promise<RecentActiv
     }
     const result = await response.json();
     return result.data || [];
+}
+
+export async function updateAdminThreshold(adminId: string, threshold: number): Promise<void> {
+    const url = new URL(`${BACKEND_URL}/api/v1/admin/threshold`);
+    const response = await fetch(url.toString(), {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ admin_id: adminId, threshold })
+    });
+    if (!response.ok) {
+        throw new Error('Failed to update threshold');
+    }
 }
