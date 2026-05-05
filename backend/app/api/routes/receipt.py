@@ -825,7 +825,8 @@ async def create_reimbursement_endpoint(
                 "attachment_url": storage_result.public_url,
                 "auto_upload": attachment_upload,
                 "policy_flags": policy_flags,
-                "ml_model_confidence_score": ml_score
+
+                "ml_model_confidence_score": confidence_percent
             },
         }
         logger.info("✅ POST /reimbursements - Reimbursement created successfully: reimbursement_id=%s, receipt_code='%s'", 

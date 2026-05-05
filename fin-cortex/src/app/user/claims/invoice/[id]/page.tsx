@@ -183,7 +183,7 @@ export default function InvoicePage() {
                                 <div className="ml-11 flex items-center gap-2">
                                     <div className="px-2.5 py-1 rounded-md bg-emerald-500/20 border border-emerald-500/30">
                                         <p className="text-xs font-medium text-emerald-500">
-                                            FinCortex AI Trust Score: {(invoiceData.ml_model_confidence_score * 100).toFixed(1)}%
+                                            FinCortex AI Trust Score: {(invoiceData.ml_model_confidence_score).toFixed(1)}%
                                         </p>
                                     </div>
                                 </div>
