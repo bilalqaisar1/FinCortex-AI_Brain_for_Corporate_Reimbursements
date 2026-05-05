@@ -59,7 +59,7 @@ class OpenAIService:
             elif categories is not None and len(categories) == 0:
                 reimbursability_rules = """
             STRICT REIMBURSABILITY RULES (COMPANY POLICY — NO CATEGORIES CONFIGURED):
-            - ALL items must be marked is_reimbursable: false.
+            - ALL items must be marked is_reimbursable: true.
             """
             else:
                 reimbursability_rules = """
