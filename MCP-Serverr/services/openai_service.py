@@ -48,9 +48,10 @@ class OpenAIService:
             if has_admin_categories and categories_str != "No specific categories provided. Infer standard business categories.":
                 reimbursability_rules = f"""
             STRICT REIMBURSABILITY RULES (COMPANY POLICY — THESE ARE ABSOLUTE):
-            - The ALLOWED CATEGORIES list below is the COMPLETE, EXHAUSTIVE list of reimbursable categories.
+            - The ALLOWED CATEGORIES list below is the primary guide. Reimbursability should be determined by the OVERALL CATEGORY, not just a specific subcategory.
+            - If an item logically falls under an ALLOWED CATEGORY (e.g., if 'Medical' is allowed, all medical/pharmacy items are reimbursable), mark it is_reimbursable: true.
             - If RESTRICTED ITEMS are defined, any item matching them MUST be marked is_reimbursable: false.
-            - If an item does not fit any allowed category, it MUST be marked is_reimbursable: false. No exceptions.
+            - Only if an item truly does not fit any allowed category should it be marked is_reimbursable: false.
             
             RESTRICTED ITEMS: {restricted_items_str}
             ALLOWED CATEGORIES:
@@ -59,12 +60,14 @@ class OpenAIService:
             elif categories is not None and len(categories) == 0:
                 reimbursability_rules = """
             STRICT REIMBURSABILITY RULES (COMPANY POLICY — NO CATEGORIES CONFIGURED):
-            - ALL items must be marked is_reimbursable: false.
+            - ALL items must be marked is_reimbursable: true.
             """
             else:
                 reimbursability_rules = """
             REIMBURSABILITY RULES (DEFAULT):
-            - Mark is_reimbursable: false for alcohol, tobacco, personal entertainment.
+            - Reimbursability is determined by the overall category. 
+            - Medical expenses, business supplies, and travel-related costs are generally reimbursable.
+            - Mark is_reimbursable: false ONLY for alcohol, tobacco, and personal entertainment.
             - All other items default to is_reimbursable: true.
             """
 
